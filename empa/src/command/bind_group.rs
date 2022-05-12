@@ -1,0 +1,47 @@
+use crate::resource_binding::{
+    BindGroup, EntryDestroyer, TypedBindGroupLayout, TypedPipelineLayout,
+};
+use std::any::Any;
+use std::sync::Arc;
+use web_sys::GpuBindGroup;
+
+pub struct BindGroupEncoding {
+    pub(crate) bind_group: GpuBindGroup,
+    pub(crate) id: usize,
+    pub(crate) _resource_destroyers: Arc<Vec<EntryDestroyer>>,
+}
+
+mod bind_groups_seal {
+    pub trait Seal {}
+}
+
+pub trait BindGroups: bind_groups_seal::Seal {
+    type Layout: TypedPipelineLayout;
+
+    type Encodings: Iterator<Item = BindGroupEncoding>;
+
+    fn encodings(&self) -> Self::Encodings;
+}
+
+macro_rules! impl_bind_groups {
+    ($n:literal, $($B:ident),*) => {
+        impl<'a, $($B),*> bind_groups_seal::Seal for ($(&'a BindGroup<$B>),*) where $($B: TypedBindGroupLayout),* {}
+        impl<'a, $($B),*> BindGroups for ($(&'a BindGroup<$B>),*) where $($B: TypedBindGroupLayout),* {
+            type Layout = ($($B,)*);
+
+            type Encodings = <[BindGroupEncoding; $n] as IntoIterator>::IntoIter;
+
+            fn encodings(&self) -> Self::Encodings {
+                #[allow(non_snake_case)]
+                let ($($B),*) = self;
+
+                [$($B.to_encoding()),*].into_iter()
+            }
+        }
+    }
+}
+
+impl_bind_groups!(1, B0);
+impl_bind_groups!(2, B0, B1);
+impl_bind_groups!(3, B0, B1, B2);
+impl_bind_groups!(4, B0, B1, B2, B3);
