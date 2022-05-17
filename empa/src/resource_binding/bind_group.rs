@@ -26,7 +26,8 @@ use std::marker;
 use std::sync::Arc;
 use wasm_bindgen::JsValue;
 use web_sys::{
-    GpuBindGroup, GpuBindGroupDescriptor, GpuBuffer, GpuBufferBinding, GpuSampler, GpuTextureView,
+    GpuBindGroup, GpuBindGroupDescriptor, GpuBindGroupEntry, GpuBuffer, GpuBufferBinding,
+    GpuSampler, GpuTextureView,
 };
 
 pub(crate) enum EntryDestroyer {
@@ -53,8 +54,10 @@ where
         let entries = js_sys::Array::new();
         let mut resource_destroyers = Vec::new();
 
-        for entry in resources.to_entries() {
-            entries.push(entry.as_web_sys().as_ref());
+        for (binding, entry) in resources.to_entries().enumerate() {
+            let web_sys_entry = GpuBindGroupEntry::new(binding as u32, entry.as_web_sys().as_ref());
+
+            entries.push(web_sys_entry.as_ref());
 
             if let Some(destroyer) = entry.entry_destroyer() {
                 resource_destroyers.push(destroyer);

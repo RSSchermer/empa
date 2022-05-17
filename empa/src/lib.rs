@@ -1,7 +1,11 @@
 #![feature(const_mut_refs, generic_associated_types, new_uninit)]
+#![feature(once_cell)]
 
-pub use empa_reflect::abi;
+mod compare_function;
+pub use self::compare_function::CompareFunction;
 
+pub mod abi;
+pub mod adapter;
 pub mod buffer;
 pub mod command;
 pub mod compute_pipeline;
@@ -16,8 +20,8 @@ pub mod shader_module;
 pub mod texture;
 pub mod type_flag;
 
-mod compare_function;
-pub use self::compare_function::CompareFunction;
-
 #[doc(hidden)]
 pub struct Untyped {}
+
+#[doc(hidden)]
+pub use memoffset::offset_of;

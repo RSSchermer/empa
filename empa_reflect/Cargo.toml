@@ -2,4 +2,12 @@
 name = "empa-reflect"
 version = "0.1.0"
 edition = "2021"
+description = "Procedural macros for the empa crate."
+authors = ["Roland Schermer <roland0507@gmail.com>"]
+homepage = "https://github.com/RSSchermer/empa"
+repository = "https://github.com/RSSchermer/empa"
+license = "MIT"
 
+[dependencies.naga]
+version = "0.8.5"
+features = ["wgsl-in"]

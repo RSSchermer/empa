@@ -2,48 +2,61 @@ use crate::render_pipeline::{
     PipelineConstantIdentifier, PipelineConstantValue, PipelineConstants,
 };
 use crate::resource_binding::{BindGroupLayoutEntry, BindingType};
+use empa_reflect::ShaderSource as DynamicShaderSource;
 use std::sync::Arc;
 use web_sys::GpuShaderModule;
 
+/// Internal type for `shader_source` macro.
+#[doc(hidden)]
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub struct PipelineConstantDescriptor {
-    pub identifier: PipelineConstantIdentifier,
-    pub constant_type: PipelineConstantType,
+pub struct StaticConstantDescriptor {
+    pub identifier: PipelineConstantIdentifier<'static>,
+    pub constant_type: StaticConstantType,
     pub required: bool,
 }
 
+/// Internal type for `shader_source` macro.
+#[doc(hidden)]
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub enum PipelineConstantType {
+pub enum StaticConstantType {
     Float,
     Bool,
     SignedInteger,
     UnsignedInteger,
 }
 
+/// Internal type for `shader_source` macro.
+#[doc(hidden)]
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub enum ShaderStage {
+pub enum StaticShaderStage {
     Vertex,
     Fragment,
     Compute,
 }
 
+/// Internal type for `shader_source` macro.
+#[doc(hidden)]
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub struct ShaderResourceBinding {
+pub struct StaticResourceBinding {
     pub group: u32,
     pub binding: u32,
     pub binding_type: BindingType,
 }
 
+/// Internal type for `shader_source` macro.
+#[doc(hidden)]
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub struct ShaderEntryPointBinding {
+pub struct StaticEntryPointBinding {
     pub location: u32,
-    pub binding_type: ShaderEntryPointBindingType,
-    pub interpolation: Option<ShaderEntryPointBindingInterpolation>,
-    pub sampling: Option<ShaderEntryPointBindingSampling>,
+    pub binding_type: StaticEntryPointBindingType,
+    pub interpolation: Option<StaticInterpolation>,
+    pub sampling: Option<StaticSampling>,
 }
 
+/// Internal type for `shader_source` macro.
+#[doc(hidden)]
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub enum ShaderEntryPointBindingType {
+pub enum StaticEntryPointBindingType {
     SignedInteger,
     SignedIntegerVector2,
     SignedIntegerVector3,
@@ -62,104 +75,117 @@ pub enum ShaderEntryPointBindingType {
     HalfFloatVector4,
 }
 
-impl ShaderEntryPointBindingType {
+impl StaticEntryPointBindingType {
     pub(crate) fn is_float(&self) -> bool {
         match self {
-            ShaderEntryPointBindingType::Float
-            | ShaderEntryPointBindingType::FloatVector2
-            | ShaderEntryPointBindingType::FloatVector3
-            | ShaderEntryPointBindingType::FloatVector4 => true,
+            StaticEntryPointBindingType::Float
+            | StaticEntryPointBindingType::FloatVector2
+            | StaticEntryPointBindingType::FloatVector3
+            | StaticEntryPointBindingType::FloatVector4 => true,
             _ => false,
         }
     }
 
     pub(crate) fn is_half_float(&self) -> bool {
         match self {
-            ShaderEntryPointBindingType::HalfFloat
-            | ShaderEntryPointBindingType::HalfFloatVector2
-            | ShaderEntryPointBindingType::HalfFloatVector3
-            | ShaderEntryPointBindingType::HalfFloatVector4 => true,
+            StaticEntryPointBindingType::HalfFloat
+            | StaticEntryPointBindingType::HalfFloatVector2
+            | StaticEntryPointBindingType::HalfFloatVector3
+            | StaticEntryPointBindingType::HalfFloatVector4 => true,
             _ => false,
         }
     }
 
     pub(crate) fn is_signed_integer(&self) -> bool {
         match self {
-            ShaderEntryPointBindingType::SignedInteger
-            | ShaderEntryPointBindingType::SignedIntegerVector2
-            | ShaderEntryPointBindingType::SignedIntegerVector3
-            | ShaderEntryPointBindingType::SignedIntegerVector4 => true,
+            StaticEntryPointBindingType::SignedInteger
+            | StaticEntryPointBindingType::SignedIntegerVector2
+            | StaticEntryPointBindingType::SignedIntegerVector3
+            | StaticEntryPointBindingType::SignedIntegerVector4 => true,
             _ => false,
         }
     }
 
     pub(crate) fn is_unsigned_integer(&self) -> bool {
         match self {
-            ShaderEntryPointBindingType::UnsignedInteger
-            | ShaderEntryPointBindingType::UnsignedIntegerVector2
-            | ShaderEntryPointBindingType::UnsignedIntegerVector3
-            | ShaderEntryPointBindingType::UnsignedIntegerVector4 => true,
+            StaticEntryPointBindingType::UnsignedInteger
+            | StaticEntryPointBindingType::UnsignedIntegerVector2
+            | StaticEntryPointBindingType::UnsignedIntegerVector3
+            | StaticEntryPointBindingType::UnsignedIntegerVector4 => true,
             _ => false,
         }
     }
 }
 
+/// Internal type for `shader_source` macro.
+#[doc(hidden)]
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub enum ShaderEntryPointBindingInterpolation {
+pub enum StaticInterpolation {
     Perspective,
     Linear,
     Flat,
 }
 
+/// Internal type for `shader_source` macro.
+#[doc(hidden)]
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub enum ShaderEntryPointBindingSampling {
+pub enum StaticSampling {
     Center,
     Centroid,
     Sample,
 }
 
+/// Internal type for `shader_source` macro.
+#[doc(hidden)]
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub struct PreprocessedShaderSource {
+pub struct StaticShaderSource {
     pub source: &'static str,
-    pub resource_bindings: &'static [ShaderResourceBinding],
-    pub constants: &'static [PipelineConstantDescriptor],
-    pub entry_points: &'static [ShaderEntryPoint],
+    pub resource_bindings: &'static [StaticResourceBinding],
+    pub constants: &'static [StaticConstantDescriptor],
+    pub entry_points: &'static [StaticEntryPoint],
 }
 
+/// Internal type for `shader_source` macro.
+#[doc(hidden)]
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub struct ShaderEntryPoint {
+pub struct StaticEntryPoint {
     pub name: &'static str,
-    pub stage: ShaderStage,
-    pub input_bindings: &'static [ShaderEntryPointBinding],
-    pub output_bindings: &'static [ShaderEntryPointBinding],
+    pub stage: StaticShaderStage,
+    pub input_bindings: &'static [StaticEntryPointBinding],
+    pub output_bindings: &'static [StaticEntryPointBinding],
 }
 
-pub(crate) enum ShaderMeta {
-    Preprocessed(PreprocessedShaderSource),
+pub(crate) enum ShaderSourceInternal {
+    Static(StaticShaderSource),
+    Dynamic(DynamicShaderSource),
 }
 
-impl ShaderMeta {
+impl ShaderSourceInternal {
     pub(crate) fn source(&self) -> &str {
         match self {
-            ShaderMeta::Preprocessed(source) => source.source,
+            ShaderSourceInternal::Static(source) => source.source,
+            ShaderSourceInternal::Dynamic(source) => source.raw_str(),
         }
     }
 
-    pub(crate) fn resource_bindings(&self) -> &[ShaderResourceBinding] {
+    pub(crate) fn resource_bindings(&self) -> &[StaticResourceBinding] {
         match self {
-            ShaderMeta::Preprocessed(source) => source.resource_bindings,
+            ShaderSourceInternal::Static(source) => source.resource_bindings,
+            ShaderSourceInternal::Dynamic(_) => todo!(),
         }
     }
 
-    pub(crate) fn constants(&self) -> &[PipelineConstantDescriptor] {
+    pub(crate) fn constants(&self) -> &[StaticConstantDescriptor] {
         match self {
-            ShaderMeta::Preprocessed(source) => source.constants,
+            ShaderSourceInternal::Static(source) => source.constants,
+            ShaderSourceInternal::Dynamic(_) => todo!(),
         }
     }
 
-    pub(crate) fn entry_points(&self) -> &[ShaderEntryPoint] {
+    pub(crate) fn entry_points(&self) -> &[StaticEntryPoint] {
         match self {
-            ShaderMeta::Preprocessed(source) => source.entry_points,
+            ShaderSourceInternal::Static(source) => source.entry_points,
+            ShaderSourceInternal::Dynamic(_) => todo!(),
         }
     }
 
@@ -195,7 +221,21 @@ impl ShaderMeta {
     }
 }
 
+pub struct ShaderSource {
+    inner: ShaderSourceInternal,
+}
+
+impl ShaderSource {
+    /// Internal function for `shader_source` macro.
+    #[doc(hidden)]
+    pub fn from_static(shader_source: StaticShaderSource) -> Self {
+        ShaderSource {
+            inner: ShaderSourceInternal::Static(shader_source),
+        }
+    }
+}
+
 pub struct ShaderModule {
     pub(crate) inner: GpuShaderModule,
-    pub(crate) meta: Arc<ShaderMeta>,
+    pub(crate) meta: Arc<ShaderSourceInternal>,
 }

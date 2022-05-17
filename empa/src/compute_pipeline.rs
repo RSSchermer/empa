@@ -2,7 +2,7 @@ use crate::device::Device;
 use crate::device::ID_GEN;
 use crate::pipeline_constants::PipelineConstants;
 use crate::resource_binding::{PipelineLayout, ShaderStages, TypedPipelineLayout};
-use crate::shader_module::{ShaderMeta, ShaderModule, ShaderStage};
+use crate::shader_module::{ShaderModule, ShaderSourceInternal, StaticShaderStage};
 use atomic_counter::AtomicCounter;
 use std::marker;
 use std::sync::Arc;
@@ -117,13 +117,13 @@ impl<Layout: TypedPipelineLayout> ComputePipelineDescriptorBuilder<PipelineLayou
 
 pub struct ComputeStage {
     pub(crate) inner: GpuProgrammableStage,
-    pub(crate) shader_meta: Arc<ShaderMeta>,
+    pub(crate) shader_meta: Arc<ShaderSourceInternal>,
     entry_index: usize,
 }
 
 pub struct ComputeStageBuilder {
     inner: GpuProgrammableStage,
-    shader_meta: Arc<ShaderMeta>,
+    shader_meta: Arc<ShaderSourceInternal>,
     entry_index: usize,
     has_constants: bool,
 }
@@ -141,7 +141,7 @@ impl ComputeStageBuilder {
             .expect("could not find entry point in shader module");
 
         assert!(
-            entry.stage == ShaderStage::Compute,
+            entry.stage == StaticShaderStage::Compute,
             "entry point is not a compute stage"
         );
 

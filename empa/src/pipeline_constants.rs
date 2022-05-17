@@ -1,14 +1,14 @@
-use crate::render_pipeline::PipelineConstantType;
+use crate::render_pipeline::StaticConstantType;
 use std::{fmt, iter, slice};
 use wasm_bindgen::JsValue;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub enum PipelineConstantIdentifier {
+pub enum PipelineConstantIdentifier<'a> {
     Number(u32),
-    Name(&'static str),
+    Name(&'a str),
 }
 
-impl PipelineConstantIdentifier {
+impl PipelineConstantIdentifier<'_> {
     pub(crate) fn to_js_value(&self) -> wasm_bindgen::JsValue {
         match self {
             PipelineConstantIdentifier::Number(n) => JsValue::from(*n),
@@ -17,7 +17,7 @@ impl PipelineConstantIdentifier {
     }
 }
 
-impl fmt::Display for PipelineConstantIdentifier {
+impl fmt::Display for PipelineConstantIdentifier<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             PipelineConstantIdentifier::Number(n) => n.fmt(f),
@@ -35,12 +35,12 @@ pub enum PipelineConstantValue {
 }
 
 impl PipelineConstantValue {
-    pub(crate) fn constant_type(&self) -> PipelineConstantType {
+    pub(crate) fn constant_type(&self) -> StaticConstantType {
         match self {
-            PipelineConstantValue::Bool(_) => PipelineConstantType::Bool,
-            PipelineConstantValue::Float(_) => PipelineConstantType::Float,
-            PipelineConstantValue::SignedInteger(_) => PipelineConstantType::SignedInteger,
-            PipelineConstantValue::UnsignedInteger(_) => PipelineConstantType::UnsignedInteger,
+            PipelineConstantValue::Bool(_) => StaticConstantType::Bool,
+            PipelineConstantValue::Float(_) => StaticConstantType::Float,
+            PipelineConstantValue::SignedInteger(_) => StaticConstantType::SignedInteger,
+            PipelineConstantValue::UnsignedInteger(_) => StaticConstantType::UnsignedInteger,
         }
     }
 

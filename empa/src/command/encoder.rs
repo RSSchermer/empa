@@ -4,6 +4,7 @@ use crate::command::{
     VertexBuffers,
 };
 use crate::compute_pipeline::ComputePipeline;
+use crate::device::Device;
 use crate::query::OcclusionQuerySet;
 use crate::render_pipeline::{
     IndexData, PipelineIndexFormat, PipelineIndexFormatCompatible, RenderPipeline,
@@ -22,7 +23,6 @@ use web_sys::{
     GpuBuffer, GpuColorDict, GpuCommandBuffer, GpuCommandEncoder, GpuComputePassEncoder,
     GpuExtent3dDict, GpuRenderPassDescriptor, GpuRenderPassEncoder,
 };
-use crate::device::Device;
 
 enum ResourceDestroyer {
     Buffer(Arc<BufferDestroyer>),
@@ -68,7 +68,7 @@ impl CommandEncoder {
     pub(crate) fn new(device: &Device) -> Self {
         CommandEncoder {
             inner: device.inner.create_command_encoder(),
-            _resource_destroyers: Vec::new()
+            _resource_destroyers: Vec::new(),
         }
     }
 
@@ -405,7 +405,7 @@ impl CommandEncoder {
             command_encoder: self,
             current_pipeline_id: None,
             current_bind_group_ids: [None; 4],
-            _marker: Default::default()
+            _marker: Default::default(),
         }
     }
 

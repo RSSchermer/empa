@@ -2,6 +2,11 @@
 name = "empa"
 version = "0.1.0"
 edition = "2021"
+description = "Typed interaction with the GPU implemented against the WebGPU spec."
+authors = ["Roland Schermer <roland0507@gmail.com>"]
+homepage = "https://github.com/RSSchermer/empa"
+repository = "https://github.com/RSSchermer/empa"
+license = "MIT"
 
 [dependencies]
 atomic-counter = "1.0.1"
@@ -13,12 +18,19 @@ js-sys = "0.3.57"
 wasm-bindgen = "0.2.80"
 wasm-bindgen-futures = "0.4.30"
 
+[dependencies.memoffset]
+version = "0.6"
+features = ["unstable_const"]
+
 [dependencies.web-sys]
 version = "0.3.57"
 features = [
+    "DomException",
+    "GpuAdapter",
     "GpuAddressMode",
     "GpuBindGroup",
     "GpuBindGroupDescriptor",
+    "GpuBindGroupEntry",
     "GpuBindGroupLayout",
     "GpuBindGroupLayoutDescriptor",
     "GpuBindGroupLayoutEntry",
@@ -42,6 +54,7 @@ features = [
     "GpuCullMode",
     "GpuDepthStencilState",
     "GpuDevice",
+    "GpuDeviceDescriptor",
     "GpuExtent3dDict",
     "GpuFilterMode",
     "GpuFragmentState",
@@ -74,6 +87,8 @@ features = [
     "GpuStencilFaceState",
     "GpuStencilOperation",
     "GpuStorageTextureBindingLayout",
+    "GpuSupportedFeatures",
+    "GpuSupportedLimits",
     "GpuTexture",
     "GpuTextureAspect",
     "GpuTextureBindingLayout",

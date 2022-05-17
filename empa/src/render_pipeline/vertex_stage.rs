@@ -1,6 +1,6 @@
 use crate::pipeline_constants::PipelineConstants;
 use crate::render_pipeline::TypedVertexLayout;
-use crate::shader_module::{ShaderMeta, ShaderModule, ShaderStage};
+use crate::shader_module::{ShaderModule, ShaderSourceInternal, StaticShaderStage};
 use std::marker;
 use std::sync::Arc;
 use wasm_bindgen::JsValue;
@@ -8,14 +8,14 @@ use web_sys::GpuVertexState;
 
 pub struct VertexStage<O> {
     pub(crate) inner: GpuVertexState,
-    pub(crate) shader_meta: Arc<ShaderMeta>,
+    pub(crate) shader_meta: Arc<ShaderSourceInternal>,
     entry_index: usize,
     _marker: marker::PhantomData<*const O>,
 }
 
 pub struct VertexStageBuilder<O> {
     inner: GpuVertexState,
-    shader_meta: Arc<ShaderMeta>,
+    shader_meta: Arc<ShaderSourceInternal>,
     entry_index: usize,
     has_constants: bool,
     _marker: marker::PhantomData<*const O>,
@@ -34,7 +34,7 @@ impl VertexStageBuilder<()> {
             .expect("could not find entry point in shader module");
 
         assert!(
-            entry.stage == ShaderStage::Vertex,
+            entry.stage == StaticShaderStage::Vertex,
             "entry point is not a vertex stage"
         );
 

@@ -1,4 +1,6 @@
-use crate::render_pipeline::{PipelineConstants, ShaderMeta, ShaderModule, ShaderStage};
+use crate::render_pipeline::{
+    PipelineConstants, ShaderModule, ShaderSourceInternal, StaticShaderStage,
+};
 use crate::render_target::{TypedColorLayout, TypedRenderLayout};
 use crate::texture::format::{Blendable, ColorRenderable, FloatSamplable};
 use std::borrow::Cow;
@@ -255,14 +257,14 @@ impl_typed_color_outputs!(8, C0, C1, C2, C3, C4, C5, C6, C7);
 
 pub struct FragmentStage<O> {
     pub(crate) inner: GpuFragmentState,
-    pub(crate) shader_meta: Arc<ShaderMeta>,
+    pub(crate) shader_meta: Arc<ShaderSourceInternal>,
     entry_index: usize,
     _marker: marker::PhantomData<*const O>,
 }
 
 pub struct FragmentStageBuilder<O> {
     inner: GpuFragmentState,
-    shader_meta: Arc<ShaderMeta>,
+    shader_meta: Arc<ShaderSourceInternal>,
     entry_index: usize,
     has_constants: bool,
     _marker: marker::PhantomData<*const O>,
@@ -281,7 +283,7 @@ impl FragmentStageBuilder<()> {
             .expect("could not find entry point in shader module");
 
         assert!(
-            entry.stage == ShaderStage::Fragment,
+            entry.stage == StaticShaderStage::Fragment,
             "entry point is not a fragment stage"
         );
 

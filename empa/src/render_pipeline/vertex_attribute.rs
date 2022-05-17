@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types)]
 
-use crate::render_pipeline::ShaderEntryPointBindingType;
+use crate::render_pipeline::StaticEntryPointBindingType;
 use web_sys::GpuVertexFormat;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -9,53 +9,53 @@ pub struct VertexAttributeFormatId {
 }
 
 impl VertexAttributeFormatId {
-    pub(crate) fn is_compatible(&self, binding_type: ShaderEntryPointBindingType) -> bool {
+    pub(crate) fn is_compatible(&self, binding_type: StaticEntryPointBindingType) -> bool {
         match binding_type {
-            ShaderEntryPointBindingType::SignedInteger => match self.inner {
+            StaticEntryPointBindingType::SignedInteger => match self.inner {
                 GpuVertexFormat::Sint32 => true,
                 _ => false,
             },
-            ShaderEntryPointBindingType::SignedIntegerVector2 => match self.inner {
+            StaticEntryPointBindingType::SignedIntegerVector2 => match self.inner {
                 GpuVertexFormat::Sint8x2
                 | GpuVertexFormat::Sint16x2
                 | GpuVertexFormat::Sint32x2 => true,
                 _ => false,
             },
-            ShaderEntryPointBindingType::SignedIntegerVector3 => match self.inner {
+            StaticEntryPointBindingType::SignedIntegerVector3 => match self.inner {
                 GpuVertexFormat::Sint32x3 => true,
                 _ => false,
             },
-            ShaderEntryPointBindingType::SignedIntegerVector4 => match self.inner {
+            StaticEntryPointBindingType::SignedIntegerVector4 => match self.inner {
                 GpuVertexFormat::Sint8x4
                 | GpuVertexFormat::Sint16x4
                 | GpuVertexFormat::Sint32x4 => true,
                 _ => false,
             },
-            ShaderEntryPointBindingType::UnsignedInteger => match self.inner {
+            StaticEntryPointBindingType::UnsignedInteger => match self.inner {
                 GpuVertexFormat::Uint32 => true,
                 _ => false,
             },
-            ShaderEntryPointBindingType::UnsignedIntegerVector2 => match self.inner {
+            StaticEntryPointBindingType::UnsignedIntegerVector2 => match self.inner {
                 GpuVertexFormat::Uint8x2
                 | GpuVertexFormat::Uint16x2
                 | GpuVertexFormat::Uint32x2 => true,
                 _ => false,
             },
-            ShaderEntryPointBindingType::UnsignedIntegerVector3 => match self.inner {
+            StaticEntryPointBindingType::UnsignedIntegerVector3 => match self.inner {
                 GpuVertexFormat::Uint32x3 => true,
                 _ => false,
             },
-            ShaderEntryPointBindingType::UnsignedIntegerVector4 => match self.inner {
+            StaticEntryPointBindingType::UnsignedIntegerVector4 => match self.inner {
                 GpuVertexFormat::Uint8x4
                 | GpuVertexFormat::Uint16x4
                 | GpuVertexFormat::Uint32x4 => true,
                 _ => false,
             },
-            ShaderEntryPointBindingType::Float => match self.inner {
+            StaticEntryPointBindingType::Float => match self.inner {
                 GpuVertexFormat::Float32 => true,
                 _ => false,
             },
-            ShaderEntryPointBindingType::FloatVector2 => match self.inner {
+            StaticEntryPointBindingType::FloatVector2 => match self.inner {
                 GpuVertexFormat::Unorm8x2
                 | GpuVertexFormat::Snorm8x2
                 | GpuVertexFormat::Unorm16x2
@@ -63,11 +63,11 @@ impl VertexAttributeFormatId {
                 | GpuVertexFormat::Float32x2 => true,
                 _ => false,
             },
-            ShaderEntryPointBindingType::FloatVector3 => match self.inner {
+            StaticEntryPointBindingType::FloatVector3 => match self.inner {
                 GpuVertexFormat::Float32x3 => true,
                 _ => false,
             },
-            ShaderEntryPointBindingType::FloatVector4 => match self.inner {
+            StaticEntryPointBindingType::FloatVector4 => match self.inner {
                 GpuVertexFormat::Unorm8x4
                 | GpuVertexFormat::Snorm8x4
                 | GpuVertexFormat::Unorm16x4
@@ -75,13 +75,13 @@ impl VertexAttributeFormatId {
                 | GpuVertexFormat::Float32x4 => true,
                 _ => false,
             },
-            ShaderEntryPointBindingType::HalfFloat => false,
-            ShaderEntryPointBindingType::HalfFloatVector2 => match self.inner {
+            StaticEntryPointBindingType::HalfFloat => false,
+            StaticEntryPointBindingType::HalfFloatVector2 => match self.inner {
                 GpuVertexFormat::Float16x2 => true,
                 _ => false,
             },
-            ShaderEntryPointBindingType::HalfFloatVector3 => false,
-            ShaderEntryPointBindingType::HalfFloatVector4 => match self.inner {
+            StaticEntryPointBindingType::HalfFloatVector3 => false,
+            StaticEntryPointBindingType::HalfFloatVector4 => match self.inner {
                 GpuVertexFormat::Float16x4 => true,
                 _ => false,
             },

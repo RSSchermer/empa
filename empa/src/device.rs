@@ -1,24 +1,39 @@
 use crate::buffer::{AsBuffer, Buffer};
 use std::mem::MaybeUninit;
 
+use crate::command::{CommandBuffer, CommandEncoder};
+use crate::compute_pipeline::ComputePipelineDescriptor;
 use crate::query::OcclusionQuerySet;
-use crate::resource_binding::{BindGroup, BindGroupLayout, BindGroupLayoutEntry, Resources, TypedBindGroupLayout, PipelineLayout, TypedPipelineLayout};
+use crate::render_pipeline::{ComputePipeline, RenderPipeline, RenderPipelineDescriptor};
+use crate::resource_binding::{
+    BindGroup, BindGroupLayout, BindGroupLayoutEntry, PipelineLayout, Resources,
+    TypedBindGroupLayout, TypedPipelineLayout,
+};
 use crate::sampler::{
     AnisotropicSamplerDescriptor, ComparisonSampler, ComparisonSamplerDescriptor,
     NonFilteringSampler, NonFilteringSamplerDescriptor, Sampler, SamplerDescriptor,
 };
-use crate::texture::format::{Texture1DFormat, Texture2DFormat, Texture3DFormat, ViewFormats, MultisampleFormat};
-use crate::texture::{Texture1D, Texture2D, Texture2DDescriptor, Texture3D, Texture3DDescriptor, TextureMultisampled2DDescriptor, TextureMultisampled2D};
+use crate::texture::format::{
+    MultisampleFormat, Texture1DFormat, Texture2DFormat, Texture3DFormat, ViewFormats,
+};
+use crate::texture::{
+    Texture1D, Texture2D, Texture2DDescriptor, Texture3D, Texture3DDescriptor,
+    TextureMultisampled2D, TextureMultisampled2DDescriptor,
+};
 use crate::{buffer, texture};
 use atomic_counter::RelaxedCounter;
 use lazy_static::lazy_static;
-use web_sys::{GpuQueue,GpuDevice};
-use crate::render_pipeline::{RenderPipelineDescriptor, RenderPipeline, ComputePipeline};
-use crate::compute_pipeline::ComputePipelineDescriptor;
-use crate::command::{CommandEncoder, CommandBuffer};
+use web_sys::{GpuDevice, GpuQueue};
+use crate::adapter::{Limits, Features};
 
 lazy_static! {
     pub(crate) static ref ID_GEN: RelaxedCounter = RelaxedCounter::new(1);
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct DeviceDescriptor {
+    pub required_features: Features,
+    pub required_limits: Limits
 }
 
 pub struct Device {
@@ -84,7 +99,10 @@ impl Device {
         BindGroupLayout::untyped(self, layout)
     }
 
-    pub fn create_pipeline_layout<T>(&self) -> PipelineLayout<T> where T: TypedPipelineLayout {
+    pub fn create_pipeline_layout<T>(&self) -> PipelineLayout<T>
+    where
+        T: TypedPipelineLayout,
+    {
         PipelineLayout::typed(self)
     }
 
@@ -96,11 +114,17 @@ impl Device {
         BindGroup::new(self, layout, resources)
     }
 
-    pub fn create_compute_pipeline<R>(&self, descriptor: &ComputePipelineDescriptor<R>) -> ComputePipeline<R> {
+    pub fn create_compute_pipeline<R>(
+        &self,
+        descriptor: &ComputePipelineDescriptor<R>,
+    ) -> ComputePipeline<R> {
         ComputePipeline::new(self, descriptor)
     }
 
-    pub fn create_render_pipeline<T, V, I, R>(&self, descriptor: &RenderPipelineDescriptor<T, V, I, R>) -> RenderPipeline<T, V, I, R> {
+    pub fn create_render_pipeline<T, V, I, R>(
+        &self,
+        descriptor: &RenderPipelineDescriptor<T, V, I, R>,
+    ) -> RenderPipeline<T, V, I, R> {
         RenderPipeline::new(self, descriptor)
     }
 
@@ -153,7 +177,14 @@ impl Device {
         Texture3D::new(self, descriptor)
     }
 
-    pub fn create_texture_multisampled_2d<F, U, const SAMPLES: u8>(&self, descriptor: &TextureMultisampled2DDescriptor) -> TextureMultisampled2D<F, U, SAMPLES> where F: MultisampleFormat, U: texture::UsageFlags + texture::RenderAttachment {
+    pub fn create_texture_multisampled_2d<F, U, const SAMPLES: u8>(
+        &self,
+        descriptor: &TextureMultisampled2DDescriptor,
+    ) -> TextureMultisampled2D<F, U, SAMPLES>
+    where
+        F: MultisampleFormat,
+        U: texture::UsageFlags + texture::RenderAttachment,
+    {
         TextureMultisampled2D::new(self, descriptor)
     }
 
@@ -167,13 +198,13 @@ impl Device {
 
     pub fn queue(&self) -> Queue {
         Queue {
-            inner: self.inner.queue()
+            inner: self.inner.queue(),
         }
     }
 }
 
 pub struct Queue {
-    inner: GpuQueue
+    inner: GpuQueue,
 }
 
 impl Queue {
