@@ -12,6 +12,11 @@ use proc_macro2;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 
+#[proc_macro]
+pub fn shader_source(input: TokenStream) -> TokenStream {
+    shader_source::expand_shader_source(input)
+}
+
 #[proc_macro_derive(PipelineConstants, attributes(constant_id))]
 pub fn derive_pipeline_constants(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);

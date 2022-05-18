@@ -1,15 +1,16 @@
-use crate::device::Device;
-use crate::texture::format::{MultisampleFormat, Renderable, ViewFormat};
-use crate::texture::{
-    CopyDst, CopySrc, FormatKind, ImageCopyTexture, ImageCopyToTextureDstMultisample,
-    ImageCopyToTextureSrcMultisample, RenderAttachment, TextureDestroyer, UsageFlags,
-};
 use std::marker;
-
 use std::sync::Arc;
+
 use web_sys::{
     GpuExtent3dDict, GpuTexture, GpuTextureAspect, GpuTextureDescriptor, GpuTextureDimension,
     GpuTextureView, GpuTextureViewDescriptor, GpuTextureViewDimension,
+};
+
+use crate::device::Device;
+use crate::texture::format::MultisampleFormat;
+use crate::texture::{
+    CopyDst, CopySrc, FormatKind, ImageCopyTexture, ImageCopyToTextureDstMultisample,
+    ImageCopyToTextureSrcMultisample, RenderAttachment, TextureDestroyer, UsageFlags,
 };
 
 pub struct TextureMultisampled2DDescriptor {
@@ -79,7 +80,7 @@ where
             inner,
             width: self.width,
             height: self.height,
-            texture_destroyer: self.inner.clone(),
+            _texture_destroyer: self.inner.clone(),
             _marker: Default::default(),
         }
     }
@@ -124,6 +125,6 @@ pub struct AttachableMultisampledImage<F, const SAMPLES: u8> {
     pub(crate) inner: GpuTextureView,
     pub(crate) width: u32,
     pub(crate) height: u32,
-    texture_destroyer: Arc<TextureDestroyer>,
+    _texture_destroyer: Arc<TextureDestroyer>,
     _marker: marker::PhantomData<*const F>,
 }

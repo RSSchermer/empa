@@ -1,5 +1,6 @@
 #![feature(const_mut_refs, generic_associated_types, new_uninit)]
 #![feature(once_cell)]
+#![feature(iter_intersperse)]
 
 mod compare_function;
 pub use self::compare_function::CompareFunction;

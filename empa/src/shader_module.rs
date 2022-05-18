@@ -1,10 +1,12 @@
-use crate::render_pipeline::{
-    PipelineConstantIdentifier, PipelineConstantValue, PipelineConstants,
-};
-use crate::resource_binding::{BindGroupLayoutEntry, BindingType};
-use empa_reflect::ShaderSource as DynamicShaderSource;
 use std::sync::Arc;
-use web_sys::GpuShaderModule;
+
+use empa_reflect::ShaderSource as DynamicShaderSource;
+use wasm_bindgen::UnwrapThrowExt;
+use web_sys::{GpuShaderModule, GpuShaderModuleDescriptor};
+
+use crate::device::Device;
+use crate::pipeline_constants::{PipelineConstantIdentifier, PipelineConstants};
+use crate::resource_binding::BindingType;
 
 /// Internal type for `shader_source` macro.
 #[doc(hidden)]
@@ -198,7 +200,7 @@ impl ShaderSourceInternal {
 
         for constant in shader_constants {
             if let Some(supplied_value) = pipeline_constants.lookup(constant.identifier) {
-                if (supplied_value.constant_type() != constant.constant_type) {
+                if supplied_value.constant_type() != constant.constant_type {
                     panic!("supplied value for pipeline constant `{}` does not match the type expected by the shader", constant.identifier)
                 }
 
@@ -206,7 +208,8 @@ impl ShaderSourceInternal {
                     record.as_ref(),
                     &constant.identifier.to_js_value(),
                     &supplied_value.to_js_value(),
-                );
+                )
+                .unwrap_throw();
             } else {
                 if constant.required {
                     panic!(
@@ -222,7 +225,7 @@ impl ShaderSourceInternal {
 }
 
 pub struct ShaderSource {
-    inner: ShaderSourceInternal,
+    inner: Arc<ShaderSourceInternal>,
 }
 
 impl ShaderSource {
@@ -230,7 +233,7 @@ impl ShaderSource {
     #[doc(hidden)]
     pub fn from_static(shader_source: StaticShaderSource) -> Self {
         ShaderSource {
-            inner: ShaderSourceInternal::Static(shader_source),
+            inner: Arc::new(ShaderSourceInternal::Static(shader_source)),
         }
     }
 }
@@ -238,4 +241,17 @@ impl ShaderSource {
 pub struct ShaderModule {
     pub(crate) inner: GpuShaderModule,
     pub(crate) meta: Arc<ShaderSourceInternal>,
+}
+
+impl ShaderModule {
+    pub(crate) fn new(device: &Device, source: &ShaderSource) -> Self {
+        let desc = GpuShaderModuleDescriptor::new(source.inner.source());
+
+        let inner = device.inner.create_shader_module(&desc);
+
+        ShaderModule {
+            inner,
+            meta: source.inner.clone(),
+        }
+    }
 }

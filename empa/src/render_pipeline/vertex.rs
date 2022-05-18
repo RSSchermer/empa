@@ -1,5 +1,3 @@
-use crate::buffer;
-use crate::buffer::Buffer;
 use crate::render_pipeline::vertex_attribute::VertexAttributeFormatId;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -35,7 +33,10 @@ pub trait TypedVertexLayout: typed_vertex_layout_seal::Seal {
 
 macro_rules! impl_typed_vertex_layout {
     ($($vertex:ident),*) => {
+        #[allow(unused_parens)]
         impl<$($vertex),*> typed_vertex_layout_seal::Seal for ($($vertex),*) where $($vertex: Vertex),* {}
+
+        #[allow(unused_parens)]
         impl<$($vertex),*> TypedVertexLayout for ($($vertex),*) where $($vertex: Vertex),* {
             const LAYOUT: &'static [VertexDescriptor<'static>] = &[
                 $($vertex::DESCRIPTOR),*

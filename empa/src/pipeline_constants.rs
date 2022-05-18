@@ -1,6 +1,8 @@
-use crate::render_pipeline::StaticConstantType;
-use std::{fmt, iter, slice};
+use std::fmt;
+
 use wasm_bindgen::JsValue;
+
+use crate::shader_module::StaticConstantType;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PipelineConstantIdentifier<'a> {

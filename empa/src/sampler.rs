@@ -1,9 +1,9 @@
+use std::ops::RangeInclusive;
+
+use web_sys::{GpuAddressMode, GpuFilterMode, GpuSampler, GpuSamplerDescriptor};
+
 use crate::device::Device;
 use crate::CompareFunction;
-use std::ops::RangeInclusive;
-use web_sys::{
-    GpuAddressMode, GpuCompareFunction, GpuFilterMode, GpuSampler, GpuSamplerDescriptor,
-};
 
 pub struct Sampler {
     pub(crate) inner: GpuSampler,

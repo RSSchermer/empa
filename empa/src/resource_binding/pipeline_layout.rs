@@ -1,8 +1,10 @@
+use std::marker;
+
+use web_sys::{GpuPipelineLayout, GpuPipelineLayoutDescriptor};
+
 use crate::device::Device;
 use crate::resource_binding::{BindGroupLayout, BindGroupLayoutEntry, TypedBindGroupLayout};
 use crate::Untyped;
-use std::marker;
-use web_sys::{GpuPipelineLayout, GpuPipelineLayoutDescriptor};
 
 mod typed_pipeline_layout_seal {
     pub trait Seal {}

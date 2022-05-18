@@ -1,28 +1,26 @@
 use std::borrow::Borrow;
+use std::fmt::Display;
+use std::future::Future;
 use std::mem::MaybeUninit;
 use std::ops::{
     Deref, DerefMut, Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive, Rem,
 };
+use std::sync::{Arc, Mutex};
 use std::{error, marker, mem, slice};
 
+use atomic_counter::AtomicCounter;
+use futures::TryFutureExt;
+use js_sys::Uint8Array;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::JsFuture;
 use web_sys::{GpuBuffer, GpuBufferDescriptor, GpuImageCopyBuffer};
-
-use crate::device::Device;
 
 use crate::abi;
 use crate::buffer::{
     CopyDst, CopySrc, MapRead, MapWrite, StorageBinding, UniformBinding, ValidUsageFlags,
 };
 use crate::command::ImageCopySize;
-use crate::device::ID_GEN;
-use atomic_counter::AtomicCounter;
-use futures::TryFutureExt;
-use js_sys::Uint8Array;
-use std::fmt::Display;
-use std::future::Future;
-use std::sync::{Arc, Mutex};
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::JsFuture;
+use crate::device::{Device, ID_GEN};
 
 /// Signals that an error occurred when trying to map a buffer.
 #[derive(Clone, PartialEq, Eq, Debug)]

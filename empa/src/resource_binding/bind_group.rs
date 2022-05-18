@@ -1,34 +1,35 @@
-use crate::buffer::{Buffer, BufferDestroyer, ReadOnlyStorage, Storage, Uniform};
+use std::marker;
+use std::sync::Arc;
+
+use atomic_counter::AtomicCounter;
+use wasm_bindgen::JsValue;
+use web_sys::{
+    GpuBindGroup, GpuBindGroupDescriptor, GpuBindGroupEntry, GpuBufferBinding, GpuSampler,
+    GpuTextureView,
+};
+
+use crate::abi;
+use crate::buffer::{BufferDestroyer, ReadOnlyStorage, Storage, Uniform};
 use crate::command::BindGroupEncoding;
-use crate::device::Device;
-use crate::device::ID_GEN;
+use crate::device::{Device, ID_GEN};
 use crate::resource_binding::typed_bind_group_entry::{
     f32_unfiltered, ShaderStages, TypedSlotBinding,
 };
-use crate::resource_binding::{
-    typed_bind_group_entry, BindGroupLayout, TypedBindGroupLayout, TypedPipelineLayout,
-};
+use crate::resource_binding::{typed_bind_group_entry, BindGroupLayout, TypedBindGroupLayout};
 use crate::sampler::{ComparisonSampler, NonFilteringSampler, Sampler};
-use crate::texture::format::{
-    FloatSamplable, SignedIntegerSamplable, Storable, UnfilteredFloatSamplable,
-    UnsignedIntegerSamplable,
-};
+use crate::texture::format::Storable;
 use crate::texture::{
     Sampled1DFloat, Sampled1DSignedInteger, Sampled1DUnfilteredFloat, Sampled1DUnsignedInteger,
-    Sampled3DFloat, Sampled3DSignedInteger, Sampled3DUnfilteredFloat, Sampled3DUnsignedInteger,
-    Storage1D, Storage3D, TextureDestroyer,
+    Sampled2DArrayDepth, Sampled2DArrayFloat, Sampled2DArraySignedInteger,
+    Sampled2DArrayUnfilteredFloat, Sampled2DArrayUnsignedInteger, Sampled2DDepth, Sampled2DFloat,
+    Sampled2DSignedInteger, Sampled2DUnfilteredFloat, Sampled2DUnsignedInteger, Sampled3DFloat,
+    Sampled3DSignedInteger, Sampled3DUnfilteredFloat, Sampled3DUnsignedInteger,
+    SampledCubeArrayDepth, SampledCubeArrayFloat, SampledCubeArraySignedInteger,
+    SampledCubeArrayUnfilteredFloat, SampledCubeArrayUnsignedInteger, SampledCubeDepth,
+    SampledCubeFloat, SampledCubeSignedInteger, SampledCubeUnfilteredFloat,
+    SampledCubeUnsignedInteger, Storage1D, Storage2D, Storage2DArray, Storage3D, TextureDestroyer,
 };
 use crate::type_flag::O;
-use crate::{abi, buffer, texture};
-use atomic_counter::AtomicCounter;
-use std::any::Any;
-use std::marker;
-use std::sync::Arc;
-use wasm_bindgen::JsValue;
-use web_sys::{
-    GpuBindGroup, GpuBindGroupDescriptor, GpuBindGroupEntry, GpuBuffer, GpuBufferBinding,
-    GpuSampler, GpuTextureView,
-};
 
 pub(crate) enum EntryDestroyer {
     Buffer(Arc<BufferDestroyer>),
@@ -64,7 +65,7 @@ where
             }
         }
 
-        let mut desc = GpuBindGroupDescriptor::new(entries.as_ref(), layout.as_web_sys());
+        let desc = GpuBindGroupDescriptor::new(entries.as_ref(), layout.as_web_sys());
         let inner = device.inner.create_bind_group(&desc);
 
         BindGroup {
@@ -187,6 +188,254 @@ where
     F: Storable,
 {
     type Binding = typed_bind_group_entry::StorageTexture1D<F, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a Sampled2DFloat {
+    type Binding = typed_bind_group_entry::Texture2D<f32, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a Sampled2DUnfilteredFloat {
+    type Binding = typed_bind_group_entry::Texture2D<f32_unfiltered, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a Sampled2DSignedInteger {
+    type Binding = typed_bind_group_entry::Texture2D<i32, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a Sampled2DUnsignedInteger {
+    type Binding = typed_bind_group_entry::Texture2D<u32, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a Sampled2DDepth {
+    type Binding = typed_bind_group_entry::TextureDepth2D<ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a Sampled2DArrayFloat {
+    type Binding = typed_bind_group_entry::Texture2DArray<f32, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a Sampled2DArrayUnfilteredFloat {
+    type Binding = typed_bind_group_entry::Texture2DArray<f32_unfiltered, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a Sampled2DArraySignedInteger {
+    type Binding = typed_bind_group_entry::Texture2DArray<i32, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a Sampled2DArrayUnsignedInteger {
+    type Binding = typed_bind_group_entry::Texture2DArray<u32, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a Sampled2DArrayDepth {
+    type Binding = typed_bind_group_entry::TextureDepth2DArray<ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a SampledCubeFloat {
+    type Binding = typed_bind_group_entry::TextureCube<f32, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a SampledCubeUnfilteredFloat {
+    type Binding = typed_bind_group_entry::TextureCube<f32_unfiltered, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a SampledCubeSignedInteger {
+    type Binding = typed_bind_group_entry::TextureCube<i32, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a SampledCubeUnsignedInteger {
+    type Binding = typed_bind_group_entry::TextureCube<u32, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a SampledCubeDepth {
+    type Binding = typed_bind_group_entry::TextureDepthCube<ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a SampledCubeArrayFloat {
+    type Binding = typed_bind_group_entry::TextureCubeArray<f32, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a SampledCubeArrayUnfilteredFloat {
+    type Binding = typed_bind_group_entry::TextureCubeArray<f32_unfiltered, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a SampledCubeArraySignedInteger {
+    type Binding = typed_bind_group_entry::TextureCubeArray<i32, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a SampledCubeArrayUnsignedInteger {
+    type Binding = typed_bind_group_entry::TextureCubeArray<u32, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a> Resource for &'a SampledCubeArrayDepth {
+    type Binding = typed_bind_group_entry::TextureDepthCubeArray<ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a, F> Resource for &'a Storage2D<F>
+where
+    F: Storable,
+{
+    type Binding = typed_bind_group_entry::StorageTexture2D<F, ShaderStages<O, O, O>>;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        BindGroupEntry::TextureView(TextureViewResource {
+            inner: self.inner.clone(),
+            _destroyer: self.texture_destroyer.clone(),
+        })
+    }
+}
+
+unsafe impl<'a, F> Resource for &'a Storage2DArray<F>
+where
+    F: Storable,
+{
+    type Binding = typed_bind_group_entry::StorageTexture2DArray<F, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {

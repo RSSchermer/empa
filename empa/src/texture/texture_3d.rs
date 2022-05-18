@@ -1,26 +1,37 @@
+use std::cmp::max;
+use std::marker;
+use std::ops::Rem;
+use std::sync::Arc;
+
+use staticvec::StaticVec;
+use web_sys::{
+    GpuExtent3dDict, GpuTexture, GpuTextureAspect, GpuTextureDescriptor, GpuTextureDimension,
+    GpuTextureFormat, GpuTextureView, GpuTextureViewDescriptor, GpuTextureViewDimension,
+};
+
 use crate::device::Device;
 use crate::texture::format::{
     FloatSamplable, ImageCopyFromBufferFormat, ImageCopyTextureFormat, ImageCopyToBufferFormat,
-    SignedIntegerSamplable, Storable, SubImageCopyFormat, Texture3DFormat,
+    SignedIntegerSamplable, Storable, SubImageCopyFormat, Texture3DFormat, TextureFormatId,
     UnfilteredFloatSamplable, UnsignedIntegerSamplable, ViewFormat, ViewFormats,
 };
 use crate::texture::{
     CopyDst, CopySrc, FormatKind, ImageCopyFromBufferDst, ImageCopyFromTextureDst,
     ImageCopyTexture, ImageCopyToBufferSrc, ImageCopyToTextureSrc, MipmapLevels, StorageBinding,
     SubImageCopyFromBufferDst, SubImageCopyFromTextureDst, SubImageCopyToBufferSrc,
-    SubImageCopyToTextureSrc, TextureBinding, TextureDestroyer, UsageFlags,
-};
-use std::cmp::max;
-use std::marker;
-use std::ops::Rem;
-use std::sync::Arc;
-use web_sys::{
-    GpuExtent3dDict, GpuTexture, GpuTextureAspect, GpuTextureDescriptor, GpuTextureDimension,
-    GpuTextureFormat, GpuTextureView, GpuTextureViewDescriptor, GpuTextureViewDimension,
+    SubImageCopyToTextureSrc, TextureBinding, TextureDestroyer, UnsupportedViewFormat, UsageFlags,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Texture3DDescriptor {
+pub struct Texture3DDescriptor<F, U, V>
+where
+    F: Texture3DFormat,
+    U: UsageFlags,
+    V: ViewFormats<F>,
+{
+    pub format: F,
+    pub usage: U,
+    pub view_formats: V,
     pub width: u32,
     pub height: u32,
     pub depth: u32,
@@ -50,46 +61,50 @@ pub struct SubImageCopy3DDescriptor {
     pub origin_z: u32,
 }
 
-pub struct Texture3D<F, Usage, ViewFormats = F> {
+pub struct Texture3D<F, Usage> {
     inner: Arc<TextureDestroyer>,
     mip_level_count: u8,
     format: FormatKind<F>,
     width: u32,
     height: u32,
     depth: u32,
+    view_formats: StaticVec<TextureFormatId, 8>,
     _usage: marker::PhantomData<Usage>,
-    _view_formats: marker::PhantomData<ViewFormats>,
 }
 
-impl<F, U, V> Texture3D<F, U, V> {
+impl<F, U> Texture3D<F, U> {
     fn as_web_sys(&self) -> &GpuTexture {
         &self.inner.texture
     }
 }
 
-impl<F, U, V> Texture3D<F, U, V>
+impl<F, U> Texture3D<F, U>
 where
     F: Texture3DFormat,
     U: UsageFlags,
-    V: ViewFormats<F>,
 {
-    pub(crate) fn new(device: &Device, descriptor: &Texture3DDescriptor) -> Self {
+    pub(crate) fn new<V: ViewFormats<F>>(
+        device: &Device,
+        descriptor: &Texture3DDescriptor<F, U, V>,
+    ) -> Self {
         let Texture3DDescriptor {
+            view_formats,
             width,
             height,
             depth,
             mipmap_levels,
-        } = *descriptor;
+            ..
+        } = descriptor;
 
-        assert!(width > 0, "width must be greater than `0`");
-        assert!(height > 0, "height must be greater than `0`");
-        assert!(depth > 0, "depth must be greater than `0`");
+        assert!(*width > 0, "width must be greater than `0`");
+        assert!(*height > 0, "height must be greater than `0`");
+        assert!(*depth > 0, "depth must be greater than `0`");
 
-        let mip_level_count = mipmap_levels.to_u32(max(max(width, height), depth));
-        let mut size = GpuExtent3dDict::new(width);
+        let mip_level_count = mipmap_levels.to_u32(max(max(*width, *height), *depth));
+        let mut size = GpuExtent3dDict::new(*width);
 
-        size.height(height);
-        size.depth_or_array_layers(depth);
+        size.height(*height);
+        size.depth_or_array_layers(*depth);
 
         let mut desc = GpuTextureDescriptor::new(F::FORMAT_ID.to_web_sys(), &size.into(), U::BITS);
 
@@ -97,16 +112,17 @@ where
         desc.mip_level_count(mip_level_count);
 
         let inner = device.inner.create_texture(&desc);
+        let view_formats = view_formats.formats().collect();
 
         Texture3D {
             inner: Arc::new(TextureDestroyer::new(inner)),
             format: FormatKind::Typed(Default::default()),
-            width,
-            height,
-            depth,
+            width: *width,
+            height: *height,
+            depth: *depth,
             mip_level_count: mip_level_count as u8,
+            view_formats,
             _usage: Default::default(),
-            _view_formats: Default::default(),
         }
     }
 
@@ -147,68 +163,171 @@ where
         self.as_web_sys().create_view_with_descriptor(&desc)
     }
 
-    pub fn sampled_float<ViewedFormat>(&self, descriptor: &View3DDescriptor) -> Sampled3DFloat
+    pub fn sampled_float(&self, descriptor: &View3DDescriptor) -> Sampled3DFloat
     where
-        ViewedFormat: ViewFormat<V> + FloatSamplable,
+        F: FloatSamplable,
         U: TextureBinding,
     {
         Sampled3DFloat {
-            inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_unfilterable_float<ViewedFormat>(
+    pub fn try_as_sampled_float<ViewedFormat>(
+        &self,
+        descriptor: &View3DDescriptor,
+    ) -> Result<Sampled3DFloat, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + FloatSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(Sampled3DFloat {
+                inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_unfiltered_float(
         &self,
         descriptor: &View3DDescriptor,
     ) -> Sampled3DUnfilteredFloat
     where
-        ViewedFormat: ViewFormat<V> + UnfilteredFloatSamplable,
+        F: UnfilteredFloatSamplable,
         U: TextureBinding,
     {
         Sampled3DUnfilteredFloat {
-            inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_signed_integer<ViewedFormat>(
+    pub fn try_as_sampled_unfiltered_float<ViewedFormat>(
         &self,
         descriptor: &View3DDescriptor,
-    ) -> Sampled3DSignedInteger
+    ) -> Result<Sampled3DUnfilteredFloat, UnsupportedViewFormat>
     where
-        ViewedFormat: ViewFormat<V> + SignedIntegerSamplable,
+        ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(Sampled3DUnfilteredFloat {
+                inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_signed_integer(&self, descriptor: &View3DDescriptor) -> Sampled3DSignedInteger
+    where
+        F: SignedIntegerSamplable,
         U: TextureBinding,
     {
         Sampled3DSignedInteger {
-            inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_unsigned_integer<ViewedFormat>(
+    pub fn try_as_sampled_signed_integer<ViewedFormat>(
+        &self,
+        descriptor: &View3DDescriptor,
+    ) -> Result<Sampled3DSignedInteger, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(Sampled3DSignedInteger {
+                inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_unsigned_integer(
         &self,
         descriptor: &View3DDescriptor,
     ) -> Sampled3DUnsignedInteger
     where
-        ViewedFormat: ViewFormat<V> + UnsignedIntegerSamplable,
+        F: UnsignedIntegerSamplable,
         U: TextureBinding,
     {
         Sampled3DUnsignedInteger {
-            inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn storage<ViewedFormat>(&self, descriptor: &View3DDescriptor) -> Storage3D<ViewedFormat>
+    pub fn try_as_sampled_unsigned_integer<ViewedFormat>(
+        &self,
+        descriptor: &View3DDescriptor,
+    ) -> Result<Sampled3DUnsignedInteger, UnsupportedViewFormat>
     where
-        ViewedFormat: ViewFormat<V> + Storable,
+        ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(Sampled3DUnsignedInteger {
+                inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn storage(&self, descriptor: &View3DDescriptor) -> Storage3D<F>
+    where
+        F: Storable,
         U: StorageBinding,
     {
         Storage3D {
-            inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
             _marker: Default::default(),
+        }
+    }
+
+    pub fn try_as_storage<ViewedFormat>(
+        &self,
+        descriptor: &View3DDescriptor,
+    ) -> Result<Storage3D<ViewedFormat>, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + Storable,
+        U: StorageBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(Storage3D {
+                inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+                _marker: Default::default(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
         }
     }
 

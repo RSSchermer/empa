@@ -1,9 +1,10 @@
+use std::sync::Arc;
+
+use web_sys::GpuBindGroup;
+
 use crate::resource_binding::{
     BindGroup, EntryDestroyer, TypedBindGroupLayout, TypedPipelineLayout,
 };
-use std::any::Any;
-use std::sync::Arc;
-use web_sys::GpuBindGroup;
 
 pub struct BindGroupEncoding {
     pub(crate) bind_group: GpuBindGroup,
@@ -25,7 +26,10 @@ pub trait BindGroups: bind_groups_seal::Seal {
 
 macro_rules! impl_bind_groups {
     ($n:literal, $($B:ident),*) => {
+        #[allow(unused_parens)]
         impl<'a, $($B),*> bind_groups_seal::Seal for ($(&'a BindGroup<$B>),*) where $($B: TypedBindGroupLayout),* {}
+
+        #[allow(unused_parens)]
         impl<'a, $($B),*> BindGroups for ($(&'a BindGroup<$B>),*) where $($B: TypedBindGroupLayout),* {
             type Layout = ($($B,)*);
 

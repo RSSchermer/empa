@@ -21,6 +21,13 @@ pub use self::usage::*;
 
 pub mod format;
 
+use std::error::Error;
+use std::fmt;
+
+use staticvec::StaticVec;
+
+use crate::texture::format::TextureFormatId;
+
 pub(crate) struct TextureDestroyer {
     texture: web_sys::GpuTexture,
 }
@@ -41,3 +48,29 @@ enum FormatKind<F> {
     Dynamic(F),
     Typed(std::marker::PhantomData<F>),
 }
+
+#[derive(Debug)]
+pub struct UnsupportedViewFormat {
+    pub(crate) format: TextureFormatId,
+    pub(crate) supported_formats: StaticVec<TextureFormatId, 8>,
+}
+
+impl fmt::Display for UnsupportedViewFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "`{}` is not one of the supported formats: ", self.format)?;
+
+        let mut supported_formats = self.supported_formats.iter();
+
+        if let Some(format) = supported_formats.next() {
+            write!(f, "`{}`", format)?;
+        }
+
+        for format in supported_formats {
+            write!(f, ", `{}`", format)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Error for UnsupportedViewFormat {}

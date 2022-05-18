@@ -1,6 +1,5 @@
-use crate::buffer;
-use crate::buffer::Buffer;
 use std::marker;
+
 use web_sys::{GpuCullMode, GpuFrontFace, GpuIndexFormat, GpuPrimitiveState, GpuPrimitiveTopology};
 
 mod pipeline_index_format_seal {

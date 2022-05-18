@@ -386,7 +386,7 @@ impl SizedBufferLayout {
     }
 
     pub fn memory_units(&self) -> &[MemoryUnit] {
-        &self.memory_units()
+        &self.0
     }
 }
 
@@ -945,7 +945,7 @@ fn collect_units(
                     let mut units = Vec::new();
                     let mut nested_tail = None;
 
-                    collect_units(offset, module, *base, &mut units, &mut nested_tail);
+                    collect_units(offset, module, *base, &mut units, &mut nested_tail)?;
 
                     if nested_tail.is_some() {
                         // Cannot have a dynamically sized array inside of a dynamically size array

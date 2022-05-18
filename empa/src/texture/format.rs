@@ -1,5 +1,7 @@
 #![allow(non_camel_case_types)]
 
+use std::fmt;
+
 use web_sys::GpuTextureFormat;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -8,7 +10,8 @@ pub struct TextureFormatId {
 }
 
 impl TextureFormatId {
-    pub(crate) fn to_web_sys(&self) -> GpuTextureFormat {
+    #[doc(hidden)]
+    pub fn to_web_sys(&self) -> GpuTextureFormat {
         self.inner
     }
 
@@ -72,6 +75,75 @@ impl TextureFormatId {
             | GpuTextureFormat::Rgba32uint => true,
             _ => false,
         }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self.inner {
+            GpuTextureFormat::R8unorm => "r8unorm",
+            GpuTextureFormat::R8snorm => "r8snorm",
+            GpuTextureFormat::R8uint => "r8uint",
+            GpuTextureFormat::R8sint => "r8sint",
+            GpuTextureFormat::R16uint => "r16uint",
+            GpuTextureFormat::R16sint => "r16sint",
+            GpuTextureFormat::R16float => "r16float",
+            GpuTextureFormat::Rg8unorm => "rg8unorm",
+            GpuTextureFormat::Rg8snorm => "rg8snorm",
+            GpuTextureFormat::Rg8uint => "rg8uint",
+            GpuTextureFormat::Rg8sint => "rg8sint",
+            GpuTextureFormat::R32uint => "r32uint",
+            GpuTextureFormat::R32sint => "r32sint",
+            GpuTextureFormat::R32float => "r32float",
+            GpuTextureFormat::Rg16uint => "rg16uint",
+            GpuTextureFormat::Rg16sint => "rg16sint",
+            GpuTextureFormat::Rg16float => "rg16float",
+            GpuTextureFormat::Rgba8unorm => "rgba8unorm",
+            GpuTextureFormat::Rgba8unormSrgb => "rgba8unormSrgb",
+            GpuTextureFormat::Rgba8snorm => "rgba8snorm",
+            GpuTextureFormat::Rgba8uint => "rgba8uint",
+            GpuTextureFormat::Rgba8sint => "rgba8sint",
+            GpuTextureFormat::Bgra8unorm => "bgra8unorm",
+            GpuTextureFormat::Bgra8unormSrgb => "bgra8unorm-srgb",
+            GpuTextureFormat::Rgb9e5ufloat => "rgb9e5ufloat",
+            GpuTextureFormat::Rgb10a2unorm => "rgb10a2unorm",
+            GpuTextureFormat::Rg11b10ufloat => "rg11b10ufloat",
+            GpuTextureFormat::Rg32uint => "rg32uint",
+            GpuTextureFormat::Rg32sint => "rg32sint",
+            GpuTextureFormat::Rg32float => "rg32float",
+            GpuTextureFormat::Rgba16uint => "rgba16uint",
+            GpuTextureFormat::Rgba16sint => "rgba16sint",
+            GpuTextureFormat::Rgba16float => "rgba16float",
+            GpuTextureFormat::Rgba32uint => "rgba32uint",
+            GpuTextureFormat::Rgba32sint => "rgba32sint",
+            GpuTextureFormat::Rgba32float => "rgba32float",
+            GpuTextureFormat::Stencil8 => "stencil8",
+            GpuTextureFormat::Depth16unorm => "depth16unorm",
+            GpuTextureFormat::Depth24plus => "depth24plus",
+            GpuTextureFormat::Depth24plusStencil8 => "depth24plus-stencil8",
+            GpuTextureFormat::Depth32float => "depth32float",
+            GpuTextureFormat::Bc1RgbaUnorm => "bc1-rgba-unorm",
+            GpuTextureFormat::Bc1RgbaUnormSrgb => "bc1-rgba-unorm-srgb",
+            GpuTextureFormat::Bc2RgbaUnorm => "bc2-rgba-unorm",
+            GpuTextureFormat::Bc2RgbaUnormSrgb => "bc2-rgba-unorm-srgb",
+            GpuTextureFormat::Bc3RgbaUnorm => "bc3-rgba-unorm",
+            GpuTextureFormat::Bc3RgbaUnormSrgb => "bc3-rgba-unorm-srgb",
+            GpuTextureFormat::Bc4RUnorm => "bc4-r-unorm",
+            GpuTextureFormat::Bc4RSnorm => "bc4-r-snorm",
+            GpuTextureFormat::Bc5RgUnorm => "bc5-rg-unorm",
+            GpuTextureFormat::Bc5RgSnorm => "bc5-rg-snorm",
+            GpuTextureFormat::Bc6hRgbUfloat => "bc6h-rgb-ufloat",
+            GpuTextureFormat::Bc6hRgbFloat => "bc6h-rgb-float",
+            GpuTextureFormat::Bc7RgbaUnorm => "bc7-rgba-unorm",
+            GpuTextureFormat::Bc7RgbaUnormSrgb => "bc7-rgba-unorm-srgb",
+            GpuTextureFormat::Depth24unormStencil8 => "depth24unorm-stencil8",
+            GpuTextureFormat::Depth32floatStencil8 => "depth32float-stencil8",
+            _ => "unknown",
+        }
+    }
+}
+
+impl fmt::Display for TextureFormatId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
     }
 }
 
@@ -1341,22 +1413,59 @@ impl SubImageCopyFormat for astc_12x10_unorm_srgb {}
 impl SubImageCopyFormat for astc_12x12_unorm {}
 impl SubImageCopyFormat for astc_12x12_unorm_srgb {}
 
-mod view_formats_seal {
-    pub trait Seal {}
-}
-
-pub trait ViewFormats<F>: view_formats_seal::Seal {}
-
-impl<F> view_formats_seal::Seal for F where F: TextureFormat {}
-impl<F> ViewFormats<F> for F where F: TextureFormat {}
-
 mod view_format_seal {
     pub trait Seal {}
 }
 
-pub trait ViewFormat<V>: TextureFormat {}
+pub trait ViewFormat<F>: TextureFormat {}
 
 impl<F> ViewFormat<F> for F where F: TextureFormat {}
+
+impl ViewFormat<rgba8unorm> for rgba8unorm_srgb {}
+impl ViewFormat<rgba8unorm_srgb> for rgba8unorm {}
+impl ViewFormat<bgra8unorm> for bgra8unorm_srgb {}
+impl ViewFormat<bgra8unorm_srgb> for bgra8unorm {}
+
+mod view_formats_seal {
+    pub trait Seal<F> {}
+}
+
+pub trait ViewFormats<F>: view_formats_seal::Seal<F> {
+    type Formats: Iterator<Item = TextureFormatId>;
+
+    fn formats(&self) -> Self::Formats;
+}
+
+macro_rules! impl_view_formats {
+    ($n:literal, $($format:ident),*) => {
+        impl<F, $($format),*> view_formats_seal::Seal<F> for ($($format,)*)
+        where
+            F: TextureFormat,
+            $($format: ViewFormat<F>),*
+        {}
+
+        impl<F, $($format),*> ViewFormats<F> for ($($format,)*)
+        where
+            F: TextureFormat,
+            $($format: ViewFormat<F>),*
+        {
+            type Formats = <[TextureFormatId; $n] as IntoIterator>::IntoIter;
+
+            fn formats(&self) -> Self::Formats {
+                [$($format::FORMAT_ID),*].into_iter()
+            }
+        }
+    }
+}
+
+impl_view_formats!(1, V);
+impl_view_formats!(2, V0, V1);
+impl_view_formats!(3, V0, V1, V2);
+impl_view_formats!(4, V0, V1, V2, V3);
+impl_view_formats!(5, V0, V1, V2, V3, V4);
+impl_view_formats!(6, V0, V1, V2, V3, V4, V5);
+impl_view_formats!(7, V0, V1, V2, V3, V4, V5, V6);
+impl_view_formats!(8, V0, V1, V2, V3, V4, V5, V6, V7);
 
 pub unsafe trait ImageData<F>
 where

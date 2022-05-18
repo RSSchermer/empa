@@ -1,7 +1,8 @@
 #![allow(non_camel_case_types)]
 
-use crate::render_pipeline::StaticEntryPointBindingType;
 use web_sys::GpuVertexFormat;
+
+use crate::shader_module::StaticEntryPointBindingType;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct VertexAttributeFormatId {

@@ -1,20 +1,16 @@
-use crate::device::Device;
-use crate::device::ID_GEN;
-use crate::render_pipeline::depth_stencil_test::DepthStencilTest;
-use crate::render_pipeline::multisample_state::MultisampleState;
-use crate::render_pipeline::vertex_stage::VertexStage;
-use crate::render_pipeline::{
-    FragmentStage, IndexAny, PipelineIndexFormat, PrimitiveAssembly, TypedVertexLayout,
-};
-use crate::render_target::{
-    MultisampleRenderLayout, RenderLayout, TypedMultisampleColorLayout, TypedRenderLayout,
-};
-use crate::resource_binding::{PipelineLayout, ShaderStages, TypedPipelineLayout};
-use crate::texture::format::MultisampleColorRenderable;
-use atomic_counter::AtomicCounter;
 use std::marker;
+
+use atomic_counter::AtomicCounter;
 use wasm_bindgen::{JsCast, JsValue};
-use web_sys::{GpuIndexFormat, GpuRenderPipeline, GpuRenderPipelineDescriptor};
+use web_sys::{GpuRenderPipeline, GpuRenderPipelineDescriptor};
+
+use crate::device::{Device, ID_GEN};
+use crate::render_pipeline::{
+    DepthStencilTest, FragmentStage, IndexAny, MultisampleState, PipelineIndexFormat,
+    PrimitiveAssembly, TypedVertexLayout, VertexStage,
+};
+use crate::render_target::{MultisampleRenderLayout, RenderLayout, TypedMultisampleColorLayout};
+use crate::resource_binding::{PipelineLayout, ShaderStages, TypedPipelineLayout};
 
 pub struct RenderPipeline<O, V, I, R> {
     inner: GpuRenderPipeline,
@@ -78,7 +74,7 @@ impl
     >
 {
     pub fn begin() -> Self {
-        let mut inner = GpuRenderPipelineDescriptor::new(&JsValue::null().unchecked_into());
+        let inner = GpuRenderPipelineDescriptor::new(&JsValue::null().unchecked_into());
 
         RenderPipelineDescriptorBuilder {
             inner,
@@ -257,7 +253,7 @@ where
     Layout: TypedPipelineLayout,
 {
     pub fn fragment<ColorLayout>(
-        mut self,
+        self,
         fragment_stage: FragmentStage<ColorLayout>,
     ) -> RenderPipelineDescriptorBuilder<
         (),
@@ -277,7 +273,7 @@ where
     Layout: TypedPipelineLayout,
 {
     pub fn fragment<ColorLayout: TypedMultisampleColorLayout>(
-        mut self,
+        self,
         fragment_stage: FragmentStage<ColorLayout>,
     ) -> RenderPipelineDescriptorBuilder<
         MultisampleState<SAMPLES>,

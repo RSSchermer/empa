@@ -1,15 +1,16 @@
-use bitflags::bitflags;
-use wasm_bindgen::{JsValue, JsCast};
-use crate::device::{DeviceDescriptor, Device};
-use wasm_bindgen_futures::JsFuture;
-use std::future::Future;
-use std::task::{Context, Poll};
-use std::pin::Pin;
-use std::fmt;
-use std::fmt::Formatter;
 use std::error::Error;
-use web_sys::{GpuAdapter, GpuSupportedFeatures, GpuDeviceDescriptor};
+use std::fmt;
+use std::future::Future;
 use std::lazy::SyncOnceCell;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+use bitflags::bitflags;
+use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen_futures::JsFuture;
+use web_sys::{GpuAdapter, GpuDeviceDescriptor};
+
+use crate::device::{Device, DeviceDescriptor};
 
 bitflags! {
     #[repr(transparent)]
@@ -69,7 +70,7 @@ impl Features {
         }
 
         if self.intersects(Features::BGRA8UNORM_STORAGE) {
-            array.push(&JsValue::from( "bgra8unorm-storage"));
+            array.push(&JsValue::from("bgra8unorm-storage"));
         }
 
         array
@@ -140,7 +141,7 @@ impl Default for Limits {
             max_compute_workgroup_size_x: 256,
             max_compute_workgroup_size_y: 256,
             max_compute_workgroup_size_z: 64,
-            max_compute_workgroups_per_dimension: 65535
+            max_compute_workgroups_per_dimension: 65535,
         }
     }
 }
@@ -148,44 +149,69 @@ impl Default for Limits {
 pub struct Adapter {
     inner: GpuAdapter,
     features_cache: SyncOnceCell<Features>,
-    limits_cache: SyncOnceCell<Limits>
+    limits_cache: SyncOnceCell<Limits>,
 }
 
 impl Adapter {
+    #[doc(hidden)]
+    pub fn from_web_sys(inner: GpuAdapter) -> Self {
+        Adapter {
+            inner,
+            features_cache: Default::default(),
+            limits_cache: Default::default(),
+        }
+    }
+
     pub fn supported_features(&self) -> &Features {
         self.features_cache.get_or_init(|| {
             let raw = self.inner.features();
             let mut features = Features::NONE;
 
-            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("depth-clip-control")).unwrap_or(false) {
+            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("depth-clip-control"))
+                .unwrap_or(false)
+            {
                 features |= Features::DEPTH_CLIP_CONTROL;
             }
 
-            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("depth24unorm-stencil8")).unwrap_or(false) {
+            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("depth24unorm-stencil8"))
+                .unwrap_or(false)
+            {
                 features |= Features::DEPTH24UNORM_STENCIL8;
             }
 
-            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("depth32float-stencil8")).unwrap_or(false) {
+            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("depth32float-stencil8"))
+                .unwrap_or(false)
+            {
                 features |= Features::DEPTH32FLOAT_STENCIL8;
             }
 
-            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("texture-compression-bc")).unwrap_or(false) {
+            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("texture-compression-bc"))
+                .unwrap_or(false)
+            {
                 features |= Features::TEXTURE_COMPRESSION_BC;
             }
 
-            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("texture-compression-etc2")).unwrap_or(false) {
+            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("texture-compression-etc2"))
+                .unwrap_or(false)
+            {
                 features |= Features::TEXTURE_COMPRESSION_ETC2;
             }
 
-            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("texture-compression-astc")).unwrap_or(false) {
+            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("texture-compression-astc"))
+                .unwrap_or(false)
+            {
                 features |= Features::TEXTURE_COMPRESSION_ASTC;
             }
 
-            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("timestamp-query")).unwrap_or(false) {
+            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("timestamp-query"))
+                .unwrap_or(false)
+            {
                 features |= Features::TIMESTAMP_QUERY;
             }
 
-            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("indirect-first-instance")).unwrap_or(false) {
+            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("indirect-first-instance"))
+                .unwrap_or(false)
+            {
                 features |= Features::INDIRECT_FIRST_INSTANCE;
             }
 
@@ -193,7 +219,9 @@ impl Adapter {
                 features |= Features::SHADER_F16;
             }
 
-            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("bgra8unorm-storage")).unwrap_or(false) {
+            if js_sys::Reflect::has(raw.as_ref(), &JsValue::from("bgra8unorm-storage"))
+                .unwrap_or(false)
+            {
                 features |= Features::BGRA8UNORM_STORAGE;
             }
 
@@ -211,8 +239,10 @@ impl Adapter {
                 max_texture_dimension_3d: raw.max_texture_dimension_3d(),
                 max_texture_array_layers: raw.max_texture_array_layers(),
                 max_bind_groups: raw.max_bind_groups(),
-                max_dynamic_uniform_buffers_per_pipeline_layout: raw.max_dynamic_uniform_buffers_per_pipeline_layout(),
-                max_dynamic_storage_buffers_per_pipeline_layout: raw.max_dynamic_storage_buffers_per_pipeline_layout(),
+                max_dynamic_uniform_buffers_per_pipeline_layout: raw
+                    .max_dynamic_uniform_buffers_per_pipeline_layout(),
+                max_dynamic_storage_buffers_per_pipeline_layout: raw
+                    .max_dynamic_storage_buffers_per_pipeline_layout(),
                 max_sampled_textures_per_shader_stage: raw.max_sampled_textures_per_shader_stage(),
                 max_samplers_per_shader_stage: raw.max_samplers_per_shader_stage(),
                 max_storage_buffers_per_shader_stage: raw.max_storage_buffers_per_shader_stage(),
@@ -231,14 +261,15 @@ impl Adapter {
                 max_compute_workgroup_size_x: raw.max_compute_workgroup_size_x(),
                 max_compute_workgroup_size_y: raw.max_compute_workgroup_size_y(),
                 max_compute_workgroup_size_z: raw.max_compute_workgroup_size_z(),
-                max_compute_workgroups_per_dimension: raw.max_compute_workgroups_per_dimension()
+                max_compute_workgroups_per_dimension: raw.max_compute_workgroups_per_dimension(),
             }
         })
     }
 
     pub fn request_device(&self, descriptor: &DeviceDescriptor) -> RequestDevice {
         let DeviceDescriptor {
-            required_features, required_limits
+            required_features,
+            required_limits,
         } = descriptor;
 
         let mut desc = GpuDeviceDescriptor::new();
@@ -254,28 +285,26 @@ impl Adapter {
         let promise = self.inner.request_device_with_descriptor(&desc);
 
         RequestDevice {
-            inner: JsFuture::from(promise)
+            inner: JsFuture::from(promise),
         }
     }
 }
 
 pub struct RequestDevice {
-    inner: JsFuture
+    inner: JsFuture,
 }
 
 impl Future for RequestDevice {
     type Output = Result<Device, RequestDeviceError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Pin::new(&mut self.get_mut().inner).poll(cx).map_ok(|device| {
-            Device {
-                inner: device.unchecked_into()
-            }
-        })
-            .map_err(|err| {
-                RequestDeviceError {
-                    inner: err.unchecked_into()
-                }
+        Pin::new(&mut self.get_mut().inner)
+            .poll(cx)
+            .map_ok(|device| Device {
+                inner: device.unchecked_into(),
+            })
+            .map_err(|err| RequestDeviceError {
+                inner: err.unchecked_into(),
             })
     }
 }

@@ -1,3 +1,12 @@
+use std::marker;
+use std::ops::Rem;
+use std::sync::Arc;
+
+use web_sys::{
+    GpuColorDict, GpuCommandBuffer, GpuCommandEncoder, GpuComputePassEncoder, GpuExtent3dDict,
+    GpuRenderPassDescriptor, GpuRenderPassEncoder,
+};
+
 use crate::buffer::BufferDestroyer;
 use crate::command::{
     BindGroupEncoding, BindGroups, IndexBuffer, IndexBufferEncoding, VertexBufferEncoding,
@@ -6,23 +15,13 @@ use crate::command::{
 use crate::compute_pipeline::ComputePipeline;
 use crate::device::Device;
 use crate::query::OcclusionQuerySet;
-use crate::render_pipeline::{
-    IndexData, PipelineIndexFormat, PipelineIndexFormatCompatible, RenderPipeline,
-};
+use crate::render_pipeline::{PipelineIndexFormat, PipelineIndexFormatCompatible, RenderPipeline};
 use crate::render_target::{RenderTargetEncoding, ValidRenderTarget};
-use crate::resource_binding::{BindGroupEntry, EntryDestroyer};
+use crate::resource_binding::EntryDestroyer;
 use crate::texture::format::{ImageData, TextureFormat};
 use crate::texture::TextureDestroyer;
 use crate::type_flag::{TypeFlag, O, X};
 use crate::{buffer, texture};
-use std::any::Any;
-use std::ops::{Range, Rem};
-use std::sync::Arc;
-use std::{marker, mem};
-use web_sys::{
-    GpuBuffer, GpuColorDict, GpuCommandBuffer, GpuCommandEncoder, GpuComputePassEncoder,
-    GpuExtent3dDict, GpuRenderPassDescriptor, GpuRenderPassEncoder,
-};
 
 enum ResourceDestroyer {
     Buffer(Arc<BufferDestroyer>),
@@ -160,6 +159,11 @@ impl CommandEncoder {
         src: &buffer::ImageCopySrcRaw,
         dst: &texture::ImageCopyFromBufferDst<F>,
     ) -> Self {
+        assert!(
+            src.inner.bytes_per_block == dst.inner.bytes_per_block,
+            "`src` bytes per block does not match `dst` bytes per block"
+        );
+
         self.image_copy_buffer_to_texture_internal(&src.inner, dst)
     }
 
@@ -205,6 +209,11 @@ impl CommandEncoder {
         dst: &texture::SubImageCopyFromBufferDst<F>,
         size: ImageCopySize,
     ) -> Self {
+        assert!(
+            src.inner.bytes_per_block == dst.inner.bytes_per_block,
+            "`src` bytes per block does not match `dst` bytes per block"
+        );
+
         self.sub_image_copy_buffer_to_texture_internal(&src.inner, dst, size)
     }
 
@@ -261,6 +270,11 @@ impl CommandEncoder {
         src: &texture::ImageCopyToBufferSrc<F>,
         dst: &buffer::ImageCopyDstRaw,
     ) -> Self {
+        assert!(
+            src.inner.bytes_per_block == dst.inner.bytes_per_block,
+            "`src` bytes per block does not match `dst` bytes per block"
+        );
+
         self.image_copy_texture_to_buffer_internal(src, &dst.inner)
     }
 
@@ -306,6 +320,11 @@ impl CommandEncoder {
         dst: &buffer::ImageCopyDstRaw,
         size: ImageCopySize,
     ) -> Self {
+        assert!(
+            src.inner.bytes_per_block == dst.inner.bytes_per_block,
+            "`src` bytes per block does not match `dst` bytes per block"
+        );
+
         self.sub_image_copy_texture_to_buffer_internal(src, &dst.inner, size)
     }
 
@@ -728,16 +747,50 @@ impl<T> RenderPassDescriptor<T, ()>
 where
     T: ValidRenderTarget,
 {
-    pub fn new(render_target: T) -> Self {
+    pub fn new(render_target: &T) -> Self {
         let RenderTargetEncoding {
             color_attachments,
             depth_stencil_attachment,
         } = render_target.encoding();
 
-        let mut inner = GpuRenderPassDescriptor::new(&color_attachments);
+        let width;
+        let height;
+
+        if let Some(attachment) = &depth_stencil_attachment {
+            width = attachment.width;
+            height = attachment.height;
+        } else {
+            let first = color_attachments.first().expect(
+                "target must specify either at least 1 color attachment or a depth-stencil \
+                attachment",
+            );
+
+            width = first.width;
+            height = first.height;
+        }
+
+        for attachment in color_attachments.iter() {
+            if attachment.width != width || attachment.height != height {
+                panic!("all attachment dimensions must match")
+            }
+        }
+
+        if let Some(attachment) = &depth_stencil_attachment {
+            if attachment.width != width || attachment.height != height {
+                panic!("all attachment dimensions must match")
+            }
+        }
+
+        let color_array = js_sys::Array::new();
+
+        for attachment in color_attachments.iter() {
+            color_array.push(attachment.inner.as_ref());
+        }
+
+        let mut inner = GpuRenderPassDescriptor::new(&color_array);
 
         if let Some(depth_stencil_attachment) = depth_stencil_attachment {
-            inner.depth_stencil_attachment(&depth_stencil_attachment);
+            inner.depth_stencil_attachment(&depth_stencil_attachment.inner);
         }
 
         RenderPassDescriptor {

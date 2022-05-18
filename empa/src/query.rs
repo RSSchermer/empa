@@ -1,5 +1,6 @@
-use crate::device::Device;
 use web_sys::{GpuQuerySet, GpuQuerySetDescriptor, GpuQueryType};
+
+use crate::device::Device;
 
 pub struct OcclusionQuerySet {
     inner: GpuQuerySet,

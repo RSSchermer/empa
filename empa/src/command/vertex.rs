@@ -1,8 +1,8 @@
+use std::sync::Arc;
+
 use crate::buffer;
 use crate::buffer::{Buffer, BufferDestroyer};
 use crate::render_pipeline::{TypedVertexLayout, Vertex};
-use std::sync::Arc;
-use web_sys::GpuBuffer;
 
 pub struct VertexBufferEncoding {
     pub(crate) buffer: Arc<BufferDestroyer>,
@@ -81,7 +81,10 @@ pub trait VertexBuffers: vertex_buffers_seal::Seal {
 
 macro_rules! impl_vertex_buffers {
     ($n:literal, $($B:ident),*) => {
+        #[allow(unused_parens)]
         impl<$($B),*> vertex_buffers_seal::Seal for ($($B),*) where $($B: VertexBuffer),* {}
+
+        #[allow(unused_parens)]
         impl<$($B),*> VertexBuffers for ($($B),*) where $($B: VertexBuffer),* {
             type Layout = ($($B::Vertex),*);
 

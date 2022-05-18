@@ -1,27 +1,38 @@
-use crate::device::Device;
-use crate::texture::format::{
-    DepthSamplable, DepthStencilFormat, FloatRenderable, FloatSamplable, ImageBufferDataFormat,
-    ImageCopyFromBufferFormat, ImageCopyTextureFormat, ImageCopyToBufferFormat, Renderable,
-    SignedIntegerSamplable, Storable, SubImageCopyFormat, Texture2DFormat, TextureFormat,
-    UnfilteredFloatSamplable, UnsignedIntegerSamplable, ViewFormat, ViewFormats,
-};
-use crate::texture::{
-    CopyDst, CopySrc, FormatKind, ImageCopyFromBufferDst, ImageCopyFromTextureDst,
-    ImageCopyTexture, ImageCopyToBufferSrc, ImageCopyToTextureSrc, MipmapLevels, RenderAttachment,
-    StorageBinding, SubImageCopyFromBufferDst, SubImageCopyFromTextureDst, SubImageCopyToBufferSrc,
-    SubImageCopyToTextureSrc, TextureBinding, TextureDestroyer, UsageFlags,
-};
 use std::cmp::max;
 use std::marker;
 use std::ops::Rem;
 use std::sync::Arc;
+
+use staticvec::StaticVec;
 use web_sys::{
     GpuExtent3dDict, GpuTexture, GpuTextureAspect, GpuTextureDescriptor, GpuTextureDimension,
     GpuTextureFormat, GpuTextureView, GpuTextureViewDescriptor, GpuTextureViewDimension,
 };
 
+use crate::device::Device;
+use crate::texture::format::{
+    DepthSamplable, DepthStencilFormat, FloatSamplable, ImageBufferDataFormat,
+    ImageCopyFromBufferFormat, ImageCopyTextureFormat, ImageCopyToBufferFormat, Renderable,
+    SignedIntegerSamplable, Storable, SubImageCopyFormat, Texture2DFormat, TextureFormat,
+    TextureFormatId, UnfilteredFloatSamplable, UnsignedIntegerSamplable, ViewFormat, ViewFormats,
+};
+use crate::texture::{
+    CopyDst, CopySrc, FormatKind, ImageCopyFromBufferDst, ImageCopyFromTextureDst,
+    ImageCopyTexture, ImageCopyToBufferSrc, ImageCopyToTextureSrc, MipmapLevels, RenderAttachment,
+    StorageBinding, SubImageCopyFromBufferDst, SubImageCopyFromTextureDst, SubImageCopyToBufferSrc,
+    SubImageCopyToTextureSrc, TextureBinding, TextureDestroyer, UnsupportedViewFormat, UsageFlags,
+};
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Texture2DDescriptor {
+pub struct Texture2DDescriptor<F, U, V>
+where
+    F: Texture2DFormat,
+    U: UsageFlags,
+    V: ViewFormats<F>,
+{
+    pub format: F,
+    pub usage: U,
+    pub view_formats: V,
     pub width: u32,
     pub height: u32,
     pub layers: u32,
@@ -136,40 +147,71 @@ pub struct SubImageCopy2DDescriptor {
     pub origin_layer: u32,
 }
 
-pub struct Texture2D<F, Usage, ViewFormats = F> {
+pub struct Texture2D<F, Usage> {
     inner: Arc<TextureDestroyer>,
     width: u32,
     height: u32,
     layers: u32,
     mip_level_count: u8,
     format: FormatKind<F>,
+    view_formats: StaticVec<TextureFormatId, 8>,
     _usage: marker::PhantomData<Usage>,
-    _view_formats: marker::PhantomData<ViewFormats>,
 }
 
-impl<F, U, V> Texture2D<F, U, V> {
+impl<F, U> Texture2D<F, U>
+where
+    F: TextureFormat,
+    U: UsageFlags,
+{
+    #[doc(hidden)]
+    pub unsafe fn from_raw_parts(
+        web_sys: GpuTexture,
+        width: u32,
+        height: u32,
+        view_formats: &[TextureFormatId],
+    ) -> Self {
+        let view_formats = StaticVec::from(view_formats);
+
+        Texture2D {
+            inner: Arc::new(TextureDestroyer::new(web_sys)),
+            width,
+            height,
+            layers: 1,
+            mip_level_count: 1,
+            format: FormatKind::Typed(Default::default()),
+            view_formats,
+            _usage: Default::default(),
+        }
+    }
+}
+
+impl<F, U> Texture2D<F, U> {
     pub(crate) fn as_web_sys(&self) -> &GpuTexture {
         &self.inner.texture
     }
 }
 
-impl<F, U, V> Texture2D<F, U, V>
+impl<F, U> Texture2D<F, U>
 where
     F: Texture2DFormat,
     U: UsageFlags,
-    V: ViewFormats<F>,
 {
-    pub(crate) fn new(device: &Device, descriptor: &Texture2DDescriptor) -> Self {
+    pub(crate) fn new<V: ViewFormats<F>>(
+        device: &Device,
+        descriptor: &Texture2DDescriptor<F, U, V>,
+    ) -> Self {
         let Texture2DDescriptor {
+            view_formats,
             width,
             height,
             layers,
             mipmap_levels,
-        } = *descriptor;
+            ..
+        } = descriptor;
 
-        assert!(width > 0, "width must be greater than `0`");
-        assert!(height > 0, "height must be greater than `0`");
-        assert!(layers > 0, "must have at least one layer");
+        assert!(*width > 0, "width must be greater than `0`");
+        assert!(*height > 0, "height must be greater than `0`");
+        assert!(*layers > 0, "must have at least one layer");
 
         let [block_width, block_height] = F::BLOCK_SIZE;
 
@@ -184,11 +226,11 @@ where
             block_height
         );
 
-        let mip_level_count = mipmap_levels.to_u32(max(width, height));
-        let mut size = GpuExtent3dDict::new(width);
+        let mip_level_count = mipmap_levels.to_u32(max(*width, *height));
+        let mut size = GpuExtent3dDict::new(*width);
 
-        size.height(height);
-        size.depth_or_array_layers(layers);
+        size.height(*height);
+        size.depth_or_array_layers(*layers);
 
         let mut desc = GpuTextureDescriptor::new(F::FORMAT_ID.to_web_sys(), &size.into(), U::BITS);
 
@@ -196,16 +238,17 @@ where
         desc.mip_level_count(mip_level_count);
 
         let inner = device.inner.create_texture(&desc);
+        let view_formats = view_formats.formats().collect();
 
         Texture2D {
             inner: Arc::new(TextureDestroyer::new(inner)),
-            width,
-            height,
-            layers,
+            width: *width,
+            height: *height,
+            layers: *layers,
             mip_level_count: mip_level_count as u8,
             format: FormatKind::Typed(Default::default()),
+            view_formats,
             _usage: Default::default(),
-            _view_formats: Default::default(),
         }
     }
 
@@ -249,67 +292,169 @@ where
         self.as_web_sys().create_view_with_descriptor(&desc)
     }
 
-    pub fn sampled_float<ViewedFormat>(&self, descriptor: &View2DDescriptor) -> Sampled2DFloat
+    pub fn sampled_float(&self, descriptor: &View2DDescriptor) -> Sampled2DFloat
     where
-        ViewedFormat: ViewFormat<V> + FloatSamplable,
+        F: FloatSamplable,
         U: TextureBinding,
     {
         Sampled2DFloat {
-            inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_unfilterable_float<ViewedFormat>(
+    pub fn try_as_sampled_float<ViewedFormat>(
+        &self,
+        descriptor: &View2DDescriptor,
+    ) -> Result<Sampled2DFloat, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + FloatSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(Sampled2DFloat {
+                inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_unfilterable_float(
         &self,
         descriptor: &View2DDescriptor,
     ) -> Sampled2DUnfilteredFloat
     where
-        ViewedFormat: ViewFormat<V> + UnfilteredFloatSamplable,
+        F: UnfilteredFloatSamplable,
         U: TextureBinding,
     {
         Sampled2DUnfilteredFloat {
-            inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_signed_integer<ViewedFormat>(
+    pub fn try_as_sampled_unfilterable_float<ViewedFormat>(
         &self,
         descriptor: &View2DDescriptor,
-    ) -> Sampled2DSignedInteger
+    ) -> Result<Sampled2DUnfilteredFloat, UnsupportedViewFormat>
     where
-        ViewedFormat: ViewFormat<V> + SignedIntegerSamplable,
+        ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(Sampled2DUnfilteredFloat {
+                inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_signed_integer(&self, descriptor: &View2DDescriptor) -> Sampled2DSignedInteger
+    where
+        F: SignedIntegerSamplable,
         U: TextureBinding,
     {
         Sampled2DSignedInteger {
-            inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_unsigned_integer<ViewedFormat>(
+    pub fn try_as_sampled_signed_integer<ViewedFormat>(
+        &self,
+        descriptor: &View2DDescriptor,
+    ) -> Result<Sampled2DSignedInteger, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(Sampled2DSignedInteger {
+                inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_unsigned_integer(
         &self,
         descriptor: &View2DDescriptor,
     ) -> Sampled2DUnsignedInteger
     where
-        ViewedFormat: ViewFormat<V> + UnsignedIntegerSamplable,
+        F: UnsignedIntegerSamplable,
         U: TextureBinding,
     {
         Sampled2DUnsignedInteger {
-            inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_depth<ViewedFormat>(&self, descriptor: &View2DDescriptor) -> Sampled2DDepth
+    pub fn try_as_sampled_unsigned_integer<ViewedFormat>(
+        &self,
+        descriptor: &View2DDescriptor,
+    ) -> Result<Sampled2DUnsignedInteger, UnsupportedViewFormat>
     where
-        ViewedFormat: ViewFormat<V> + DepthSamplable,
+        ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(Sampled2DUnsignedInteger {
+                inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_depth(&self, descriptor: &View2DDescriptor) -> Sampled2DDepth
+    where
+        F: DepthSamplable,
         U: TextureBinding,
     {
         Sampled2DDepth {
-            inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
+        }
+    }
+
+    pub fn try_as_sampled_depth<ViewedFormat>(
+        &self,
+        descriptor: &View2DDescriptor,
+    ) -> Result<Sampled2DDepth, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + DepthSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(Sampled2DDepth {
+                inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
         }
     }
 
@@ -376,73 +521,177 @@ where
         self.as_web_sys().create_view_with_descriptor(&desc)
     }
 
-    pub fn sampled_array_float<ViewedFormat>(
-        &self,
-        descriptor: &View2DArrayDescriptor,
-    ) -> Sampled2DArrayFloat
+    pub fn sampled_array_float(&self, descriptor: &View2DArrayDescriptor) -> Sampled2DArrayFloat
     where
-        ViewedFormat: ViewFormat<V> + FloatSamplable,
+        F: FloatSamplable,
         U: TextureBinding,
     {
         Sampled2DArrayFloat {
-            inner: self.view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_array_unfilterable_float<ViewedFormat>(
+    pub fn try_as_sampled_array_float<ViewedFormat>(
+        &self,
+        descriptor: &View2DArrayDescriptor,
+    ) -> Result<Sampled2DArrayFloat, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + FloatSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(Sampled2DArrayFloat {
+                inner: self
+                    .view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_array_unfilterable_float(
         &self,
         descriptor: &View2DArrayDescriptor,
     ) -> Sampled2DArrayUnfilteredFloat
     where
-        ViewedFormat: ViewFormat<V> + UnfilteredFloatSamplable,
+        F: UnfilteredFloatSamplable,
         U: TextureBinding,
     {
         Sampled2DArrayUnfilteredFloat {
-            inner: self.view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_array_signed_integer<ViewedFormat>(
+    pub fn try_as_sampled_array_unfilterable_float<ViewedFormat>(
+        &self,
+        descriptor: &View2DArrayDescriptor,
+    ) -> Result<Sampled2DArrayUnfilteredFloat, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(Sampled2DArrayUnfilteredFloat {
+                inner: self
+                    .view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_array_signed_integer(
         &self,
         descriptor: &View2DArrayDescriptor,
     ) -> Sampled2DArraySignedInteger
     where
-        ViewedFormat: ViewFormat<V> + SignedIntegerSamplable,
+        F: SignedIntegerSamplable,
         U: TextureBinding,
     {
         Sampled2DArraySignedInteger {
-            inner: self.view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_array_unsigned_integer<ViewedFormat>(
+    pub fn try_as_sampled_array_signed_integer<ViewedFormat>(
+        &self,
+        descriptor: &View2DArrayDescriptor,
+    ) -> Result<Sampled2DArraySignedInteger, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(Sampled2DArraySignedInteger {
+                inner: self
+                    .view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_array_unsigned_integer(
         &self,
         descriptor: &View2DArrayDescriptor,
     ) -> Sampled2DArrayUnsignedInteger
     where
-        ViewedFormat: ViewFormat<V> + UnsignedIntegerSamplable,
+        F: UnsignedIntegerSamplable,
         U: TextureBinding,
     {
         Sampled2DArrayUnsignedInteger {
-            inner: self.view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_array_depth<ViewedFormat>(
+    pub fn try_as_sampled_array_unsigned_integer<ViewedFormat>(
         &self,
         descriptor: &View2DArrayDescriptor,
-    ) -> Sampled2DArrayDepth
+    ) -> Result<Sampled2DArrayUnsignedInteger, UnsupportedViewFormat>
     where
-        ViewedFormat: ViewFormat<V> + DepthSamplable,
+        ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(Sampled2DArrayUnsignedInteger {
+                inner: self
+                    .view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_array_depth(&self, descriptor: &View2DArrayDescriptor) -> Sampled2DArrayDepth
+    where
+        F: DepthSamplable,
         U: TextureBinding,
     {
         Sampled2DArrayDepth {
-            inner: self.view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
+        }
+    }
+
+    pub fn try_as_sampled_array_depth<ViewedFormat>(
+        &self,
+        descriptor: &View2DArrayDescriptor,
+    ) -> Result<Sampled2DArrayDepth, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + DepthSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(Sampled2DArrayDepth {
+                inner: self
+                    .view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
         }
     }
 
@@ -505,73 +754,172 @@ where
         self.as_web_sys().create_view_with_descriptor(&desc)
     }
 
-    pub fn sampled_cube_float<ViewedFormat>(
-        &self,
-        descriptor: &ViewCubeDescriptor,
-    ) -> SampledCubeFloat
+    pub fn sampled_cube_float(&self, descriptor: &ViewCubeDescriptor) -> SampledCubeFloat
     where
-        ViewedFormat: ViewFormat<V> + FloatSamplable,
+        F: FloatSamplable,
         U: TextureBinding,
     {
         SampledCubeFloat {
-            inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_cube_unfilterable_float<ViewedFormat>(
+    pub fn try_as_sampled_cube_float<ViewedFormat>(
+        &self,
+        descriptor: &ViewCubeDescriptor,
+    ) -> Result<SampledCubeFloat, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + FloatSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(SampledCubeFloat {
+                inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_cube_unfilterable_float(
         &self,
         descriptor: &ViewCubeDescriptor,
     ) -> SampledCubeUnfilteredFloat
     where
-        ViewedFormat: ViewFormat<V> + UnfilteredFloatSamplable,
+        F: UnfilteredFloatSamplable,
         U: TextureBinding,
     {
         SampledCubeUnfilteredFloat {
-            inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_cube_signed_integer<ViewedFormat>(
+    pub fn try_as_sampled_cube_unfilterable_float<ViewedFormat>(
+        &self,
+        descriptor: &ViewCubeDescriptor,
+    ) -> Result<SampledCubeUnfilteredFloat, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(SampledCubeUnfilteredFloat {
+                inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_cube_signed_integer(
         &self,
         descriptor: &ViewCubeDescriptor,
     ) -> SampledCubeSignedInteger
     where
-        ViewedFormat: ViewFormat<V> + SignedIntegerSamplable,
+        F: SignedIntegerSamplable,
         U: TextureBinding,
     {
         SampledCubeSignedInteger {
-            inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_cube_unsigned_integer<ViewedFormat>(
+    pub fn try_as_sampled_cube_signed_integer<ViewedFormat>(
+        &self,
+        descriptor: &ViewCubeDescriptor,
+    ) -> Result<SampledCubeSignedInteger, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(SampledCubeSignedInteger {
+                inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_cube_unsigned_integer(
         &self,
         descriptor: &ViewCubeDescriptor,
     ) -> SampledCubeUnsignedInteger
     where
-        ViewedFormat: ViewFormat<V> + UnsignedIntegerSamplable,
+        F: UnsignedIntegerSamplable,
         U: TextureBinding,
     {
         SampledCubeUnsignedInteger {
-            inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_cube_depth<ViewedFormat>(
+    pub fn try_as_sampled_cube_unsigned_integer<ViewedFormat>(
         &self,
         descriptor: &ViewCubeDescriptor,
-    ) -> SampledCubeDepth
+    ) -> Result<SampledCubeUnsignedInteger, UnsupportedViewFormat>
     where
-        ViewedFormat: ViewFormat<V> + DepthSamplable,
+        ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(SampledCubeUnsignedInteger {
+                inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_cube_depth(&self, descriptor: &ViewCubeDescriptor) -> SampledCubeDepth
+    where
+        F: DepthSamplable,
         U: TextureBinding,
     {
         SampledCubeDepth {
-            inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
+        }
+    }
+
+    pub fn try_as_sampled_cube_depth<ViewedFormat>(
+        &self,
+        descriptor: &ViewCubeDescriptor,
+    ) -> Result<SampledCubeDepth, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + DepthSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(SampledCubeDepth {
+                inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
         }
     }
 
@@ -643,73 +991,183 @@ where
         self.as_web_sys().create_view_with_descriptor(&desc)
     }
 
-    pub fn sampled_cube_array_float<ViewedFormat>(
+    pub fn sampled_cube_array_float(
         &self,
         descriptor: &ViewCubeArrayDescriptor,
     ) -> SampledCubeArrayFloat
     where
-        ViewedFormat: ViewFormat<V> + FloatSamplable,
+        F: FloatSamplable,
         U: TextureBinding,
     {
         SampledCubeArrayFloat {
-            inner: self.view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_cube_array_unfilterable_float<ViewedFormat>(
+    pub fn try_as_sampled_cube_array_float<ViewedFormat>(
+        &self,
+        descriptor: &ViewCubeArrayDescriptor,
+    ) -> Result<SampledCubeArrayFloat, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + FloatSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(SampledCubeArrayFloat {
+                inner: self
+                    .view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_cube_array_unfilterable_float(
         &self,
         descriptor: &ViewCubeArrayDescriptor,
     ) -> SampledCubeArrayUnfilteredFloat
     where
-        ViewedFormat: ViewFormat<V> + UnfilteredFloatSamplable,
+        F: UnfilteredFloatSamplable,
         U: TextureBinding,
     {
         SampledCubeArrayUnfilteredFloat {
-            inner: self.view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_cube_array_signed_integer<ViewedFormat>(
+    pub fn try_as_sampled_cube_array_unfilterable_float<ViewedFormat>(
+        &self,
+        descriptor: &ViewCubeArrayDescriptor,
+    ) -> Result<SampledCubeArrayUnfilteredFloat, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(SampledCubeArrayUnfilteredFloat {
+                inner: self
+                    .view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_cube_array_signed_integer(
         &self,
         descriptor: &ViewCubeArrayDescriptor,
     ) -> SampledCubeArraySignedInteger
     where
-        ViewedFormat: ViewFormat<V> + SignedIntegerSamplable,
+        F: SignedIntegerSamplable,
         U: TextureBinding,
     {
         SampledCubeArraySignedInteger {
-            inner: self.view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_cube_array_unsigned_integer<ViewedFormat>(
+    pub fn try_as_sampled_cube_array_signed_integer<ViewedFormat>(
+        &self,
+        descriptor: &ViewCubeArrayDescriptor,
+    ) -> Result<SampledCubeArraySignedInteger, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(SampledCubeArraySignedInteger {
+                inner: self
+                    .view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_cube_array_unsigned_integer(
         &self,
         descriptor: &ViewCubeArrayDescriptor,
     ) -> SampledCubeArrayUnsignedInteger
     where
-        ViewedFormat: ViewFormat<V> + UnsignedIntegerSamplable,
+        F: UnsignedIntegerSamplable,
         U: TextureBinding,
     {
         SampledCubeArrayUnsignedInteger {
-            inner: self.view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
         }
     }
 
-    pub fn sampled_cube_array_depth<ViewedFormat>(
+    pub fn try_as_sampled_cube_array_unsigned_integer<ViewedFormat>(
+        &self,
+        descriptor: &ViewCubeArrayDescriptor,
+    ) -> Result<SampledCubeArrayUnsignedInteger, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(SampledCubeArrayUnsignedInteger {
+                inner: self
+                    .view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    pub fn sampled_cube_array_depth(
         &self,
         descriptor: &ViewCubeArrayDescriptor,
     ) -> SampledCubeArrayDepth
     where
-        ViewedFormat: ViewFormat<V> + DepthSamplable,
+        F: DepthSamplable,
         U: TextureBinding,
     {
         SampledCubeArrayDepth {
-            inner: self.view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
             texture_destroyer: self.inner.clone(),
+        }
+    }
+
+    pub fn try_as_sampled_cube_array_depth<ViewedFormat>(
+        &self,
+        descriptor: &ViewCubeArrayDescriptor,
+    ) -> Result<SampledCubeArrayDepth, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + DepthSamplable,
+        U: TextureBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(SampledCubeArrayDepth {
+                inner: self
+                    .view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                texture_destroyer: self.inner.clone(),
+            })
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
         }
     }
 
@@ -728,12 +1186,12 @@ where
         }
     }
 
-    pub fn attachable_image<ViewedFormat>(
+    fn attachable_image_internal<ViewedFormat>(
         &self,
         descriptor: &AttachableImageDescriptor,
     ) -> AttachableImage<ViewedFormat>
     where
-        ViewedFormat: ViewFormat<V> + Renderable,
+        ViewedFormat: Renderable,
         U: RenderAttachment,
     {
         let AttachableImageDescriptor {
@@ -765,9 +1223,38 @@ where
         }
     }
 
-    pub fn storage<ViewedFormat>(&self, descriptor: &Storage2DDescriptor) -> Storage2D<ViewedFormat>
+    pub fn attachable_image(&self, descriptor: &AttachableImageDescriptor) -> AttachableImage<F>
     where
-        ViewedFormat: ViewFormat<V> + Storable,
+        F: Renderable,
+        U: RenderAttachment,
+    {
+        self.attachable_image_internal(descriptor)
+    }
+
+    pub fn try_as_attachable_image<ViewedFormat>(
+        &self,
+        descriptor: &AttachableImageDescriptor,
+    ) -> Result<AttachableImage<ViewedFormat>, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + Renderable,
+        U: RenderAttachment,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(self.attachable_image_internal(descriptor))
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    fn storage_internal<ViewedFormat>(
+        &self,
+        descriptor: &Storage2DDescriptor,
+    ) -> Storage2D<ViewedFormat>
+    where
+        ViewedFormat: Storable,
         U: StorageBinding,
     {
         let Storage2DDescriptor {
@@ -797,12 +1284,38 @@ where
         }
     }
 
-    pub fn storage_array<ViewedFormat>(
+    pub fn storage(&self, descriptor: &Storage2DDescriptor) -> Storage2D<F>
+    where
+        F: Storable,
+        U: StorageBinding,
+    {
+        self.storage_internal(descriptor)
+    }
+
+    pub fn try_as_storage<ViewedFormat>(
+        &self,
+        descriptor: &Storage2DDescriptor,
+    ) -> Result<Storage2D<ViewedFormat>, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + Storable,
+        U: StorageBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(self.storage_internal(descriptor))
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
+        }
+    }
+
+    fn storage_array_internal<ViewedFormat>(
         &self,
         descriptor: &Storage2DArrayDescriptor,
     ) -> Storage2DArray<ViewedFormat>
     where
-        ViewedFormat: ViewFormat<V> + Storable,
+        ViewedFormat: Storable,
         U: StorageBinding,
     {
         let Storage2DArrayDescriptor {
@@ -835,6 +1348,32 @@ where
             inner,
             texture_destroyer: self.inner.clone(),
             _marker: Default::default(),
+        }
+    }
+
+    pub fn storage_array(&self, descriptor: &Storage2DArrayDescriptor) -> Storage2DArray<F>
+    where
+        F: Storable,
+        U: StorageBinding,
+    {
+        self.storage_array_internal(descriptor)
+    }
+
+    pub fn try_as_storage_array<ViewedFormat>(
+        &self,
+        descriptor: &Storage2DArrayDescriptor,
+    ) -> Result<Storage2DArray<ViewedFormat>, UnsupportedViewFormat>
+    where
+        ViewedFormat: ViewFormat<F> + Storable,
+        U: StorageBinding,
+    {
+        if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
+            Ok(self.storage_array_internal(descriptor))
+        } else {
+            Err(UnsupportedViewFormat {
+                format: ViewedFormat::FORMAT_ID,
+                supported_formats: self.view_formats.clone(),
+            })
         }
     }
 

@@ -1,8 +1,10 @@
+use std::sync::Arc;
+
+use web_sys::GpuIndexFormat;
+
 use crate::buffer;
 use crate::buffer::{Buffer, BufferDestroyer};
 use crate::render_pipeline::IndexData;
-use std::sync::Arc;
-use web_sys::{GpuBuffer, GpuIndexFormat};
 
 pub struct IndexBufferEncoding {
     pub(crate) buffer: Arc<BufferDestroyer>,

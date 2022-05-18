@@ -1,7 +1,8 @@
+use std::marker;
+
 use crate::texture::format::{
     ColorRenderable, DepthStencilRenderable, MultisampleColorRenderable, TextureFormatId,
 };
-use std::marker;
 
 pub struct RenderLayoutDescriptor<'a> {
     pub color_layout: &'a [TextureFormatId],
@@ -27,7 +28,10 @@ pub trait TypedColorLayout: typed_color_layout_seal::Seal {
 
 macro_rules! impl_typed_color_layout {
     ($($color:ident),*) => {
+        #[allow(unused_parens)]
         impl<$($color),*> typed_color_layout_seal::Seal for ($($color),*) where $($color: ColorRenderable,)* {}
+
+        #[allow(unused_parens)]
         impl<$($color),*> TypedColorLayout for ($($color),*) where $($color: ColorRenderable,)* {
             const COLOR_FORMATS: &'static [TextureFormatId] =  &[$($color::FORMAT_ID),*];
         }
@@ -53,7 +57,10 @@ pub trait TypedMultisampleColorLayout: typed_multisample_color_layout_seal::Seal
 
 macro_rules! impl_typed_multisample_color_layout {
     ($($color:ident),*) => {
+        #[allow(unused_parens)]
         impl<$($color),*> typed_multisample_color_layout_seal::Seal for ($($color),*) where $($color: MultisampleColorRenderable,)* {}
+
+        #[allow(unused_parens)]
         impl<$($color),*> TypedMultisampleColorLayout for ($($color),*) where $($color: MultisampleColorRenderable,)* {
             const COLOR_FORMATS: &'static [TextureFormatId] =  &[$($color::FORMAT_ID),*];
         }

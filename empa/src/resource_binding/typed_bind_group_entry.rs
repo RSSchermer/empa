@@ -1,3 +1,5 @@
+use std::marker;
+
 use crate::abi;
 use crate::resource_binding::bind_group_layout::{
     BindGroupLayoutEntry, BindingType, ShaderStages as ShaderStageFlags, SizedBufferLayout,
@@ -5,11 +7,8 @@ use crate::resource_binding::bind_group_layout::{
 };
 use crate::texture::format::Storable;
 use crate::type_flag::{TypeFlag, O, X};
-use std::marker;
 
 mod visibility_seal {
-    use crate::resource_binding::ShaderStages as ShaderStageFlags;
-
     pub trait Seal {
         #[doc(hidden)]
         const BITS: u32;

@@ -1,16 +1,16 @@
-use crate::render_pipeline::{
-    PipelineConstants, ShaderModule, ShaderSourceInternal, StaticShaderStage,
-};
-use crate::render_target::{TypedColorLayout, TypedRenderLayout};
-use crate::texture::format::{Blendable, ColorRenderable, FloatSamplable};
-use std::borrow::Cow;
 use std::marker;
 use std::sync::Arc;
+
 use wasm_bindgen::JsValue;
 use web_sys::{
     GpuBlendComponent, GpuBlendFactor, GpuBlendOperation, GpuBlendState, GpuColorTargetState,
-    GpuFragmentState, GpuTextureFormat,
+    GpuFragmentState,
 };
+
+use crate::pipeline_constants::PipelineConstants;
+use crate::render_target::TypedColorLayout;
+use crate::shader_module::{ShaderModule, ShaderSourceInternal, StaticShaderStage};
+use crate::texture::format::{Blendable, ColorRenderable};
 
 pub enum BlendFactor {
     Zero,
@@ -230,7 +230,10 @@ pub trait TypedColorOutputs: typed_color_outputs_seal::Seal {
 
 macro_rules! impl_typed_color_outputs {
     ($n:literal, $($color:ident),*) => {
+        #[allow(unused_parens)]
         impl<$($color),*> typed_color_outputs_seal::Seal for ($($color),*) where $($color: TypedColorOutput),* {}
+
+        #[allow(unused_parens)]
         impl<$($color),*> TypedColorOutputs for ($($color),*) where $($color: TypedColorOutput),* {
             type Layout = ($($color::Format),*);
 

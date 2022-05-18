@@ -1,10 +1,14 @@
 use std::env;
 
+use empa_reflect::{
+    BindingType, ConstantIdentifier, ConstantType, EntryPointBinding, EntryPointBindingType,
+    Interpolation, MemoryUnit, MemoryUnitLayout, Sampling, ShaderSource, ShaderStage,
+    SizedBufferLayout, StorageTextureFormat, TexelType, UnsizedBufferLayout,
+};
 use include_preprocessor::{preprocess, SearchPaths};
-use proc_macro::{Literal, Span, TokenStream, TokenTree};
-use syn::{parse_macro_input, LitStr};
-use empa_reflect::{ShaderSource, BindingType, TexelType, StorageTextureFormat, SizedBufferLayout, MemoryUnit, MemoryUnitLayout, UnsizedBufferLayout, ConstantIdentifier, ConstantType, ShaderStage, EntryPointBinding, EntryPointBindingType, Interpolation, Sampling};
+use proc_macro::{Span, TokenStream};
 use quote::quote;
+use syn::{parse_macro_input, LitStr};
 
 pub fn expand_shader_source(input: TokenStream) -> TokenStream {
     let path = parse_macro_input!(input as LitStr);
@@ -38,7 +42,7 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
         let binding = b.binding();
         let binding_type = binding_type_tokens(b.binding_type());
 
-        quote!{
+        quote! {
             #mod_path::StaticResourceBinding {
                 group: #group,
                 binding: #binding,
@@ -59,7 +63,7 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
         let constant_type = constant_type_tokens(c.constant_type());
         let required = c.required();
 
-        quote!{
+        quote! {
             #mod_path::StaticConstantDescriptor {
                 identifier: #identifier,
                 constant_type: #constant_type,
@@ -74,7 +78,7 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
         let input_bindings = e.input_bindings().iter().map(entry_point_binding_tokens);
         let output_bindings = e.output_bindings().iter().map(entry_point_binding_tokens);
 
-        quote!{
+        quote! {
             #mod_path::StaticEntryPoint {
                 name: #name,
                 stage: #stage,
@@ -272,9 +276,7 @@ fn storage_format_tokens(storage_format: StorageTextureFormat) -> proc_macro2::T
 }
 
 fn sized_buffer_layout_tokens(layout: &SizedBufferLayout) -> proc_macro2::TokenStream {
-    let recurse = layout.memory_units().iter().map(|u| {
-        memory_unit_tokens(u)
-    });
+    let recurse = layout.memory_units().iter().map(|u| memory_unit_tokens(u));
 
     quote! {
         empa::resource_binding::SizedBufferLayout(&[#(#recurse),*])
@@ -282,14 +284,10 @@ fn sized_buffer_layout_tokens(layout: &SizedBufferLayout) -> proc_macro2::TokenS
 }
 
 fn unsized_buffer_layout_tokens(layout: &UnsizedBufferLayout) -> proc_macro2::TokenStream {
-    let head_recurse = layout.sized_head().iter().map(|u| {
-        memory_unit_tokens(u)
-    });
+    let head_recurse = layout.sized_head().iter().map(|u| memory_unit_tokens(u));
 
     let tail = if let Some(layout) = layout.unsized_tail() {
-        let recurse = layout.iter().map(|u| {
-            memory_unit_tokens(u)
-        });
+        let recurse = layout.iter().map(|u| memory_unit_tokens(u));
 
         quote! {
             Some(&[#(#recurse),*])
@@ -505,7 +503,7 @@ fn entry_point_binding_tokens(entry_point_binding: &EntryPointBinding) -> proc_m
         quote!(None)
     };
 
-    quote!{
+    quote! {
         #mod_path::StaticEntryPointBinding {
             location: #location,
             binding_type: #binding_type,
@@ -515,7 +513,9 @@ fn entry_point_binding_tokens(entry_point_binding: &EntryPointBinding) -> proc_m
     }
 }
 
-fn entry_point_binding_type_tokens(binding_type: EntryPointBindingType) -> proc_macro2::TokenStream {
+fn entry_point_binding_type_tokens(
+    binding_type: EntryPointBindingType,
+) -> proc_macro2::TokenStream {
     let mod_path = quote!(empa::shader_module);
 
     match binding_type {

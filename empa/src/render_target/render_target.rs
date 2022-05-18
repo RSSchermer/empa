@@ -1,10 +1,12 @@
+use staticvec::StaticVec;
+
 use crate::render_target::multisample_attachment::{
     MultisampleColorTargets, MultisampleDepthStencilTarget,
 };
 use crate::render_target::{
-    ColorTargets, DepthStencilTarget, MultisampleRenderLayout, RenderLayout, TypedRenderLayout,
+    ColorTargetEncoding, ColorTargets, DepthStencilTarget, DepthStencilTargetEncoding,
+    MultisampleRenderLayout, RenderLayout, TypedRenderLayout,
 };
-use web_sys::GpuRenderPassDepthStencilAttachment;
 
 mod valid_render_target_seal {
     pub trait Seal {}
@@ -17,8 +19,8 @@ pub trait ValidRenderTarget: valid_render_target_seal::Seal {
 }
 
 pub struct RenderTargetEncoding {
-    pub(crate) color_attachments: js_sys::Array,
-    pub(crate) depth_stencil_attachment: Option<GpuRenderPassDepthStencilAttachment>,
+    pub(crate) color_attachments: StaticVec<ColorTargetEncoding, 8>,
+    pub(crate) depth_stencil_attachment: Option<DepthStencilTargetEncoding>,
 }
 
 pub struct RenderTarget<C, Ds> {
@@ -45,15 +47,9 @@ where
             depth_stencil,
         } = self;
 
-        let color_attachments = color
-            .encodings()
-            .map(|e| e.inner)
-            .collect::<js_sys::Array>();
-        let depth_stencil_attachment = depth_stencil.to_encoding().inner;
-
         RenderTargetEncoding {
-            color_attachments,
-            depth_stencil_attachment: Some(depth_stencil_attachment),
+            color_attachments: color.encodings().collect(),
+            depth_stencil_attachment: Some(depth_stencil.to_encoding()),
         }
     }
 }
@@ -66,14 +62,8 @@ where
     type RenderLayout = RenderLayout<C::Layout, ()>;
 
     fn encoding(&self) -> RenderTargetEncoding {
-        let color_attachments = self
-            .color
-            .encodings()
-            .map(|e| e.inner)
-            .collect::<js_sys::Array>();
-
         RenderTargetEncoding {
-            color_attachments,
+            color_attachments: self.color.encodings().collect(),
             depth_stencil_attachment: None,
         }
     }
@@ -87,11 +77,9 @@ where
     type RenderLayout = RenderLayout<(), Ds::Format>;
 
     fn encoding(&self) -> RenderTargetEncoding {
-        let depth_stencil_attachment = self.depth_stencil.to_encoding().inner;
-
         RenderTargetEncoding {
-            color_attachments: js_sys::Array::new(),
-            depth_stencil_attachment: Some(depth_stencil_attachment),
+            color_attachments: StaticVec::new(),
+            depth_stencil_attachment: Some(self.depth_stencil.to_encoding()),
         }
     }
 }
@@ -121,15 +109,9 @@ where
             depth_stencil,
         } = self;
 
-        let color_attachments = color
-            .encodings()
-            .map(|e| e.inner)
-            .collect::<js_sys::Array>();
-        let depth_stencil_attachment = depth_stencil.to_encoding().inner;
-
         RenderTargetEncoding {
-            color_attachments,
-            depth_stencil_attachment: Some(depth_stencil_attachment),
+            color_attachments: color.encodings().collect(),
+            depth_stencil_attachment: Some(depth_stencil.to_encoding()),
         }
     }
 }
@@ -147,14 +129,8 @@ where
     type RenderLayout = MultisampleRenderLayout<C::Layout, (), SAMPLES>;
 
     fn encoding(&self) -> RenderTargetEncoding {
-        let color_attachments = self
-            .color
-            .encodings()
-            .map(|e| e.inner)
-            .collect::<js_sys::Array>();
-
         RenderTargetEncoding {
-            color_attachments,
+            color_attachments: self.color.encodings().collect(),
             depth_stencil_attachment: None,
         }
     }
@@ -173,11 +149,9 @@ where
     type RenderLayout = MultisampleRenderLayout<(), Ds::Format, SAMPLES>;
 
     fn encoding(&self) -> RenderTargetEncoding {
-        let depth_stencil_attachment = self.depth_stencil.to_encoding().inner;
-
         RenderTargetEncoding {
-            color_attachments: js_sys::Array::new(),
-            depth_stencil_attachment: Some(depth_stencil_attachment),
+            color_attachments: StaticVec::new(),
+            depth_stencil_attachment: Some(self.depth_stencil.to_encoding()),
         }
     }
 }

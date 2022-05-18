@@ -1,9 +1,10 @@
+use std::marker;
+use std::sync::Arc;
+
+use web_sys::{GpuImageCopyTexture, GpuOrigin3dDict, GpuTextureAspect};
+
 use crate::command::ImageCopySize;
 use crate::texture::TextureDestroyer;
-use std::marker;
-use std::ops::Rem;
-use std::sync::Arc;
-use web_sys::{GpuImageCopyTexture, GpuOrigin3dDict, GpuTexture, GpuTextureAspect};
 
 pub(crate) struct ImageCopyTexture<F> {
     pub(crate) texture: Arc<TextureDestroyer>,

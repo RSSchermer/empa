@@ -1,13 +1,11 @@
 use crate::render_target::{
     ColorTargetEncoding, DepthStencilTargetEncoding, LoadOp, StoreOp, TypedColorLayout,
-    TypedRenderLayout,
 };
 use crate::texture::format::{
     ColorRenderable, CombinedDepthStencilRenderable, DepthRenderable, DepthStencilRenderable,
     FloatRenderable, SignedIntegerRenderable, StencilRenderable, UnsignedIntegerRenderable,
 };
 use crate::texture::AttachableImage;
-use web_sys::{GpuRenderPassColorAttachment, GpuRenderPassDepthStencilAttachment};
 
 mod color_targets_seal {
     pub trait Seal {}
@@ -23,7 +21,10 @@ pub trait ColorTargets: color_targets_seal::Seal {
 
 macro_rules! impl_color_targets {
     ($n:literal, $($A:ident),*) => {
+        #[allow(unused_parens)]
         impl<$($A),*> color_targets_seal::Seal for ($($A),*) where $($A: ColorTarget),* {}
+
+        #[allow(unused_parens)]
         impl<$($A),*> ColorTargets for ($($A),*) where $($A: ColorTarget),* {
             type Layout = ($($A::Format),*);
             type Encodings = <[ColorTargetEncoding; $n] as IntoIterator>::IntoIter;
@@ -74,7 +75,13 @@ where
     type Format = F;
 
     fn to_encoding(&self) -> ColorTargetEncoding {
-        todo!()
+        let FloatAttachment {
+            image,
+            load_op,
+            store_op,
+        } = self;
+
+        todo!();
     }
 }
 

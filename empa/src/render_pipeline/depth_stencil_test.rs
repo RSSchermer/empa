@@ -1,8 +1,10 @@
+use std::marker;
+
+use web_sys::{GpuDepthStencilState, GpuStencilFaceState, GpuStencilOperation};
+
 use crate::render_target::ReadOnly;
 use crate::texture::format::DepthStencilFormat;
 use crate::CompareFunction;
-use std::marker;
-use web_sys::{GpuDepthStencilState, GpuStencilFaceState, GpuStencilOperation};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct StencilFaceState {
@@ -25,8 +27,8 @@ impl StencilFaceState {
 
         state.compare(compare.to_web_sys());
         state.depth_fail_op(depth_fail_op.to_web_sys());
-        state.fail_op(depth_fail_op.to_web_sys());
-        state.pass_op(depth_fail_op.to_web_sys());
+        state.fail_op(fail_op.to_web_sys());
+        state.pass_op(pass_op.to_web_sys());
 
         state
     }

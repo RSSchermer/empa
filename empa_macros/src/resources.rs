@@ -96,7 +96,6 @@ pub fn expand_derive_resources(input: &DeriveInput) -> Result<TokenStream, Strin
         }
 
         let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-        let len = resource_fields.len();
 
         let impl_block = quote! {
             #[automatically_derived]

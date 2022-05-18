@@ -22,8 +22,12 @@ pub enum StoreOp {
 
 pub struct ColorTargetEncoding {
     pub(crate) inner: web_sys::GpuRenderPassColorAttachment,
+    pub(crate) width: u32,
+    pub(crate) height: u32,
 }
 
 pub struct DepthStencilTargetEncoding {
     pub(crate) inner: web_sys::GpuRenderPassDepthStencilAttachment,
+    pub(crate) width: u32,
+    pub(crate) height: u32,
 }

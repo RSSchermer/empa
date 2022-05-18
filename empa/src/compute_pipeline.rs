@@ -1,15 +1,14 @@
-use crate::device::Device;
-use crate::device::ID_GEN;
+use std::marker;
+use std::sync::Arc;
+
+use atomic_counter::AtomicCounter;
+use wasm_bindgen::{JsCast, JsValue};
+use web_sys::{GpuComputePipeline, GpuComputePipelineDescriptor, GpuProgrammableStage};
+
+use crate::device::{Device, ID_GEN};
 use crate::pipeline_constants::PipelineConstants;
 use crate::resource_binding::{PipelineLayout, ShaderStages, TypedPipelineLayout};
 use crate::shader_module::{ShaderModule, ShaderSourceInternal, StaticShaderStage};
-use atomic_counter::AtomicCounter;
-use std::marker;
-use std::sync::Arc;
-use wasm_bindgen::{JsCast, JsValue};
-use web_sys::{
-    GpuComputePipeline, GpuComputePipelineDescriptor, GpuPipelineLayout, GpuProgrammableStage,
-};
 
 pub struct ComputePipeline<L> {
     inner: GpuComputePipeline,

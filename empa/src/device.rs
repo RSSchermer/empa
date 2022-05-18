@@ -1,10 +1,15 @@
-use crate::buffer::{AsBuffer, Buffer};
 use std::mem::MaybeUninit;
 
+use atomic_counter::RelaxedCounter;
+use lazy_static::lazy_static;
+use web_sys::{GpuDevice, GpuQueue};
+
+use crate::adapter::{Features, Limits};
+use crate::buffer::{AsBuffer, Buffer};
 use crate::command::{CommandBuffer, CommandEncoder};
-use crate::compute_pipeline::ComputePipelineDescriptor;
+use crate::compute_pipeline::{ComputePipeline, ComputePipelineDescriptor};
 use crate::query::OcclusionQuerySet;
-use crate::render_pipeline::{ComputePipeline, RenderPipeline, RenderPipelineDescriptor};
+use crate::render_pipeline::{RenderPipeline, RenderPipelineDescriptor};
 use crate::resource_binding::{
     BindGroup, BindGroupLayout, BindGroupLayoutEntry, PipelineLayout, Resources,
     TypedBindGroupLayout, TypedPipelineLayout,
@@ -13,18 +18,15 @@ use crate::sampler::{
     AnisotropicSamplerDescriptor, ComparisonSampler, ComparisonSamplerDescriptor,
     NonFilteringSampler, NonFilteringSamplerDescriptor, Sampler, SamplerDescriptor,
 };
+use crate::shader_module::{ShaderModule, ShaderSource};
 use crate::texture::format::{
     MultisampleFormat, Texture1DFormat, Texture2DFormat, Texture3DFormat, ViewFormats,
 };
 use crate::texture::{
-    Texture1D, Texture2D, Texture2DDescriptor, Texture3D, Texture3DDescriptor,
+    Texture1D, Texture1DDescriptor, Texture2D, Texture2DDescriptor, Texture3D, Texture3DDescriptor,
     TextureMultisampled2D, TextureMultisampled2DDescriptor,
 };
 use crate::{buffer, texture};
-use atomic_counter::RelaxedCounter;
-use lazy_static::lazy_static;
-use web_sys::{GpuDevice, GpuQueue};
-use crate::adapter::{Limits, Features};
 
 lazy_static! {
     pub(crate) static ref ID_GEN: RelaxedCounter = RelaxedCounter::new(1);
@@ -33,7 +35,7 @@ lazy_static! {
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub struct DeviceDescriptor {
     pub required_features: Features,
-    pub required_limits: Limits
+    pub required_limits: Limits,
 }
 
 pub struct Device {
@@ -41,6 +43,11 @@ pub struct Device {
 }
 
 impl Device {
+    #[doc(hidden)]
+    pub fn as_web_sys(&self) -> &GpuDevice {
+        &self.inner
+    }
+
     pub fn create_buffer<D, T, U>(&self, data: D) -> Buffer<T, U>
     where
         D: AsBuffer<T>,
@@ -114,6 +121,10 @@ impl Device {
         BindGroup::new(self, layout, resources)
     }
 
+    pub fn create_shader_module(&self, source: &ShaderSource) -> ShaderModule {
+        ShaderModule::new(self, source)
+    }
+
     pub fn create_compute_pipeline<R>(
         &self,
         descriptor: &ComputePipelineDescriptor<R>,
@@ -150,16 +161,22 @@ impl Device {
         NonFilteringSampler::new(self, descriptor)
     }
 
-    pub fn create_texture_1d<F, U, V>(&self, size: u32) -> Texture1D<F, U, V>
+    pub fn create_texture_1d<F, U, V>(
+        &self,
+        descriptor: &Texture1DDescriptor<F, U, V>,
+    ) -> Texture1D<F, U>
     where
         F: Texture1DFormat,
         U: texture::UsageFlags,
         V: ViewFormats<F>,
     {
-        Texture1D::new(self, size)
+        Texture1D::new(self, descriptor)
     }
 
-    pub fn create_texture_2d<F, U, V>(&self, descriptor: &Texture2DDescriptor) -> Texture2D<F, U, V>
+    pub fn create_texture_2d<F, U, V>(
+        &self,
+        descriptor: &Texture2DDescriptor<F, U, V>,
+    ) -> Texture2D<F, U>
     where
         F: Texture2DFormat,
         U: texture::UsageFlags,
@@ -168,7 +185,10 @@ impl Device {
         Texture2D::new(self, descriptor)
     }
 
-    pub fn create_texture_3d<F, U, V>(&self, descriptor: &Texture3DDescriptor) -> Texture3D<F, U, V>
+    pub fn create_texture_3d<F, U, V>(
+        &self,
+        descriptor: &Texture3DDescriptor<F, U, V>,
+    ) -> Texture3D<F, U>
     where
         F: Texture3DFormat,
         U: texture::UsageFlags,

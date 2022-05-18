@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "empa",
+    "empa_arwa",
     "empa_macros",
     "empa_reflect"
 ]

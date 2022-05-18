@@ -1,10 +1,11 @@
+use std::marker;
+use std::sync::Arc;
+
+use web_sys::GpuVertexState;
+
 use crate::pipeline_constants::PipelineConstants;
 use crate::render_pipeline::TypedVertexLayout;
 use crate::shader_module::{ShaderModule, ShaderSourceInternal, StaticShaderStage};
-use std::marker;
-use std::sync::Arc;
-use wasm_bindgen::JsValue;
-use web_sys::GpuVertexState;
 
 pub struct VertexStage<O> {
     pub(crate) inner: GpuVertexState,
@@ -47,7 +48,7 @@ impl VertexStageBuilder<()> {
         }
     }
 
-    pub fn vertex_layout<V: TypedVertexLayout>(self, color_outputs: V) -> VertexStageBuilder<V> {
+    pub fn vertex_layout<V: TypedVertexLayout>(self) -> VertexStageBuilder<V> {
         let VertexStageBuilder {
             inner,
             shader_meta,

@@ -1,15 +1,12 @@
 use crate::render_target::{
     ColorTargetEncoding, DepthStencilTargetEncoding, LoadOp, StoreOp, TypedMultisampleColorLayout,
-    TypedRenderLayout,
 };
 use crate::texture::format::{
-    ColorRenderable, CombinedDepthStencilRenderable, DepthRenderable, DepthStencilRenderable,
-    FloatRenderable, MultisampleColorRenderable, MultisampleFloatRenderable,
-    MultisampleSignedIntegerRenderable, MultisampleUnsignedIntegerRenderable, Resolvable,
-    SignedIntegerRenderable, StencilRenderable, UnsignedIntegerRenderable,
+    CombinedDepthStencilRenderable, DepthRenderable, DepthStencilRenderable,
+    MultisampleColorRenderable, MultisampleFloatRenderable, MultisampleSignedIntegerRenderable,
+    MultisampleUnsignedIntegerRenderable, Resolvable, StencilRenderable,
 };
 use crate::texture::{AttachableImage, AttachableMultisampledImage};
-use web_sys::{GpuRenderPassColorAttachment, GpuRenderPassDepthStencilAttachment};
 
 mod multisample_color_targets_seal {
     pub trait Seal<const SAMPLES: u8> {}
@@ -27,7 +24,10 @@ pub trait MultisampleColorTargets<const SAMPLES: u8>:
 
 macro_rules! impl_multisample_color_targets {
     ($n:literal, $($A:ident),*) => {
+        #[allow(unused_parens)]
         impl<$($A,)* const SAMPLES: u8> multisample_color_targets_seal::Seal<SAMPLES> for ($($A),*) where $($A: MultisampleColorTarget<SAMPLES>),* {}
+
+        #[allow(unused_parens)]
         impl<$($A,)* const SAMPLES: u8> MultisampleColorTargets<SAMPLES> for ($($A),*) where $($A: MultisampleColorTarget<SAMPLES>),* {
             type Layout = ($($A::Format),*);
             type Encodings = <[ColorTargetEncoding; $n] as IntoIterator>::IntoIter;

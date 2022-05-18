@@ -1,7 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::spanned::Spanned;
-use syn::{Attribute, Data, DeriveInput, Field, Ident, Lit, Meta, NestedMeta, Type, Error};
+use syn::{Attribute, Data, DeriveInput, Field, Ident, Lit, Meta, NestedMeta, Type};
 
 use crate::error_log::ErrorLog;
 
@@ -20,8 +20,7 @@ pub fn expand_derive_pipeline_constants(input: &DeriveInput) -> Result<TokenStre
                 if field.id == f.id {
                     log.log_error(format!(
                         "Fields `{}` and `{}` declare the same ID.",
-                        &f.name,
-                        &field.name
+                        &f.name, &field.name
                     ));
 
                     continue 'outer;
@@ -48,7 +47,7 @@ pub fn expand_derive_pipeline_constants(input: &DeriveInput) -> Result<TokenStre
             };
 
             quote_spanned!(span=> {
-                #pattern => Some(self.#field_ident)
+                #pattern => Some(<#ty as #mod_path::PipelineConstant>::to_value(&self.#field_ident))
             })
         });
 
@@ -70,7 +69,10 @@ pub fn expand_derive_pipeline_constants(input: &DeriveInput) -> Result<TokenStre
         };
 
         let suffix = struct_name.to_string().trim_start_matches("r#").to_owned();
-        let dummy_const = Ident::new(&format!("_IMPL_PIPELINE_CONSTANTS_FOR_{}", suffix), Span::call_site());
+        let dummy_const = Ident::new(
+            &format!("_IMPL_PIPELINE_CONSTANTS_FOR_{}", suffix),
+            Span::call_site(),
+        );
 
         let generated = quote! {
             #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
@@ -167,7 +169,7 @@ impl ConstantField {
             name: field_name,
             ty: ast.ty.clone(),
             id,
-            span: ast.span()
+            span: ast.span(),
         }
     }
 }
