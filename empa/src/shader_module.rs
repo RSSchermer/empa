@@ -8,6 +8,8 @@ use crate::device::Device;
 use crate::pipeline_constants::{PipelineConstantIdentifier, PipelineConstants};
 use crate::resource_binding::BindingType;
 
+pub use empa_macros::shader_source;
+
 /// Internal type for `shader_source` macro.
 #[doc(hidden)]
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -157,9 +159,10 @@ pub struct StaticEntryPoint {
     pub output_bindings: &'static [StaticEntryPointBinding],
 }
 
+#[derive(Clone)]
 pub(crate) enum ShaderSourceInternal {
     Static(StaticShaderSource),
-    Dynamic(DynamicShaderSource),
+    Dynamic(Arc<DynamicShaderSource>),
 }
 
 impl ShaderSourceInternal {
@@ -225,22 +228,22 @@ impl ShaderSourceInternal {
 }
 
 pub struct ShaderSource {
-    inner: Arc<ShaderSourceInternal>,
+    inner: ShaderSourceInternal,
 }
 
 impl ShaderSource {
     /// Internal function for `shader_source` macro.
     #[doc(hidden)]
-    pub fn from_static(shader_source: StaticShaderSource) -> Self {
+    pub const fn from_static(shader_source: StaticShaderSource) -> Self {
         ShaderSource {
-            inner: Arc::new(ShaderSourceInternal::Static(shader_source)),
+            inner: ShaderSourceInternal::Static(shader_source),
         }
     }
 }
 
 pub struct ShaderModule {
     pub(crate) inner: GpuShaderModule,
-    pub(crate) meta: Arc<ShaderSourceInternal>,
+    pub(crate) meta: ShaderSourceInternal,
 }
 
 impl ShaderModule {

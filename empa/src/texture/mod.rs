@@ -30,17 +30,20 @@ use crate::texture::format::TextureFormatId;
 
 pub(crate) struct TextureDestroyer {
     texture: web_sys::GpuTexture,
+    is_swap_chain: bool
 }
 
 impl TextureDestroyer {
-    fn new(texture: web_sys::GpuTexture) -> Self {
-        TextureDestroyer { texture }
+    fn new(texture: web_sys::GpuTexture, is_swap_chain: bool) -> Self {
+        TextureDestroyer { texture, is_swap_chain }
     }
 }
 
 impl Drop for TextureDestroyer {
     fn drop(&mut self) {
-        self.texture.destroy();
+        if !self.is_swap_chain {
+            self.texture.destroy();
+        }
     }
 }
 

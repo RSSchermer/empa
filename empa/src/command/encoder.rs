@@ -1,7 +1,8 @@
-use std::marker;
 use std::ops::Rem;
 use std::sync::Arc;
+use std::{marker, mem};
 
+use staticvec::StaticVec;
 use web_sys::{
     GpuColorDict, GpuCommandBuffer, GpuCommandEncoder, GpuComputePassEncoder, GpuExtent3dDict,
     GpuRenderPassDescriptor, GpuRenderPassEncoder,
@@ -27,6 +28,7 @@ enum ResourceDestroyer {
     Buffer(Arc<BufferDestroyer>),
     Texture(Arc<TextureDestroyer>),
     BindGroup(Arc<Vec<EntryDestroyer>>),
+    RenderTarget(Arc<StaticVec<Arc<TextureDestroyer>, 9>>),
 }
 
 impl From<Arc<BufferDestroyer>> for ResourceDestroyer {
@@ -44,6 +46,12 @@ impl From<Arc<TextureDestroyer>> for ResourceDestroyer {
 impl From<Arc<Vec<EntryDestroyer>>> for ResourceDestroyer {
     fn from(destroyer: Arc<Vec<EntryDestroyer>>) -> Self {
         ResourceDestroyer::BindGroup(destroyer)
+    }
+}
+
+impl From<Arc<StaticVec<Arc<TextureDestroyer>, 9_usize>>> for ResourceDestroyer {
+    fn from(destroyer: Arc<StaticVec<Arc<TextureDestroyer>, 9>>) -> Self {
+        ResourceDestroyer::RenderTarget(destroyer)
     }
 }
 
@@ -81,7 +89,32 @@ impl CommandEncoder {
         U1: buffer::CopyDst + 'static,
         T: 'static,
     {
-        todo!();
+        let src_offset = src.offset_in_bytes() as u32;
+        let dst_offset = dst.offset_in_bytes() as u32;
+        let size = mem::size_of::<T>();
+
+        assert!(
+            size.rem(4) == 0,
+            "copied size in bytes must be a multiple of `4`"
+        );
+
+        // This may be redundant, because the offset must be sized aligned anyway?
+        assert!(
+            src_offset.rem(4) == 0,
+            "`src` view's offset in bytes must be a multiple of `8`"
+        );
+        assert!(
+            dst_offset.rem(4) == 0,
+            "`dst` view's offset in bytes must be a multiple of `8`"
+        );
+
+        self.inner.copy_buffer_to_buffer_with_u32_and_u32_and_u32(
+            src.as_web_sys(),
+            src_offset,
+            dst.as_web_sys(),
+            dst_offset,
+            size as u32,
+        );
 
         self
     }
@@ -101,7 +134,33 @@ impl CommandEncoder {
             "source and destination have different lengths"
         );
 
-        todo!();
+        let src_offset = src.offset_in_bytes() as u32;
+        let dst_offset = dst.offset_in_bytes() as u32;
+
+        debug_assert!(src.size_in_bytes() == dst.size_in_bytes());
+
+        let size = src.size_in_bytes();
+
+        assert!(
+            size.rem(4) == 0,
+            "copied size in bytes must be a multiple of `4`"
+        );
+        assert!(
+            src_offset.rem(4) == 0,
+            "`src` view's offset in bytes must be a multiple of `8`"
+        );
+        assert!(
+            dst_offset.rem(4) == 0,
+            "`dst` view's offset in bytes must be a multiple of `8`"
+        );
+
+        self.inner.copy_buffer_to_buffer_with_u32_and_u32_and_u32(
+            src.as_web_sys(),
+            src_offset,
+            dst.as_web_sys(),
+            dst_offset,
+            size as u32,
+        );
 
         self
     }
@@ -429,10 +488,13 @@ impl CommandEncoder {
     }
 
     pub fn begin_render_pass<T, Q>(
-        self,
+        mut self,
         descriptor: &RenderPassDescriptor<T, Q>,
     ) -> RenderPassEncoder<T, (), (), (), (), Q> {
         let inner = self.inner.begin_render_pass(&descriptor.inner);
+
+        self._resource_destroyers
+            .push(descriptor._texture_destroyers.clone().into());
 
         RenderPassEncoder {
             inner,
@@ -616,7 +678,7 @@ impl<P, R> ComputePassEncoder<P, R> {
     }
 
     pub fn end(self) -> CommandEncoder {
-        self.inner.end_pass();
+        self.inner.end();
 
         self.command_encoder
     }
@@ -633,7 +695,10 @@ where
             count_z,
         } = dispatch_workgroups;
 
-        self.inner.dispatch_with_y_and_z(count_x, count_y, count_z);
+        self.inner
+            .dispatch_workgroups_with_workgroup_count_y_and_workgroup_count_z(
+                count_x, count_y, count_z,
+            );
 
         self
     }
@@ -643,7 +708,7 @@ where
         U: buffer::Indirect,
     {
         self.inner
-            .dispatch_indirect_with_u32(view.as_web_sys(), view.size_in_bytes() as u32);
+            .dispatch_workgroups_indirect_with_u32(view.as_web_sys(), view.size_in_bytes() as u32);
 
         self
     }
@@ -740,14 +805,14 @@ impl EndRenderPass for () {}
 
 pub struct RenderPassDescriptor<RenderTarget, OcclusionQueryState> {
     inner: GpuRenderPassDescriptor,
+    _texture_destroyers: Arc<StaticVec<Arc<TextureDestroyer>, 9>>,
     _marker: marker::PhantomData<(*const RenderTarget, OcclusionQueryState)>,
 }
 
-impl<T> RenderPassDescriptor<T, ()>
-where
-    T: ValidRenderTarget,
-{
-    pub fn new(render_target: &T) -> Self {
+impl RenderPassDescriptor<(), ()> {
+    pub fn new<T: ValidRenderTarget>(
+        render_target: &T,
+    ) -> RenderPassDescriptor<T::RenderLayout, ()> {
         let RenderTargetEncoding {
             color_attachments,
             depth_stencil_attachment,
@@ -782,23 +847,29 @@ where
         }
 
         let color_array = js_sys::Array::new();
+        let mut texture_destroyers = StaticVec::new();
 
-        for attachment in color_attachments.iter() {
+        for attachment in color_attachments {
             color_array.push(attachment.inner.as_ref());
+            texture_destroyers.push(attachment._texture_destroyer);
         }
 
         let mut inner = GpuRenderPassDescriptor::new(&color_array);
 
         if let Some(depth_stencil_attachment) = depth_stencil_attachment {
             inner.depth_stencil_attachment(&depth_stencil_attachment.inner);
+            texture_destroyers.push(depth_stencil_attachment._texture_destroyer);
         }
 
         RenderPassDescriptor {
             inner,
+            _texture_destroyers: Arc::new(texture_destroyers),
             _marker: Default::default(),
         }
     }
+}
 
+impl<T> RenderPassDescriptor<T, ()> {
     pub fn occlusion_query_set(
         mut self,
         occlusion_query_set: &OcclusionQuerySet,
@@ -808,6 +879,7 @@ where
 
         RenderPassDescriptor {
             inner: self.inner,
+            _texture_destroyers: self._texture_destroyers,
             _marker: Default::default(),
         }
     }
@@ -1182,7 +1254,7 @@ where
     Q: EndRenderPass,
 {
     pub fn end(self) -> CommandEncoder {
-        self.inner.end_pass();
+        self.inner.end();
 
         self.command_encoder
     }

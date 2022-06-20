@@ -24,9 +24,9 @@ pub fn expand_derive_vertex(input: &DeriveInput) -> Result<TokenStream, String> 
         }
 
         let input_rate = if per_instance {
-            quote!(#mod_path::InputRate::PerInstance)
+            quote!(#mod_path::VertexInputRate::PerInstance)
         } else {
-            quote!(#mod_path::InputRate::PerVertex)
+            quote!(#mod_path::VertexInputRate::PerVertex)
         };
 
         let mut position = 0;
@@ -53,9 +53,11 @@ pub fn expand_derive_vertex(input: &DeriveInput) -> Result<TokenStream, String> 
                 let ident = Ident::new(a.format.as_str(), Span::call_site()).into_token_stream();
 
                 quote_spanned!(span=> {
-                    assert_format_compatible::<#ty, #ident>();
+                    {
+                        assert_format_compatible::<#ty, #ident>();
 
-                    <#ident as VertexAttributeFormat>::FORMAT_ID
+                        <#ident as VertexAttributeFormat>::FORMAT_ID
+                    }
                 })
             };
 
@@ -74,11 +76,11 @@ pub fn expand_derive_vertex(input: &DeriveInput) -> Result<TokenStream, String> 
 
             #[automatically_derived]
             unsafe impl #impl_generics #mod_path::Vertex for #struct_name #ty_generics #where_clause {
-                const DESCRIPTOR: #mod_path::VertexDescriptor = #mod_path::VertexDescriptor {
+                const DESCRIPTOR: #mod_path::VertexDescriptor<'static> = #mod_path::VertexDescriptor {
                     input_rate: #input_rate,
                     attribute_descriptors: &[
                         #(#recurse),*
-                    ];
+                    ]
                 };
             }
         };
@@ -91,13 +93,12 @@ pub fn expand_derive_vertex(input: &DeriveInput) -> Result<TokenStream, String> 
             const #dummy_const: () = {
                 #[allow(unknown_lints)]
                 #[cfg_attr(feature = "cargo-clippy", allow(useless_attribute))]
-                #[allow(rust_2018_idioms)]
                 use #mod_path::vertex_attribute::*;
 
                 const fn assert_format_compatible<T, F>()
                 where
                     T: #mod_path::vertex_attribute::VertexAttributeFormatCompatible<F>,
-                    F: #mod_path::vertex_attribute::VertexAttributeFormatId
+                    F: #mod_path::vertex_attribute::VertexAttributeFormat
                 {}
 
                 #impl_block

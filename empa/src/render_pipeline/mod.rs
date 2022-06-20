@@ -20,3 +20,5 @@ mod vertex_stage;
 pub use self::vertex_stage::*;
 
 pub mod vertex_attribute;
+
+pub use empa_macros::Vertex;

@@ -74,7 +74,10 @@ impl
     >
 {
     pub fn begin() -> Self {
-        let inner = GpuRenderPipelineDescriptor::new(&JsValue::null().unchecked_into());
+        let inner = GpuRenderPipelineDescriptor::new(
+            JsValue::null().unchecked_ref(),
+            JsValue::null().unchecked_ref(),
+        );
 
         RenderPipelineDescriptorBuilder {
             inner,
@@ -146,7 +149,7 @@ where
 {
     pub fn vertex<VertexLayout: TypedVertexLayout>(
         mut self,
-        vertex_stage: VertexStage<VertexLayout>,
+        vertex_stage: &VertexStage<VertexLayout>,
     ) -> RenderPipelineDescriptorBuilder<
         M,
         PipelineLayout<Layout>,
@@ -200,7 +203,7 @@ where
 {
     fn fragment_internal<ColorLayout>(
         mut self,
-        fragment_stage: FragmentStage<ColorLayout>,
+        fragment_stage: &FragmentStage<ColorLayout>,
     ) -> RenderPipelineDescriptorBuilder<
         M,
         PipelineLayout<Layout>,
@@ -254,7 +257,7 @@ where
 {
     pub fn fragment<ColorLayout>(
         self,
-        fragment_stage: FragmentStage<ColorLayout>,
+        fragment_stage: &FragmentStage<ColorLayout>,
     ) -> RenderPipelineDescriptorBuilder<
         (),
         PipelineLayout<Layout>,
@@ -274,7 +277,7 @@ where
 {
     pub fn fragment<ColorLayout: TypedMultisampleColorLayout>(
         self,
-        fragment_stage: FragmentStage<ColorLayout>,
+        fragment_stage: &FragmentStage<ColorLayout>,
     ) -> RenderPipelineDescriptorBuilder<
         MultisampleState<SAMPLES>,
         PipelineLayout<Layout>,

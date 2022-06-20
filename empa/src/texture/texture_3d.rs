@@ -115,7 +115,7 @@ where
         let view_formats = view_formats.formats().collect();
 
         Texture3D {
-            inner: Arc::new(TextureDestroyer::new(inner)),
+            inner: Arc::new(TextureDestroyer::new(inner, false)),
             format: FormatKind::Typed(Default::default()),
             width: *width,
             height: *height,

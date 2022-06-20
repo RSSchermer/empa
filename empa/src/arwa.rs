@@ -1,25 +1,26 @@
-use arwa::html::HtmlCanvasElement;
-use arwa::window::WindowNavigator;
-use arwa::worker::WorkerNavigator;
-use empa::adapter::Adapter;
-use empa::device::Device;
-use empa::texture;
-use empa::texture::format::{
-    bgra8unorm, rgba16float, rgba8unorm, TextureFormat, TextureFormatId, ViewFormats,
-};
-use empa::texture::Texture2D;
-use staticvec::StaticVec;
 use std::future::Future;
 use std::marker;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use wasm_bindgen::JsCast;
-use wasm_bindgen::JsValue;
+
+use arwa::html::HtmlCanvasElement;
+use arwa::window::WindowNavigator;
+use arwa::worker::WorkerNavigator;
+use staticvec::StaticVec;
+use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Gpu, GpuCanvasCompositingAlphaMode, GpuCanvasConfiguration, GpuCanvasContext,
     GpuPowerPreference, GpuPredefinedColorSpace, GpuRequestAdapterOptions,
 };
+
+use crate::adapter::Adapter;
+use crate::device::Device;
+use crate::texture;
+use crate::texture::format::{
+    bgra8unorm, rgba16float, rgba8unorm, TextureFormat, TextureFormatId, ViewFormats,
+};
+use crate::texture::Texture2D;
 
 mod navigator_ext_seal {
     pub trait Seal {}
@@ -102,7 +103,7 @@ impl Empa {
             PowerPreference::DontCare => (),
         }
 
-        opts.force_software(force_fallback_adapter);
+        opts.force_fallback_adapter(force_fallback_adapter);
 
         let promise = self.inner.request_adapter_with_options(&opts);
 
@@ -121,9 +122,13 @@ impl Future for RequestAdapter {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         Pin::new(&mut self.get_mut().inner).poll(cx).map(|result| {
-            result
-                .map(|v| Some(Adapter::from_web_sys(v.unchecked_into())))
-                .unwrap_or(None)
+            result.ok().and_then(|v| {
+                if v.is_null() {
+                    None
+                } else {
+                    Some(Adapter::from_web_sys(v.unchecked_into()))
+                }
+            })
         })
     }
 }
@@ -247,7 +252,7 @@ where
 
     pub fn get_current_texture(&self) -> Texture2D<F, U> {
         unsafe {
-            Texture2D::from_raw_parts(
+            Texture2D::from_swap_chain_texture(
                 self.inner.get_current_texture(),
                 self.canvas.width(),
                 self.canvas.height(),
@@ -262,5 +267,29 @@ where
         inner.unconfigure();
 
         CanvasContext { inner, canvas }
+    }
+}
+
+mod html_canvas_element_ext_seal {
+    pub trait Seal {}
+}
+
+pub trait HtmlCanvasElementExt: html_canvas_element_ext_seal::Seal {
+    fn empa_context(&self) -> CanvasContext;
+}
+
+impl html_canvas_element_ext_seal::Seal for HtmlCanvasElement {}
+impl HtmlCanvasElementExt for HtmlCanvasElement {
+    fn empa_context(&self) -> CanvasContext {
+        let as_web_sys: &web_sys::HtmlCanvasElement = self.as_ref();
+        let inner = as_web_sys
+            .get_context("webgpu")
+            .unwrap_throw()
+            .unwrap_throw();
+
+        CanvasContext {
+            inner: inner.unchecked_into(),
+            canvas: self.clone(),
+        }
     }
 }

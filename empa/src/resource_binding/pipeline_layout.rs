@@ -41,6 +41,11 @@ pub trait TypedPipelineLayout: typed_pipeline_layout_seal::Seal {
     const BIND_GROUP_LAYOUTS: &'static [&'static [Option<BindGroupLayoutEntry>]];
 }
 
+impl typed_pipeline_layout_seal::Seal for () {}
+impl TypedPipelineLayout for () {
+    const BIND_GROUP_LAYOUTS: &'static [&'static [Option<BindGroupLayoutEntry>]] = &[];
+}
+
 macro_rules! impl_typed_pipeline_layout {
     ($($B:ident),*) => {
         impl<$($B),*> typed_pipeline_layout_seal::Seal for ($($B,)*) where $($B: TypedBindGroupLayout),* {}

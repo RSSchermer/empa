@@ -163,8 +163,7 @@ where
     F: TextureFormat,
     U: UsageFlags,
 {
-    #[doc(hidden)]
-    pub unsafe fn from_raw_parts(
+    pub(crate) fn from_swap_chain_texture(
         web_sys: GpuTexture,
         width: u32,
         height: u32,
@@ -173,7 +172,7 @@ where
         let view_formats = StaticVec::from(view_formats);
 
         Texture2D {
-            inner: Arc::new(TextureDestroyer::new(web_sys)),
+            inner: Arc::new(TextureDestroyer::new(web_sys, true)),
             width,
             height,
             layers: 1,
@@ -241,7 +240,7 @@ where
         let view_formats = view_formats.formats().collect();
 
         Texture2D {
-            inner: Arc::new(TextureDestroyer::new(inner)),
+            inner: Arc::new(TextureDestroyer::new(inner, false)),
             width: *width,
             height: *height,
             layers: *layers,

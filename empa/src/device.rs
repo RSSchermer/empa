@@ -51,6 +51,7 @@ impl Device {
     pub fn create_buffer<D, T, U>(&self, data: D) -> Buffer<T, U>
     where
         D: AsBuffer<T>,
+        T: ?Sized,
         U: buffer::ValidUsageFlags,
     {
         data.as_buffer(self, false)
@@ -229,6 +230,10 @@ pub struct Queue {
 
 impl Queue {
     pub fn submit(&self, command_buffer: CommandBuffer) {
-        self.inner.submit(command_buffer.as_web_sys().as_ref());
+        let array = js_sys::Array::new();
+
+        array.push(command_buffer.as_web_sys().as_ref());
+
+        self.inner.submit(array.as_ref());
     }
 }

@@ -165,13 +165,13 @@ pub enum BindingType {
 impl BindingType {
     fn try_from_naga(module: &naga::Module, ty: &naga::TypeInner) -> Result<Self, ()> {
         match ty {
-            naga::TypeInner::Pointer { base, class } => match class {
-                naga::StorageClass::Uniform => {
+            naga::TypeInner::Pointer { base, space } => match space {
+                naga::AddressSpace::Uniform => {
                     let layout = SizedBufferLayout::try_from_naga(module, *base)?;
 
                     Ok(BindingType::Uniform(layout))
                 }
-                naga::StorageClass::Storage { access } => {
+                naga::AddressSpace::Storage { access } => {
                     if *access == naga::StorageAccess::all() {
                         let layout = UnsizedBufferLayout::try_from_naga(module, *base)?;
 

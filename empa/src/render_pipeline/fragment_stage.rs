@@ -1,7 +1,7 @@
 use std::marker;
 use std::sync::Arc;
 
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{JsValue, UnwrapThrowExt};
 use web_sys::{
     GpuBlendComponent, GpuBlendFactor, GpuBlendOperation, GpuBlendState, GpuColorTargetState,
     GpuFragmentState,
@@ -260,14 +260,14 @@ impl_typed_color_outputs!(8, C0, C1, C2, C3, C4, C5, C6, C7);
 
 pub struct FragmentStage<O> {
     pub(crate) inner: GpuFragmentState,
-    pub(crate) shader_meta: Arc<ShaderSourceInternal>,
+    pub(crate) shader_meta: ShaderSourceInternal,
     entry_index: usize,
     _marker: marker::PhantomData<*const O>,
 }
 
 pub struct FragmentStageBuilder<O> {
     inner: GpuFragmentState,
-    shader_meta: Arc<ShaderSourceInternal>,
+    shader_meta: ShaderSourceInternal,
     entry_index: usize,
     has_constants: bool,
     _marker: marker::PhantomData<*const O>,
@@ -304,7 +304,7 @@ impl FragmentStageBuilder<()> {
         color_outputs: O,
     ) -> FragmentStageBuilder<O::Layout> {
         let FragmentStageBuilder {
-            inner,
+            mut inner,
             shader_meta,
             entry_index,
             has_constants,
@@ -355,6 +355,14 @@ impl FragmentStageBuilder<()> {
             }
         }
 
+        let js_array: js_sys::Array = js_sys::Array::new();
+
+        for encoding in color_outputs.encodings() {
+            js_array.push(encoding.inner.as_ref());
+        }
+
+        inner.targets(js_array.as_ref());
+
         FragmentStageBuilder {
             inner,
             shader_meta,
@@ -379,8 +387,8 @@ impl<O> FragmentStageBuilder<O> {
 
         let record = shader_meta.build_constants(pipeline_constants);
 
-        // TODO: update web_sys; currently no way to actually set constants
-        todo!();
+        // TODO: get support for WebIDL record types in wasm bindgen
+        js_sys::Reflect::set(inner.as_ref(), &JsValue::from("constants"), &record).unwrap_throw();
 
         FragmentStageBuilder {
             inner,

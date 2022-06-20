@@ -1,5 +1,7 @@
+use web_sys::{GpuRenderPassColorAttachment, GpuRenderPassDepthStencilAttachment};
+
 use crate::render_target::{
-    ColorTargetEncoding, DepthStencilTargetEncoding, LoadOp, StoreOp, TypedColorLayout,
+    ColorTargetEncoding, DepthStencilTargetEncoding, DepthValue, LoadOp, StoreOp, TypedColorLayout,
 };
 use crate::texture::format::{
     ColorRenderable, CombinedDepthStencilRenderable, DepthRenderable, DepthStencilRenderable,
@@ -81,7 +83,22 @@ where
             store_op,
         } = self;
 
-        todo!();
+        let mut inner = GpuRenderPassColorAttachment::new(
+            load_op.op_to_web_sys(),
+            store_op.to_web_sys(),
+            &image.inner,
+        );
+
+        if let Some(value) = load_op.value_to_web_sys() {
+            inner.clear_value(value.as_ref());
+        }
+
+        ColorTargetEncoding {
+            inner,
+            width: image.width,
+            height: image.height,
+            _texture_destroyer: image.texture_destroyer.clone(),
+        }
     }
 }
 
@@ -105,7 +122,28 @@ where
     type Format = F;
 
     fn to_encoding(&self) -> ColorTargetEncoding {
-        todo!()
+        let SignedIntegerAttachment {
+            image,
+            load_op,
+            store_op,
+        } = self;
+
+        let mut inner = GpuRenderPassColorAttachment::new(
+            load_op.op_to_web_sys(),
+            store_op.to_web_sys(),
+            &image.inner,
+        );
+
+        if let Some(value) = load_op.value_to_web_sys() {
+            inner.clear_value(value.as_ref());
+        }
+
+        ColorTargetEncoding {
+            inner,
+            width: image.width,
+            height: image.height,
+            _texture_destroyer: image.texture_destroyer.clone(),
+        }
     }
 }
 
@@ -129,7 +167,28 @@ where
     type Format = F;
 
     fn to_encoding(&self) -> ColorTargetEncoding {
-        todo!()
+        let UnsignedIntegerAttachment {
+            image,
+            load_op,
+            store_op,
+        } = self;
+
+        let mut inner = GpuRenderPassColorAttachment::new(
+            load_op.op_to_web_sys(),
+            store_op.to_web_sys(),
+            &image.inner,
+        );
+
+        if let Some(value) = load_op.value_to_web_sys() {
+            inner.clear_value(value.as_ref());
+        }
+
+        ColorTargetEncoding {
+            inner,
+            width: image.width,
+            height: image.height,
+            _texture_destroyer: image.texture_destroyer.clone(),
+        }
     }
 }
 
@@ -140,9 +199,7 @@ mod depth_stencil_target_seal {
 pub trait DepthStencilTarget: depth_stencil_target_seal::Seal {
     type Format: DepthStencilRenderable;
 
-    fn to_encoding(&self) -> DepthStencilTargetEncoding {
-        todo!()
-    }
+    fn to_encoding(&self) -> DepthStencilTargetEncoding;
 }
 
 pub struct DepthStencilAttachment<'a, F>
@@ -150,7 +207,7 @@ where
     F: CombinedDepthStencilRenderable,
 {
     pub image: &'a AttachableImage<F>,
-    pub depth_load_op: LoadOp<f32>,
+    pub depth_load_op: LoadOp<DepthValue>,
     pub depth_store_op: StoreOp,
     pub stencil_load_op: LoadOp<u32>,
     pub stencil_store_op: StoreOp,
@@ -167,7 +224,38 @@ where
     type Format = F;
 
     fn to_encoding(&self) -> DepthStencilTargetEncoding {
-        todo!()
+        let DepthStencilAttachment {
+            image,
+            depth_load_op,
+            depth_store_op,
+            stencil_load_op,
+            stencil_store_op,
+        } = self;
+
+        let mut inner = GpuRenderPassDepthStencilAttachment::new(&image.inner);
+
+        inner.depth_read_only(false);
+        inner.depth_load_op(depth_load_op.op_to_web_sys());
+        inner.depth_store_op(depth_store_op.to_web_sys());
+
+        if let Some(value) = depth_load_op.value_to_web_sys() {
+            inner.depth_clear_value(value);
+        }
+
+        inner.stencil_read_only(false);
+        inner.stencil_load_op(stencil_load_op.op_to_web_sys());
+        inner.stencil_store_op(stencil_store_op.to_web_sys());
+
+        if let Some(value) = stencil_load_op.value_to_web_sys() {
+            inner.stencil_clear_value(value);
+        }
+
+        DepthStencilTargetEncoding {
+            inner,
+            width: image.width,
+            height: image.height,
+            _texture_destroyer: image.texture_destroyer.clone(),
+        }
     }
 }
 
@@ -189,7 +277,19 @@ where
     type Format = F;
 
     fn to_encoding(&self) -> DepthStencilTargetEncoding {
-        todo!()
+        let ReadOnlyDepthStencilAttachment { image } = self;
+
+        let mut inner = GpuRenderPassDepthStencilAttachment::new(&image.inner);
+
+        inner.depth_read_only(true);
+        inner.stencil_read_only(true);
+
+        DepthStencilTargetEncoding {
+            inner,
+            width: image.width,
+            height: image.height,
+            _texture_destroyer: image.texture_destroyer.clone(),
+        }
     }
 }
 
@@ -198,7 +298,7 @@ where
     F: DepthRenderable,
 {
     pub image: &'a AttachableImage<F>,
-    pub load_op: LoadOp<f32>,
+    pub load_op: LoadOp<DepthValue>,
     pub store_op: StoreOp,
 }
 
@@ -210,7 +310,28 @@ where
     type Format = F;
 
     fn to_encoding(&self) -> DepthStencilTargetEncoding {
-        todo!()
+        let DepthAttachment {
+            image,
+            load_op,
+            store_op,
+        } = self;
+
+        let mut inner = GpuRenderPassDepthStencilAttachment::new(&image.inner);
+
+        inner.depth_read_only(false);
+        inner.depth_load_op(load_op.op_to_web_sys());
+        inner.depth_store_op(store_op.to_web_sys());
+
+        if let Some(value) = load_op.value_to_web_sys() {
+            inner.depth_clear_value(value);
+        }
+
+        DepthStencilTargetEncoding {
+            inner,
+            width: image.width,
+            height: image.height,
+            _texture_destroyer: image.texture_destroyer.clone(),
+        }
     }
 }
 
@@ -232,7 +353,18 @@ where
     type Format = F;
 
     fn to_encoding(&self) -> DepthStencilTargetEncoding {
-        todo!()
+        let ReadOnlyDepthAttachment { image } = self;
+
+        let mut inner = GpuRenderPassDepthStencilAttachment::new(&image.inner);
+
+        inner.depth_read_only(true);
+
+        DepthStencilTargetEncoding {
+            inner,
+            width: image.width,
+            height: image.height,
+            _texture_destroyer: image.texture_destroyer.clone(),
+        }
     }
 }
 
@@ -253,7 +385,28 @@ where
     type Format = F;
 
     fn to_encoding(&self) -> DepthStencilTargetEncoding {
-        todo!()
+        let StencilAttachment {
+            image,
+            load_op,
+            store_op,
+        } = self;
+
+        let mut inner = GpuRenderPassDepthStencilAttachment::new(&image.inner);
+
+        inner.stencil_read_only(false);
+        inner.stencil_load_op(load_op.op_to_web_sys());
+        inner.stencil_store_op(store_op.to_web_sys());
+
+        if let Some(value) = load_op.value_to_web_sys() {
+            inner.stencil_clear_value(value);
+        }
+
+        DepthStencilTargetEncoding {
+            inner,
+            width: image.width,
+            height: image.height,
+            _texture_destroyer: image.texture_destroyer.clone(),
+        }
     }
 }
 
@@ -275,6 +428,17 @@ where
     type Format = F;
 
     fn to_encoding(&self) -> DepthStencilTargetEncoding {
-        todo!()
+        let ReadOnlyStencilAttachment { image } = self;
+
+        let mut inner = GpuRenderPassDepthStencilAttachment::new(&image.inner);
+
+        inner.stencil_read_only(true);
+
+        DepthStencilTargetEncoding {
+            inner,
+            width: image.width,
+            height: image.height,
+            _texture_destroyer: image.texture_destroyer.clone(),
+        }
     }
 }

@@ -21,6 +21,9 @@ pub mod shader_module;
 pub mod texture;
 pub mod type_flag;
 
+#[cfg(feature = "arwa")]
+pub mod arwa;
+
 #[doc(hidden)]
 pub struct Untyped {}
 

@@ -1,6 +1,8 @@
 use std::ops::RangeInclusive;
 
-use web_sys::{GpuAddressMode, GpuFilterMode, GpuSampler, GpuSamplerDescriptor};
+use web_sys::{
+    GpuAddressMode, GpuFilterMode, GpuMipmapFilterMode, GpuSampler, GpuSamplerDescriptor,
+};
 
 use crate::device::Device;
 use crate::CompareFunction;
@@ -109,7 +111,7 @@ impl AnisotropicSamplerDescriptor {
         desc.address_mode_w(address_mode_w.to_web_sys());
         desc.mag_filter(GpuFilterMode::Linear);
         desc.min_filter(GpuFilterMode::Linear);
-        desc.mipmap_filter(GpuFilterMode::Linear);
+        desc.mipmap_filter(GpuMipmapFilterMode::Linear);
         desc.lod_min_clamp(*lod_clamp.start());
         desc.lod_max_clamp(*lod_clamp.end());
         desc.max_anisotropy(*max_anisotropy);
@@ -301,10 +303,10 @@ pub enum MipmapFilterMode {
 }
 
 impl MipmapFilterMode {
-    fn to_web_sys(&self) -> GpuFilterMode {
+    fn to_web_sys(&self) -> GpuMipmapFilterMode {
         match self {
-            MipmapFilterMode::Nearest => GpuFilterMode::Nearest,
-            MipmapFilterMode::Linear => GpuFilterMode::Linear,
+            MipmapFilterMode::Nearest => GpuMipmapFilterMode::Nearest,
+            MipmapFilterMode::Linear => GpuMipmapFilterMode::Linear,
         }
     }
 }

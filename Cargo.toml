@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "empa",
-    "empa_arwa",
     "empa_macros",
-    "empa_reflect"
+    "empa_reflect",
+    "examples/web/0_triangle"
 ]

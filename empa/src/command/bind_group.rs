@@ -5,6 +5,7 @@ use web_sys::GpuBindGroup;
 use crate::resource_binding::{
     BindGroup, EntryDestroyer, TypedBindGroupLayout, TypedPipelineLayout,
 };
+use std::iter;
 
 pub struct BindGroupEncoding {
     pub(crate) bind_group: GpuBindGroup,
@@ -22,6 +23,16 @@ pub trait BindGroups: bind_groups_seal::Seal {
     type Encodings: Iterator<Item = BindGroupEncoding>;
 
     fn encodings(&self) -> Self::Encodings;
+}
+
+impl bind_groups_seal::Seal for () {}
+impl BindGroups for () {
+    type Layout = ();
+    type Encodings = iter::Empty<BindGroupEncoding>;
+
+    fn encodings(&self) -> Self::Encodings {
+        iter::empty()
+    }
 }
 
 macro_rules! impl_bind_groups {

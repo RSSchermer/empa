@@ -1,4 +1,4 @@
-use crate::type_flag::{TypeFlag, X};
+use crate::type_flag::{TypeFlag, O, X};
 
 mod usage_flags_seal {
     pub trait Seal {
@@ -143,4 +143,76 @@ impl<U1: TypeFlag, U2: TypeFlag, U3: TypeFlag, U4: TypeFlag> render_attachment_s
 impl<U1: TypeFlag, U2: TypeFlag, U3: TypeFlag, U4: TypeFlag> RenderAttachment
     for Usages<X, U1, U2, U3, U4>
 {
+}
+
+impl Usages<O, O, O, O, O> {
+    pub fn render_attachment() -> Usages<X, O, O, O, O> {
+        Usages {
+            _marker: Default::default(),
+        }
+    }
+
+    pub fn storage_binding() -> Usages<O, X, O, O, O> {
+        Usages {
+            _marker: Default::default(),
+        }
+    }
+
+    pub fn texture_binding() -> Usages<O, O, X, O, O> {
+        Usages {
+            _marker: Default::default(),
+        }
+    }
+
+    pub fn copy_dst() -> Usages<O, O, O, X, O> {
+        Usages {
+            _marker: Default::default(),
+        }
+    }
+
+    pub fn copy_src() -> Usages<O, O, O, O, X> {
+        Usages {
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<U1: TypeFlag, U2: TypeFlag, U3: TypeFlag, U4: TypeFlag> Usages<O, U1, U2, U3, U4> {
+    pub fn and_render_attachment(self) -> Usages<X, U1, U2, U3, U4> {
+        Usages {
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<U0: TypeFlag, U2: TypeFlag, U3: TypeFlag, U4: TypeFlag> Usages<U0, O, U2, U3, U4> {
+    pub fn and_storage_binding(self) -> Usages<U0, X, U2, U3, U4> {
+        Usages {
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<U0: TypeFlag, U1: TypeFlag, U3: TypeFlag, U4: TypeFlag> Usages<U0, U1, O, U3, U4> {
+    pub fn and_texture_binding(self) -> Usages<U0, U1, X, U3, U4> {
+        Usages {
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<U0: TypeFlag, U1: TypeFlag, U2: TypeFlag, U4: TypeFlag> Usages<U0, U1, U2, O, U4> {
+    pub fn and_copy_dst(self) -> Usages<U0, U1, U2, X, U4> {
+        Usages {
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<U0: TypeFlag, U1: TypeFlag, U2: TypeFlag, U3: TypeFlag> Usages<U0, U1, U2, U3, O> {
+    pub fn and_copy_src(self) -> Usages<U0, U1, U2, U3, X> {
+        Usages {
+            _marker: Default::default(),
+        }
+    }
 }

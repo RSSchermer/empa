@@ -1,25 +1,26 @@
 use std::marker;
 use std::sync::Arc;
 
+use wasm_bindgen::{JsValue, UnwrapThrowExt};
 use web_sys::GpuVertexState;
 
 use crate::pipeline_constants::PipelineConstants;
 use crate::render_pipeline::TypedVertexLayout;
 use crate::shader_module::{ShaderModule, ShaderSourceInternal, StaticShaderStage};
 
-pub struct VertexStage<O> {
+pub struct VertexStage<V> {
     pub(crate) inner: GpuVertexState,
-    pub(crate) shader_meta: Arc<ShaderSourceInternal>,
+    pub(crate) shader_meta: ShaderSourceInternal,
     entry_index: usize,
-    _marker: marker::PhantomData<*const O>,
+    _marker: marker::PhantomData<*const V>,
 }
 
-pub struct VertexStageBuilder<O> {
+pub struct VertexStageBuilder<V> {
     inner: GpuVertexState,
-    shader_meta: Arc<ShaderSourceInternal>,
+    shader_meta: ShaderSourceInternal,
     entry_index: usize,
     has_constants: bool,
-    _marker: marker::PhantomData<*const O>,
+    _marker: marker::PhantomData<*const V>,
 }
 
 impl VertexStageBuilder<()> {
@@ -89,11 +90,11 @@ impl VertexStageBuilder<()> {
     }
 }
 
-impl<O> VertexStageBuilder<O> {
+impl<V> VertexStageBuilder<V> {
     pub fn pipeline_constants<C: PipelineConstants>(
         self,
         pipeline_constants: &C,
-    ) -> VertexStageBuilder<O> {
+    ) -> VertexStageBuilder<V> {
         let VertexStageBuilder {
             inner,
             shader_meta,
@@ -103,8 +104,8 @@ impl<O> VertexStageBuilder<O> {
 
         let record = shader_meta.build_constants(pipeline_constants);
 
-        // TODO: update web_sys; currently no way to actually set constants
-        todo!();
+        // TODO: get support for WebIDL record types in wasm bindgen
+        js_sys::Reflect::set(inner.as_ref(), &JsValue::from("constants"), &record).unwrap_throw();
 
         VertexStageBuilder {
             inner,

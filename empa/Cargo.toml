@@ -9,15 +9,17 @@ repository = "https://github.com/RSSchermer/empa"
 license = "MIT"
 
 [dependencies]
+arwa = { path = "../../rudo/arwa" }
 atomic-counter = "1.0.1"
 bitflags = "1.3.2"
+empa-macros = { version = "0.1.0", path = "../empa_macros" }
 empa-reflect = { version = "0.1.0", path = "../empa_reflect" }
 futures = "0.3.21"
 lazy_static = "1.4.0"
-js-sys = "0.3.57"
+js-sys = { version  = "0.3.57", path = "../../wasm-bindgen/crates/js-sys" }
 staticvec = "0.11.5"
-wasm-bindgen = "0.2.80"
-wasm-bindgen-futures = "0.4.30"
+wasm-bindgen = { version = "0.2.80", path = "../../wasm-bindgen" }
+wasm-bindgen-futures = { version = "0.4.30", path = "../../wasm-bindgen/crates/futures" }
 
 [dependencies.memoffset]
 version = "0.6"
@@ -25,8 +27,10 @@ features = ["unstable_const"]
 
 [dependencies.web-sys]
 version = "0.3.57"
+path = "../../wasm-bindgen/crates/web-sys"
 features = [
     "DomException",
+    "Gpu",
     "GpuAdapter",
     "GpuAddressMode",
     "GpuBindGroup",
@@ -44,6 +48,9 @@ features = [
     "GpuBufferBindingLayout",
     "GpuBufferBindingType",
     "GpuBufferDescriptor",
+    "GpuCanvasCompositingAlphaMode",
+    "GpuCanvasConfiguration",
+    "GpuCanvasContext",
     "GpuColorDict",
     "GpuColorTargetState",
     "GpuCommandBuffer",
@@ -63,10 +70,14 @@ features = [
     "GpuImageCopyBuffer",
     "GpuImageCopyTexture",
     "GpuIndexFormat",
+    "GpuLoadOp",
+    "GpuMipmapFilterMode",
     "GpuMultisampleState",
     "GpuOrigin3dDict",
     "GpuPipelineLayout",
     "GpuPipelineLayoutDescriptor",
+    "GpuPowerPreference",
+    "GpuPredefinedColorSpace",
     "GpuPrimitiveState",
     "GpuPrimitiveTopology",
     "GpuProgrammableStage",
@@ -80,6 +91,7 @@ features = [
     "GpuRenderPassEncoder",
     "GpuRenderPipeline",
     "GpuRenderPipelineDescriptor",
+    "GpuRequestAdapterOptions",
     "GpuSampler",
     "GpuSamplerBindingLayout",
     "GpuSamplerBindingType",
@@ -89,6 +101,7 @@ features = [
     "GpuStencilFaceState",
     "GpuStencilOperation",
     "GpuStorageTextureBindingLayout",
+    "GpuStoreOp",
     "GpuSupportedFeatures",
     "GpuSupportedLimits",
     "GpuTexture",
@@ -104,3 +117,6 @@ features = [
     "GpuVertexFormat",
     "GpuVertexState"
 ]
+
+[features]
+arwa = []

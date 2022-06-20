@@ -60,7 +60,7 @@ where
         let inner = device.inner.create_texture(&desc);
 
         TextureMultisampled2D {
-            inner: Arc::new(TextureDestroyer::new(inner)),
+            inner: Arc::new(TextureDestroyer::new(inner, false)),
             width,
             height,
             format: FormatKind::Typed(Default::default()),
@@ -125,6 +125,6 @@ pub struct AttachableMultisampledImage<F, const SAMPLES: u8> {
     pub(crate) inner: GpuTextureView,
     pub(crate) width: u32,
     pub(crate) height: u32,
-    _texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) _texture_destroyer: Arc<TextureDestroyer>,
     _marker: marker::PhantomData<*const F>,
 }

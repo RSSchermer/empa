@@ -2,7 +2,7 @@ use std::marker;
 use std::sync::Arc;
 
 use atomic_counter::AtomicCounter;
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{GpuComputePipeline, GpuComputePipelineDescriptor, GpuProgrammableStage};
 
 use crate::device::{Device, ID_GEN};
@@ -49,7 +49,10 @@ pub struct ComputePipelineDescriptorBuilder<L, S> {
 
 impl ComputePipelineDescriptorBuilder<(), ()> {
     pub fn begin() -> Self {
-        let inner = GpuComputePipelineDescriptor::new(&JsValue::null().unchecked_into());
+        let inner = GpuComputePipelineDescriptor::new(
+            JsValue::null().unchecked_ref(),
+            JsValue::null().unchecked_ref(),
+        );
 
         ComputePipelineDescriptorBuilder {
             inner,
@@ -116,13 +119,12 @@ impl<Layout: TypedPipelineLayout> ComputePipelineDescriptorBuilder<PipelineLayou
 
 pub struct ComputeStage {
     pub(crate) inner: GpuProgrammableStage,
-    pub(crate) shader_meta: Arc<ShaderSourceInternal>,
-    entry_index: usize,
+    pub(crate) shader_meta: ShaderSourceInternal,
 }
 
 pub struct ComputeStageBuilder {
     inner: GpuProgrammableStage,
-    shader_meta: Arc<ShaderSourceInternal>,
+    shader_meta: ShaderSourceInternal,
     entry_index: usize,
     has_constants: bool,
 }
@@ -165,8 +167,8 @@ impl ComputeStageBuilder {
 
         let record = shader_meta.build_constants(pipeline_constants);
 
-        // TODO: update web_sys; currently no way to actually set constants
-        todo!();
+        // TODO: get support for WebIDL record types in wasm bindgen
+        js_sys::Reflect::set(inner.as_ref(), &JsValue::from("constants"), &record).unwrap_throw();
 
         ComputeStageBuilder {
             inner,
@@ -180,18 +182,14 @@ impl ComputeStageBuilder {
         let ComputeStageBuilder {
             inner,
             shader_meta,
-            entry_index,
             has_constants,
+            ..
         } = self;
 
         if !has_constants && shader_meta.constants().iter().any(|c| c.required) {
             panic!("the shader declares pipeline constants without fallback values, but no pipeline constants were set");
         }
 
-        ComputeStage {
-            inner,
-            shader_meta,
-            entry_index,
-        }
+        ComputeStage { inner, shader_meta }
     }
 }

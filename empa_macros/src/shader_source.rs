@@ -1,14 +1,23 @@
 use std::env;
+use std::path::Path;
 
 use empa_reflect::{
     BindingType, ConstantIdentifier, ConstantType, EntryPointBinding, EntryPointBindingType,
     Interpolation, MemoryUnit, MemoryUnitLayout, Sampling, ShaderSource, ShaderStage,
     SizedBufferLayout, StorageTextureFormat, TexelType, UnsizedBufferLayout,
 };
-use include_preprocessor::{preprocess, SearchPaths};
-use proc_macro::{Span, TokenStream};
+use include_preprocessor::{preprocess, SearchPaths, PathTracker};
+use proc_macro::{Span, TokenStream, tracked_path};
 use quote::quote;
 use syn::{parse_macro_input, LitStr};
+
+struct ProcMacroPathTracker;
+
+impl PathTracker for ProcMacroPathTracker {
+    fn track(&mut self, path: &Path) {
+        tracked_path::path(path.to_str().expect("cannot track non-unicode path"));
+    }
+}
 
 pub fn expand_shader_source(input: TokenStream) -> TokenStream {
     let path = parse_macro_input!(input as LitStr);
@@ -27,14 +36,20 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
     let output = if source_join.is_file() {
         let buffer = String::new();
 
-        preprocess(source_join, search_paths, buffer).unwrap()
+        preprocess(source_join, search_paths, buffer, &mut ProcMacroPathTracker).unwrap()
     } else {
         panic!("Entry (`{:?}`) point is not a file!", source_join);
     };
 
     let source_token = LitStr::new(&output, Span::call_site().into());
 
-    let shader_source = ShaderSource::parse(output).unwrap();
+    let shader_source = match ShaderSource::parse(output.clone()) {
+        Ok(shader_source) => shader_source,
+        Err(err) => {
+            panic!("{}", err.emit_to_string(&output));
+        }
+    };
+
     let mod_path = quote!(empa::shader_module);
 
     let resource_bindings = shader_source.resource_bindings().iter().map(|b| {

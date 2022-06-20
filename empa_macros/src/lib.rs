@@ -1,4 +1,4 @@
-#![feature(proc_macro_span)]
+#![feature(proc_macro_span, track_path)]
 
 mod abi_sized;
 mod error_log;
@@ -48,9 +48,11 @@ pub fn derive_sized(input: TokenStream) -> TokenStream {
 pub fn derive_vertex(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    vertex::expand_derive_vertex(&input)
+    let tokens = vertex::expand_derive_vertex(&input)
         .unwrap_or_else(compile_error)
-        .into()
+        .into();
+
+    tokens
 }
 
 fn compile_error(message: String) -> proc_macro2::TokenStream {
