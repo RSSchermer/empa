@@ -77,6 +77,7 @@ pub fn expand_derive_vertex(input: &DeriveInput) -> Result<TokenStream, String> 
             #[automatically_derived]
             unsafe impl #impl_generics #mod_path::Vertex for #struct_name #ty_generics #where_clause {
                 const DESCRIPTOR: #mod_path::VertexDescriptor<'static> = #mod_path::VertexDescriptor {
+                    array_stride: std::mem::size_of::<#struct_name #ty_generics>() as u32,
                     input_rate: #input_rate,
                     attribute_descriptors: &[
                         #(#recurse),*

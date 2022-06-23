@@ -1,5 +1,4 @@
 use std::marker;
-use std::sync::Arc;
 
 use atomic_counter::AtomicCounter;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};

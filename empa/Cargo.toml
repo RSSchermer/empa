@@ -16,18 +16,17 @@ empa-macros = { version = "0.1.0", path = "../empa_macros" }
 empa-reflect = { version = "0.1.0", path = "../empa_reflect" }
 futures = "0.3.21"
 lazy_static = "1.4.0"
-js-sys = { version  = "0.3.57", path = "../../wasm-bindgen/crates/js-sys" }
+js-sys = "0.3.58"
 staticvec = "0.11.5"
-wasm-bindgen = { version = "0.2.80", path = "../../wasm-bindgen" }
-wasm-bindgen-futures = { version = "0.4.30", path = "../../wasm-bindgen/crates/futures" }
+wasm-bindgen = "0.2.81"
+wasm-bindgen-futures = "0.4.31"
 
 [dependencies.memoffset]
 version = "0.6"
 features = ["unstable_const"]
 
 [dependencies.web-sys]
-version = "0.3.57"
-path = "../../wasm-bindgen/crates/web-sys"
+version = "0.3.58"
 features = [
     "DomException",
     "Gpu",
@@ -114,8 +113,11 @@ features = [
     "GpuTextureView",
     "GpuTextureViewDescriptor",
     "GpuTextureViewDimension",
+    "GpuVertexAttribute",
+    "GpuVertexBufferLayout",
     "GpuVertexFormat",
-    "GpuVertexState"
+    "GpuVertexState",
+    "GpuVertexStepMode"
 ]
 
 [features]

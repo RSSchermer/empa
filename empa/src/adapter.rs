@@ -300,10 +300,8 @@ impl Future for RequestDevice {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         Pin::new(&mut self.get_mut().inner)
             .poll(cx)
-            .map_ok(|device| {
-                Device {
-                    inner: device.unchecked_into(),
-                }
+            .map_ok(|device| Device {
+                inner: device.unchecked_into(),
             })
             .map_err(|err| RequestDeviceError {
                 inner: err.unchecked_into(),

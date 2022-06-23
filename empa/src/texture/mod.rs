@@ -30,12 +30,15 @@ use crate::texture::format::TextureFormatId;
 
 pub(crate) struct TextureDestroyer {
     texture: web_sys::GpuTexture,
-    is_swap_chain: bool
+    is_swap_chain: bool,
 }
 
 impl TextureDestroyer {
     fn new(texture: web_sys::GpuTexture, is_swap_chain: bool) -> Self {
-        TextureDestroyer { texture, is_swap_chain }
+        TextureDestroyer {
+            texture,
+            is_swap_chain,
+        }
     }
 }
 

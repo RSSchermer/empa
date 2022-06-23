@@ -1,9 +1,20 @@
+use web_sys::{GpuVertexAttribute, GpuVertexStepMode};
+
 use crate::render_pipeline::vertex_attribute::VertexAttributeFormatId;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum VertexInputRate {
     PerVertex,
     PerInstance,
+}
+
+impl VertexInputRate {
+    pub(crate) fn to_web_sys(&self) -> GpuVertexStepMode {
+        match self {
+            VertexInputRate::PerVertex => GpuVertexStepMode::Vertex,
+            VertexInputRate::PerInstance => GpuVertexStepMode::Instance,
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -13,8 +24,19 @@ pub struct VertexAttributeDescriptor {
     pub shader_location: u32,
 }
 
+impl VertexAttributeDescriptor {
+    pub(crate) fn to_web_sys(&self) -> GpuVertexAttribute {
+        GpuVertexAttribute::new(
+            self.format.to_web_sys(),
+            self.offset as f64,
+            self.shader_location,
+        )
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct VertexDescriptor<'a> {
+    pub array_stride: u32,
     pub attribute_descriptors: &'a [VertexAttributeDescriptor],
     pub input_rate: VertexInputRate,
 }

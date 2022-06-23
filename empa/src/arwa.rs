@@ -251,14 +251,12 @@ where
     }
 
     pub fn get_current_texture(&self) -> Texture2D<F, U> {
-        unsafe {
-            Texture2D::from_swap_chain_texture(
-                self.inner.get_current_texture(),
-                self.canvas.width(),
-                self.canvas.height(),
-                &self.view_formats,
-            )
-        }
+        Texture2D::from_swap_chain_texture(
+            self.inner.get_current_texture(),
+            self.canvas.width(),
+            self.canvas.height(),
+            &self.view_formats,
+        )
     }
 
     pub fn unconfigure(self) -> CanvasContext {

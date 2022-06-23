@@ -6,8 +6,8 @@ use empa_reflect::{
     Interpolation, MemoryUnit, MemoryUnitLayout, Sampling, ShaderSource, ShaderStage,
     SizedBufferLayout, StorageTextureFormat, TexelType, UnsizedBufferLayout,
 };
-use include_preprocessor::{preprocess, SearchPaths, PathTracker};
-use proc_macro::{Span, TokenStream, tracked_path};
+use include_preprocessor::{preprocess, PathTracker, SearchPaths};
+use proc_macro::{tracked_path, Span, TokenStream};
 use quote::quote;
 use syn::{parse_macro_input, LitStr};
 

@@ -88,6 +88,10 @@ impl VertexAttributeFormatId {
             },
         }
     }
+
+    pub(crate) fn to_web_sys(&self) -> GpuVertexFormat {
+        self.inner
+    }
 }
 
 mod vertex_attribute_format_seal {

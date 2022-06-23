@@ -11,7 +11,7 @@ use empa::command::{Draw, RenderPassDescriptor};
 use empa::device::DeviceDescriptor;
 use empa::render_pipeline::{
     ColorOutput, ColorWriteMask, FragmentStageBuilder, RenderPipelineDescriptorBuilder,
-    VertexStage, VertexStageBuilder,
+    VertexStageBuilder,
 };
 use empa::render_target::{FloatAttachment, LoadOp, RenderTarget, StoreOp};
 use empa::shader_module::{shader_source, ShaderSource};
@@ -22,7 +22,6 @@ use empa::{buffer, texture};
 use futures::FutureExt;
 use std::convert::TryInto;
 use std::error::Error;
-use wasm_bindgen::{throw_val, JsValue};
 
 mod console_error_panic_hook;
 
@@ -47,7 +46,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
     let empa = window.navigator().empa();
     let canvas: HtmlCanvasElement = window
         .document()
-        .query_selector_first(&selector!("#canvas"))
+        .query_selector(&selector!("#canvas"))
         .ok_or("canvas not found")?
         .try_into()?;
 

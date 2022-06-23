@@ -2,7 +2,7 @@ use std::marker;
 use std::sync::Arc;
 
 use wasm_bindgen::{JsValue, UnwrapThrowExt};
-use web_sys::GpuVertexState;
+use web_sys::{GpuVertexBufferLayout, GpuVertexState};
 
 use crate::pipeline_constants::PipelineConstants;
 use crate::render_pipeline::TypedVertexLayout;
@@ -51,7 +51,7 @@ impl VertexStageBuilder<()> {
 
     pub fn vertex_layout<V: TypedVertexLayout>(self) -> VertexStageBuilder<V> {
         let VertexStageBuilder {
-            inner,
+            mut inner,
             shader_meta,
             entry_index,
             has_constants,
@@ -79,6 +79,24 @@ impl VertexStageBuilder<()> {
 
             panic!("no attribute found for location `{}`", binding.location);
         }
+
+        let layout_array = js_sys::Array::new();
+
+        for descriptor in layout {
+            let attributes: js_sys::Array = descriptor
+                .attribute_descriptors
+                .iter()
+                .map(|a| a.to_web_sys())
+                .collect();
+            let mut buffer_layout =
+                GpuVertexBufferLayout::new(descriptor.array_stride as f64, attributes.as_ref());
+
+            buffer_layout.step_mode(descriptor.input_rate.to_web_sys());
+
+            layout_array.push(buffer_layout.as_ref());
+        }
+
+        inner.buffers(layout_array.as_ref());
 
         VertexStageBuilder {
             inner,

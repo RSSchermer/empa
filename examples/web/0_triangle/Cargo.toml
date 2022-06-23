@@ -10,4 +10,4 @@ publish = false
 arwa = { version = "0.1.0", path = "../../../../rudo/arwa" }
 empa = { version = "0.1.0", path = "../../../empa", features = ["arwa"] }
 futures = "0.3.21"
-wasm-bindgen = { version = "0.2.80", path = "../../../../wasm-bindgen" }
+wasm-bindgen = "0.2.81"
