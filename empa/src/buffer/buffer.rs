@@ -38,7 +38,12 @@ pub trait AsBuffer<T>
 where
     T: ?Sized,
 {
-    fn as_buffer<Usage>(&self, device: &Device, mapped_at_creation: bool) -> Buffer<T, Usage>
+    fn as_buffer<Usage>(
+        &self,
+        device: &Device,
+        mapped_at_creation: bool,
+        usage: Usage,
+    ) -> Buffer<T, Usage>
     where
         Usage: ValidUsageFlags;
 }
@@ -48,7 +53,12 @@ where
     D: Borrow<T>,
     T: Copy + 'static,
 {
-    fn as_buffer<Usage>(&self, device: &Device, mapped_at_creation: bool) -> Buffer<T, Usage>
+    fn as_buffer<Usage>(
+        &self,
+        device: &Device,
+        mapped_at_creation: bool,
+        _usage: Usage,
+    ) -> Buffer<T, Usage>
     where
         Usage: ValidUsageFlags,
     {
@@ -94,7 +104,12 @@ where
     D: Borrow<[T]>,
     T: Copy + 'static,
 {
-    fn as_buffer<Usage>(&self, device: &Device, mapped_at_creation: bool) -> Buffer<[T], Usage>
+    fn as_buffer<Usage>(
+        &self,
+        device: &Device,
+        mapped_at_creation: bool,
+        _usage: Usage,
+    ) -> Buffer<[T], Usage>
     where
         Usage: ValidUsageFlags,
     {
@@ -214,7 +229,7 @@ impl<T, U> Buffer<MaybeUninit<T>, U>
 where
     U: ValidUsageFlags,
 {
-    pub(crate) fn create_uninit(device: &Device, mapped_at_creation: bool) -> Self {
+    pub(crate) fn create_uninit(device: &Device, mapped_at_creation: bool, _usage: U) -> Self {
         let id = ID_GEN.get();
         let size_in_bytes = mem::size_of::<T>();
         let mut desc = GpuBufferDescriptor::new(size_in_bytes as f64, U::BITS);
@@ -267,6 +282,7 @@ where
         device: &Device,
         len: usize,
         mapped_at_creation: bool,
+        _usage: U,
     ) -> Self {
         let id = ID_GEN.get();
         let size_in_bytes = mem::size_of::<T>() * len;
@@ -339,6 +355,10 @@ impl<T, U> Buffer<T, U> {
         U: MapWrite,
     {
         View::from(self).mapped_mut()
+    }
+
+    pub fn view(&self) -> View<T, U> {
+        self.into()
     }
 
     pub fn uniform(&self) -> Uniform<T>
@@ -468,6 +488,10 @@ impl<T, U> Buffer<[T], U> {
         U: MapWrite,
     {
         View::from(self).mapped_mut()
+    }
+
+    pub fn view(&self) -> View<[T], U> {
+        self.into()
     }
 
     pub fn storage(&self) -> Storage<[T]>
@@ -1532,7 +1556,7 @@ impl MapContext {
 
 #[wasm_bindgen(module = "/src/js_support.js")]
 extern "C" {
-    #[wasm_bindgen(js_name = __glitz_js_buffer_to_memory)]
+    #[wasm_bindgen(js_name = __glitz_js_copy_buffer_to_memory)]
     fn copy_buffer_to_memory(
         buffer: &Uint8Array,
         offset: u32,

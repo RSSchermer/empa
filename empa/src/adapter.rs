@@ -1,8 +1,8 @@
 use std::error::Error;
 use std::fmt;
 use std::future::Future;
-use std::lazy::SyncOnceCell;
 use std::pin::Pin;
+use std::sync::OnceLock;
 use std::task::{Context, Poll};
 
 use bitflags::bitflags;
@@ -148,8 +148,8 @@ impl Default for Limits {
 
 pub struct Adapter {
     inner: GpuAdapter,
-    features_cache: SyncOnceCell<Features>,
-    limits_cache: SyncOnceCell<Limits>,
+    features_cache: OnceLock<Features>,
+    limits_cache: OnceLock<Limits>,
 }
 
 impl Adapter {

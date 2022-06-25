@@ -1,5 +1,5 @@
 [package]
-name = "triangle-example"
+name = "animated-triangle-example"
 version = "0.1.0"
 authors = ["Roland Schermer <roland0507@gmail.com>"]
 edition = "2021"

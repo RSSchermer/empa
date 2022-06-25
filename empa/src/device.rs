@@ -48,49 +48,57 @@ impl Device {
         &self.inner
     }
 
-    pub fn create_buffer<D, T, U>(&self, data: D) -> Buffer<T, U>
+    pub fn create_buffer<D, T, U>(&self, data: D, usage: U) -> Buffer<T, U>
     where
         D: AsBuffer<T>,
         T: ?Sized,
         U: buffer::ValidUsageFlags,
     {
-        data.as_buffer(self, false)
+        data.as_buffer(self, false, usage)
     }
 
-    pub fn create_buffer_mapped<D, T, U>(&self, data: D) -> Buffer<T, U>
+    pub fn create_buffer_mapped<D, T, U>(&self, data: D, usage: U) -> Buffer<T, U>
     where
         D: AsBuffer<T>,
         U: buffer::ValidUsageFlags,
     {
-        data.as_buffer(self, true)
+        data.as_buffer(self, true, usage)
     }
 
-    pub fn create_buffer_uninit<T, U>(&self) -> Buffer<MaybeUninit<T>, U>
+    pub fn create_buffer_uninit<T, U>(&self, usage: U) -> Buffer<MaybeUninit<T>, U>
     where
         U: buffer::ValidUsageFlags,
     {
-        Buffer::create_uninit(self, false)
+        Buffer::create_uninit(self, false, usage)
     }
 
-    pub fn create_buffer_uninit_mapped<T, U>(&self) -> Buffer<MaybeUninit<T>, U>
+    pub fn create_buffer_uninit_mapped<T, U>(&self, usage: U) -> Buffer<MaybeUninit<T>, U>
     where
         U: buffer::ValidUsageFlags,
     {
-        Buffer::create_uninit(self, true)
+        Buffer::create_uninit(self, true, usage)
     }
 
-    pub fn create_slice_buffer_uninit<T, U>(&self, len: usize) -> Buffer<[MaybeUninit<T>], U>
+    pub fn create_slice_buffer_uninit<T, U>(
+        &self,
+        len: usize,
+        usage: U,
+    ) -> Buffer<[MaybeUninit<T>], U>
     where
         U: buffer::ValidUsageFlags,
     {
-        Buffer::create_slice_uninit(self, len, false)
+        Buffer::create_slice_uninit(self, len, false, usage)
     }
 
-    pub fn create_slice_buffer_uninit_mapped<T, U>(&self, len: usize) -> Buffer<[MaybeUninit<T>], U>
+    pub fn create_slice_buffer_uninit_mapped<T, U>(
+        &self,
+        len: usize,
+        usage: U,
+    ) -> Buffer<[MaybeUninit<T>], U>
     where
         U: buffer::ValidUsageFlags,
     {
-        Buffer::create_slice_uninit(self, len, true)
+        Buffer::create_slice_uninit(self, len, true, usage)
     }
 
     pub fn create_bind_group_layout<T>(&self) -> BindGroupLayout<T>

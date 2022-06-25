@@ -1,5 +1,6 @@
 use naga::front::wgsl;
 use naga::proc::IndexableLength;
+use naga::AddressSpace;
 use std::convert::TryFrom;
 use std::ops::Deref;
 
@@ -19,12 +20,11 @@ impl ShaderSource {
 
         for (_, global) in module.global_variables.iter() {
             if let Some(naga::ResourceBinding { group, binding }) = global.binding {
-                let ty = module.types.get_handle(global.ty).unwrap();
-
                 resource_bindings.push(ShaderResourceBinding {
                     group,
                     binding,
-                    binding_type: BindingType::try_from_naga(&module, &ty.inner).unwrap(),
+                    binding_type: BindingType::try_from_naga(&module, &global.space, global.ty)
+                        .unwrap(),
                 });
             }
         }
@@ -163,134 +163,162 @@ pub enum BindingType {
 }
 
 impl BindingType {
-    fn try_from_naga(module: &naga::Module, ty: &naga::TypeInner) -> Result<Self, ()> {
-        match ty {
-            naga::TypeInner::Pointer { base, space } => match space {
-                naga::AddressSpace::Uniform => {
-                    let layout = SizedBufferLayout::try_from_naga(module, *base)?;
+    fn try_from_naga(
+        module: &naga::Module,
+        space: &naga::AddressSpace,
+        type_handle: naga::Handle<naga::Type>,
+    ) -> Result<Self, ()> {
+        match space {
+            AddressSpace::Uniform => {
+                let layout = SizedBufferLayout::try_from_naga(module, type_handle)?;
 
-                    Ok(BindingType::Uniform(layout))
+                Ok(BindingType::Uniform(layout))
+            }
+            AddressSpace::Storage { access } => {
+                if *access == naga::StorageAccess::all() {
+                    let layout = UnsizedBufferLayout::try_from_naga(module, type_handle)?;
+
+                    Ok(BindingType::Storage(layout))
+                } else if *access == naga::StorageAccess::LOAD {
+                    let layout = UnsizedBufferLayout::try_from_naga(module, type_handle)?;
+
+                    Ok(BindingType::ReadOnlyStorage(layout))
+                } else {
+                    Err(())
                 }
-                naga::AddressSpace::Storage { access } => {
-                    if *access == naga::StorageAccess::all() {
-                        let layout = UnsizedBufferLayout::try_from_naga(module, *base)?;
+            }
+            AddressSpace::Handle => {
+                let ty = module.types.get_handle(type_handle).unwrap();
 
-                        Ok(BindingType::Storage(layout))
-                    } else if *access == naga::StorageAccess::LOAD {
-                        let layout = UnsizedBufferLayout::try_from_naga(module, *base)?;
+                match &ty.inner {
+                    naga::TypeInner::Image {
+                        dim,
+                        arrayed,
+                        class,
+                    } => match (dim, arrayed, class) {
+                        (
+                            naga::ImageDimension::D1,
+                            false,
+                            naga::ImageClass::Sampled { kind, multi: false },
+                        ) => {
+                            let texel_type = TexelType::try_from(*kind)?;
 
-                        Ok(BindingType::ReadOnlyStorage(layout))
-                    } else {
-                        Err(())
+                            Ok(BindingType::Texture1D(texel_type))
+                        }
+                        (
+                            naga::ImageDimension::D2,
+                            false,
+                            naga::ImageClass::Sampled { kind, multi: false },
+                        ) => {
+                            let texel_type = TexelType::try_from(*kind)?;
+
+                            Ok(BindingType::Texture2D(texel_type))
+                        }
+                        (
+                            naga::ImageDimension::D3,
+                            false,
+                            naga::ImageClass::Sampled { kind, multi: false },
+                        ) => {
+                            let texel_type = TexelType::try_from(*kind)?;
+
+                            Ok(BindingType::Texture3D(texel_type))
+                        }
+                        (
+                            naga::ImageDimension::D2,
+                            true,
+                            naga::ImageClass::Sampled { kind, multi: false },
+                        ) => {
+                            let texel_type = TexelType::try_from(*kind)?;
+
+                            Ok(BindingType::Texture2DArray(texel_type))
+                        }
+                        (
+                            naga::ImageDimension::Cube,
+                            false,
+                            naga::ImageClass::Sampled { kind, multi: false },
+                        ) => {
+                            let texel_type = TexelType::try_from(*kind)?;
+
+                            Ok(BindingType::TextureCube(texel_type))
+                        }
+                        (
+                            naga::ImageDimension::Cube,
+                            true,
+                            naga::ImageClass::Sampled { kind, multi: false },
+                        ) => {
+                            let texel_type = TexelType::try_from(*kind)?;
+
+                            Ok(BindingType::TextureCubeArray(texel_type))
+                        }
+                        (
+                            naga::ImageDimension::D2,
+                            false,
+                            naga::ImageClass::Sampled { kind, multi: true },
+                        ) => {
+                            let texel_type = TexelType::try_from(*kind)?;
+
+                            Ok(BindingType::TextureMultisampled2D(texel_type))
+                        }
+                        (naga::ImageDimension::D2, false, naga::ImageClass::Depth { .. }) => {
+                            Ok(BindingType::TextureDepth2D)
+                        }
+                        (naga::ImageDimension::D2, true, naga::ImageClass::Depth { .. }) => {
+                            Ok(BindingType::TextureDepth2DArray)
+                        }
+                        (naga::ImageDimension::Cube, false, naga::ImageClass::Depth { .. }) => {
+                            Ok(BindingType::TextureDepthCube)
+                        }
+                        (naga::ImageDimension::Cube, true, naga::ImageClass::Depth { .. }) => {
+                            Ok(BindingType::TextureDepthCubeArray)
+                        }
+                        (
+                            naga::ImageDimension::D1,
+                            false,
+                            naga::ImageClass::Storage { format, .. },
+                        ) => {
+                            let format = StorageTextureFormat::try_from(*format)?;
+
+                            Ok(BindingType::StorageTexture1D(format))
+                        }
+                        (
+                            naga::ImageDimension::D2,
+                            false,
+                            naga::ImageClass::Storage { format, .. },
+                        ) => {
+                            let format = StorageTextureFormat::try_from(*format)?;
+
+                            Ok(BindingType::StorageTexture2D(format))
+                        }
+                        (
+                            naga::ImageDimension::D2,
+                            true,
+                            naga::ImageClass::Storage { format, .. },
+                        ) => {
+                            let format = StorageTextureFormat::try_from(*format)?;
+
+                            Ok(BindingType::StorageTexture2DArray(format))
+                        }
+                        (
+                            naga::ImageDimension::D3,
+                            false,
+                            naga::ImageClass::Storage { format, .. },
+                        ) => {
+                            let format = StorageTextureFormat::try_from(*format)?;
+
+                            Ok(BindingType::StorageTexture3D(format))
+                        }
+                        _ => Err(()),
+                    },
+                    // TODO: non-filtering sampler
+                    naga::TypeInner::Sampler { comparison: true } => {
+                        Ok(BindingType::ComparisonSampler)
                     }
+                    naga::TypeInner::Sampler { comparison: false } => {
+                        Ok(BindingType::FilteringSampler)
+                    }
+                    _ => Err(()),
                 }
-                _ => Err(()),
-            },
-            naga::TypeInner::Image {
-                dim,
-                arrayed,
-                class,
-            } => match (dim, arrayed, class) {
-                (
-                    naga::ImageDimension::D1,
-                    false,
-                    naga::ImageClass::Sampled { kind, multi: false },
-                ) => {
-                    let texel_type = TexelType::try_from(*kind)?;
-
-                    Ok(BindingType::Texture1D(texel_type))
-                }
-                (
-                    naga::ImageDimension::D2,
-                    false,
-                    naga::ImageClass::Sampled { kind, multi: false },
-                ) => {
-                    let texel_type = TexelType::try_from(*kind)?;
-
-                    Ok(BindingType::Texture2D(texel_type))
-                }
-                (
-                    naga::ImageDimension::D3,
-                    false,
-                    naga::ImageClass::Sampled { kind, multi: false },
-                ) => {
-                    let texel_type = TexelType::try_from(*kind)?;
-
-                    Ok(BindingType::Texture3D(texel_type))
-                }
-                (
-                    naga::ImageDimension::D2,
-                    true,
-                    naga::ImageClass::Sampled { kind, multi: false },
-                ) => {
-                    let texel_type = TexelType::try_from(*kind)?;
-
-                    Ok(BindingType::Texture2DArray(texel_type))
-                }
-                (
-                    naga::ImageDimension::Cube,
-                    false,
-                    naga::ImageClass::Sampled { kind, multi: false },
-                ) => {
-                    let texel_type = TexelType::try_from(*kind)?;
-
-                    Ok(BindingType::TextureCube(texel_type))
-                }
-                (
-                    naga::ImageDimension::Cube,
-                    true,
-                    naga::ImageClass::Sampled { kind, multi: false },
-                ) => {
-                    let texel_type = TexelType::try_from(*kind)?;
-
-                    Ok(BindingType::TextureCubeArray(texel_type))
-                }
-                (
-                    naga::ImageDimension::D2,
-                    false,
-                    naga::ImageClass::Sampled { kind, multi: true },
-                ) => {
-                    let texel_type = TexelType::try_from(*kind)?;
-
-                    Ok(BindingType::TextureMultisampled2D(texel_type))
-                }
-                (naga::ImageDimension::D2, false, naga::ImageClass::Depth { .. }) => {
-                    Ok(BindingType::TextureDepth2D)
-                }
-                (naga::ImageDimension::D2, true, naga::ImageClass::Depth { .. }) => {
-                    Ok(BindingType::TextureDepth2DArray)
-                }
-                (naga::ImageDimension::Cube, false, naga::ImageClass::Depth { .. }) => {
-                    Ok(BindingType::TextureDepthCube)
-                }
-                (naga::ImageDimension::Cube, true, naga::ImageClass::Depth { .. }) => {
-                    Ok(BindingType::TextureDepthCubeArray)
-                }
-                (naga::ImageDimension::D1, false, naga::ImageClass::Storage { format, .. }) => {
-                    let format = StorageTextureFormat::try_from(*format)?;
-
-                    Ok(BindingType::StorageTexture1D(format))
-                }
-                (naga::ImageDimension::D2, false, naga::ImageClass::Storage { format, .. }) => {
-                    let format = StorageTextureFormat::try_from(*format)?;
-
-                    Ok(BindingType::StorageTexture2D(format))
-                }
-                (naga::ImageDimension::D2, true, naga::ImageClass::Storage { format, .. }) => {
-                    let format = StorageTextureFormat::try_from(*format)?;
-
-                    Ok(BindingType::StorageTexture2DArray(format))
-                }
-                (naga::ImageDimension::D3, false, naga::ImageClass::Storage { format, .. }) => {
-                    let format = StorageTextureFormat::try_from(*format)?;
-
-                    Ok(BindingType::StorageTexture3D(format))
-                }
-                _ => Err(()),
-            },
-            // TODO: non-filtering sampler
-            naga::TypeInner::Sampler { comparison: true } => Ok(BindingType::ComparisonSampler),
-            naga::TypeInner::Sampler { comparison: false } => Ok(BindingType::FilteringSampler),
+            }
             _ => Err(()),
         }
     }

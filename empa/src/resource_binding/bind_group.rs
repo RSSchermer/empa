@@ -56,12 +56,15 @@ where
         let mut resource_destroyers = Vec::new();
 
         for (binding, entry) in resources.to_entries().enumerate() {
-            let web_sys_entry = GpuBindGroupEntry::new(binding as u32, entry.as_web_sys().as_ref());
+            if let Some(entry) = entry {
+                let web_sys_entry =
+                    GpuBindGroupEntry::new(binding as u32, entry.as_web_sys().as_ref());
 
-            entries.push(web_sys_entry.as_ref());
+                entries.push(web_sys_entry.as_ref());
 
-            if let Some(destroyer) = entry.entry_destroyer() {
-                resource_destroyers.push(destroyer);
+                if let Some(destroyer) = entry.entry_destroyer() {
+                    resource_destroyers.push(destroyer);
+                }
             }
         }
 
@@ -128,7 +131,7 @@ pub struct SamplerResource {
 pub unsafe trait Resources {
     type Layout: TypedBindGroupLayout;
 
-    type ToEntries: Iterator<Item = BindGroupEntry>;
+    type ToEntries: Iterator<Item = Option<BindGroupEntry>>;
 
     fn to_entries(&self) -> Self::ToEntries;
 }

@@ -8,3 +8,5 @@ mod pipeline_layout;
 pub use self::pipeline_layout::*;
 
 pub mod typed_bind_group_entry;
+
+pub use empa_macros::Resources;

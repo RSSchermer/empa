@@ -13,7 +13,7 @@ pub fn expand_derive_resources(input: &DeriveInput) -> Result<TokenStream, Strin
         let mod_path = quote!(empa::resource_binding);
         let mut log = ErrorLog::new();
 
-        let mut resource_fields: HashMap<u32, ResourceField> = HashMap::new();
+        let mut resource_fields: HashMap<usize, ResourceField> = HashMap::new();
         let mut max_binding = 0;
 
         for (position, field) in data.fields.iter().enumerate() {
@@ -38,7 +38,7 @@ pub fn expand_derive_resources(input: &DeriveInput) -> Result<TokenStream, Strin
         let mut bindings = Vec::with_capacity(max_binding as usize);
         let mut entries = Vec::with_capacity(max_binding as usize);
 
-        for i in 0..max_binding {
+        for i in 0..=max_binding {
             let tokens = if let Some(field) = resource_fields.get(&i) {
                 let ty = &field.ty;
                 let span = field.span;
@@ -62,13 +62,13 @@ pub fn expand_derive_resources(input: &DeriveInput) -> Result<TokenStream, Strin
                 };
 
                 quote_spanned! {span=>
-                    <#ty as #mod_path::Resource>::WithVisibility<
-                        #mod_path::typed_binding_group_entry::ShaderStages<
-                            empa::type_flags::#compute_visible,
-                            empa::type_flags::#fragment_visible,
-                            empa::type_flags::#vertex_visible,
+                    <<#ty as #mod_path::Resource>::Binding as #mod_path::typed_bind_group_entry::TypedSlotBinding>::WithVisibility<
+                        #mod_path::typed_bind_group_entry::ShaderStages<
+                            empa::type_flag::#compute_visible,
+                            empa::type_flag::#fragment_visible,
+                            empa::type_flag::#vertex_visible,
                         >
-                    >::Binding
+                    >
                 }
             } else {
                 quote!(())
@@ -95,14 +95,15 @@ pub fn expand_derive_resources(input: &DeriveInput) -> Result<TokenStream, Strin
             entries.push(tokens);
         }
 
+        let iter_len = max_binding + 1;
         let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
         let impl_block = quote! {
             #[automatically_derived]
             unsafe impl #impl_generics #mod_path::Resources for #struct_name #ty_generics #where_clause {
-                type Binding = (#(#bindings,)*);
+                type Layout = (#(#bindings,)*);
 
-                type ToEntries = <[Option<#mod_path::BindGroupEntry; #max_binding] as IntoIterator>::IntoIter;
+                type ToEntries = <[Option<#mod_path::BindGroupEntry>; #iter_len] as IntoIterator>::IntoIter;
 
                 fn to_entries(&self) -> Self::ToEntries {
                     [#(#entries,)*].into_iter()
@@ -184,7 +185,7 @@ impl ResourcesField {
                 match meta_item {
                     NestedMeta::Meta(Meta::NameValue(m)) if m.path.is_ident("binding") => {
                         if let Lit::Int(i) = &m.lit {
-                            if let Ok(value) = i.base10_parse::<u32>() {
+                            if let Ok(value) = i.base10_parse::<usize>() {
                                 binding = Some(value);
                             } else {
                                 log.log_error(format!(
@@ -314,7 +315,7 @@ struct ResourceField {
     ident: Option<Ident>,
     ty: Type,
     position: usize,
-    binding: u32,
+    binding: usize,
     visibility: Visibility,
     span: Span,
 }

@@ -116,7 +116,7 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
 }
 
 fn binding_type_tokens(binding_type: &BindingType) -> proc_macro2::TokenStream {
-    let mod_path = quote!(empa::resource_bindings);
+    let mod_path = quote!(empa::resource_binding);
 
     match binding_type {
         BindingType::Texture1D(texel_type) => {
@@ -217,7 +217,7 @@ fn binding_type_tokens(binding_type: &BindingType) -> proc_macro2::TokenStream {
 }
 
 fn texel_type_tokens(texel_type: TexelType) -> proc_macro2::TokenStream {
-    let mod_path = quote!(empa::resource_bindings);
+    let mod_path = quote!(empa::resource_binding);
 
     match texel_type {
         TexelType::Float => {
