@@ -21,7 +21,6 @@ use empa::resource_binding::Resources;
 use empa::shader_module::{shader_source, ShaderSource};
 use empa::texture::format::rgba8unorm;
 use empa::texture::AttachableImageDescriptor;
-use empa::type_flag::{O, X};
 use empa::{buffer, texture};
 use futures::FutureExt;
 
@@ -122,17 +121,15 @@ async fn render() -> Result<(), Box<dyn Error>> {
         },
     );
 
-    let uniform_staging_buffer =
-        device.create_buffer(1.0, buffer::Usages::map_write().and_copy_src());
+    let queue = device.queue();
 
-    while let time = window.request_animation_frame().await {
-        uniform_staging_buffer.map_write().await;
-        *uniform_staging_buffer.mapped_mut() = f32::sin(time as f32 * 0.001);
-        uniform_staging_buffer.unmap();
+    loop {
+        let time = window.request_animation_frame().await;
+
+        queue.write_buffer(uniform_buffer.view(), &f32::sin(time as f32 * 0.001));
 
         let command_buffer = device
             .create_command_encoder()
-            .copy_buffer_to_buffer(uniform_staging_buffer.view(), uniform_buffer.view())
             .begin_render_pass(&RenderPassDescriptor::new(&RenderTarget {
                 color: FloatAttachment {
                     image: &context
@@ -155,8 +152,6 @@ async fn render() -> Result<(), Box<dyn Error>> {
             .end()
             .finish();
 
-        device.queue().submit(command_buffer);
+        queue.submit(command_buffer);
     }
-
-    Ok(())
 }

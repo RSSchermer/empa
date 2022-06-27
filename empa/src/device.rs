@@ -20,13 +20,12 @@ use crate::sampler::{
 };
 use crate::shader_module::{ShaderModule, ShaderSource};
 use crate::texture::format::{
-    MultisampleFormat, Texture1DFormat, Texture2DFormat, Texture3DFormat, ViewFormats,
+    ImageData, MultisampleFormat, Texture1DFormat, Texture2DFormat, Texture3DFormat, TextureFormat,
+    ViewFormats,
 };
-use crate::texture::{
-    Texture1D, Texture1DDescriptor, Texture2D, Texture2DDescriptor, Texture3D, Texture3DDescriptor,
-    TextureMultisampled2D, TextureMultisampled2DDescriptor,
-};
+use crate::texture::{ImageDataLayout, Texture1D, Texture1DDescriptor, Texture2D, Texture2DDescriptor, Texture3D, Texture3DDescriptor, TextureMultisampled2D, TextureMultisampled2DDescriptor, ImageDataByteLayout, ImageCopySize3D};
 use crate::{buffer, texture};
+use std::{mem, slice};
 
 lazy_static! {
     pub(crate) static ref ID_GEN: RelaxedCounter = RelaxedCounter::new(1);
@@ -233,7 +232,7 @@ impl Device {
 }
 
 pub struct Queue {
-    inner: GpuQueue,
+    pub(crate) inner: GpuQueue,
 }
 
 impl Queue {
@@ -243,5 +242,218 @@ impl Queue {
         array.push(command_buffer.as_web_sys().as_ref());
 
         self.inner.submit(array.as_ref());
+    }
+
+    pub fn write_buffer<T, U>(&self, dst: buffer::View<T, U>, data: &T)
+    where
+        T: Copy + 'static,
+        U: buffer::CopyDst,
+    {
+        let ptr = data as *const T as *const u8;
+        let len = mem::size_of::<T>();
+
+        let bytes = unsafe { slice::from_raw_parts(ptr, len) };
+
+        self.inner.write_buffer_with_u32_and_u8_array(
+            dst.as_web_sys(),
+            dst.offset_in_bytes() as u32,
+            bytes,
+        );
+    }
+
+    pub fn write_buffer_slice<T, U>(&self, dst: buffer::View<[T], U>, data: &[T])
+    where
+        T: Copy + 'static,
+        U: buffer::CopyDst,
+    {
+        assert_eq!(
+            dst.len(),
+            data.len(),
+            "the size of the buffer view `len` does not match the size of the data"
+        );
+
+        let ptr = data as *const [T] as *const u8;
+        let len = mem::size_of::<T>() * data.len();
+
+        let bytes = unsafe { slice::from_raw_parts(ptr, len) };
+
+        self.inner.write_buffer_with_u32_and_u8_array(
+            dst.as_web_sys(),
+            dst.offset_in_bytes() as u32,
+            bytes,
+        );
+    }
+
+    fn write_texture_internal<F, T>(
+        &self,
+        dst: &texture::ImageCopyTexture<F>,
+        data: &[T],
+        layout: ImageDataByteLayout,
+        size: ImageCopySize3D,
+    ) {
+        let ImageCopySize3D {
+            width,
+            height,
+            depth_or_layers,
+        } = size;
+
+        let [block_width, block_height] = dst.block_size;
+
+        let width_in_blocks = width / block_width;
+
+        assert!(
+            layout.blocks_per_row >= width_in_blocks,
+            "blocks per row must be at least the copy width in blocks (`{}`)",
+            width_in_blocks
+        );
+
+        let height_in_blocks = height / block_height;
+
+        assert!(
+            layout.rows_per_image >= height_in_blocks,
+            "rows per image must be at least the copy height in blocks (`{}`)",
+            height_in_blocks
+        );
+
+        let min_size = layout.blocks_per_row * layout.rows_per_image * depth_or_layers;
+
+        assert!(
+            data.len() >= min_size as usize,
+            "data slice must contains enough elements for the copy size (`{}` blocks)",
+            min_size
+        );
+
+        let ptr = data as *const [T] as *const u8;
+        let len = mem::size_of::<T>() * data.len();
+
+        let bytes = unsafe { slice::from_raw_parts(ptr, len) };
+
+        self.inner.write_texture_with_u8_array_and_gpu_extent_3d_dict(
+            &dst.to_web_sys(),
+            bytes,
+            &layout.to_web_sys(),
+            &size.to_web_sys()
+        );
+    }
+
+    pub fn write_texture<F, T>(
+        &self,
+        dst: &texture::ImageCopyDst<F>,
+        data: &[T],
+        layout: ImageDataLayout,
+    ) where
+        T: ImageData<F>,
+        F: TextureFormat,
+    {
+        let size = ImageCopySize3D {
+            width: dst.inner.width,
+            height: dst.inner.height,
+            depth_or_layers: dst.inner.depth_or_layers,
+        };
+        let byte_layout = layout.to_byte_layout(mem::size_of::<T>() as u32);
+
+        self.write_texture_internal(&dst.inner, data, byte_layout, size);
+    }
+
+    pub fn write_texture_sub_image<F, T>(
+        &self,
+        dst: &texture::SubImageCopyDst<F>,
+        data: &[T],
+        layout: ImageDataLayout,
+        size: ImageCopySize3D,
+    ) where
+        T: ImageData<F>,
+        F: TextureFormat,
+    {
+        size.validate_with_block_size(dst.inner.block_size);
+        dst.inner.validate_dst_with_size(size);
+
+        let byte_layout = layout.to_byte_layout(mem::size_of::<T>() as u32);
+
+        self.write_texture_internal(&dst.inner, data, byte_layout, size);
+    }
+
+    fn write_texture_raw_internal<F>(
+        &self,
+        dst: &texture::ImageCopyTexture<F>,
+        bytes: &[u8],
+        layout: ImageDataByteLayout,
+        size: ImageCopySize3D,
+    ) {
+        assert!(
+            layout.bytes_per_block == dst.bytes_per_block,
+            "`layout` bytes per block does not match `dst` bytes per block"
+        );
+
+        let ImageCopySize3D {
+            width,
+            height,
+            depth_or_layers,
+        } = size;
+
+        let [block_width, block_height] = dst.block_size;
+
+        let width_in_blocks = width / block_width;
+
+        assert!(
+            layout.blocks_per_row >= width_in_blocks,
+            "blocks per row must be at least the copy width in blocks (`{}`)",
+            width_in_blocks
+        );
+
+        let height_in_blocks = height / block_height;
+
+        assert!(
+            layout.rows_per_image >= height_in_blocks,
+            "rows per image must be at least the copy height in blocks (`{}`)",
+            height_in_blocks
+        );
+
+        let min_size = layout.bytes_per_block * layout.blocks_per_row * layout.rows_per_image * depth_or_layers;
+
+        assert!(
+            bytes.len() >= min_size as usize,
+            "data slice must contains enough elements for the copy size (`{}` blocks)",
+            min_size
+        );
+
+        self.inner.write_texture_with_u8_array_and_gpu_extent_3d_dict(
+            &dst.to_web_sys(),
+            bytes,
+            &layout.to_web_sys(),
+            &size.to_web_sys()
+        );
+    }
+
+    pub fn write_texture_raw<F>(
+        &self,
+        dst: &texture::ImageCopyDst<F>,
+        bytes: &[u8],
+        layout: ImageDataByteLayout,
+    ) where
+        F: TextureFormat,
+    {
+        let size = ImageCopySize3D {
+            width: dst.inner.width,
+            height: dst.inner.height,
+            depth_or_layers: dst.inner.depth_or_layers,
+        };
+
+        self.write_texture_raw_internal(&dst.inner, bytes, layout, size);
+    }
+
+    pub fn write_texture_sub_image_raw<F>(
+        &self,
+        dst: &texture::SubImageCopyDst<F>,
+        bytes: &[u8],
+        layout: ImageDataByteLayout,
+        size: ImageCopySize3D,
+    ) where
+        F: TextureFormat,
+    {
+        size.validate_with_block_size(dst.inner.block_size);
+        dst.inner.validate_dst_with_size(size);
+
+        self.write_texture_raw_internal(&dst.inner, bytes, layout, size);
     }
 }

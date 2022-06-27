@@ -8,7 +8,6 @@ publish = false
 
 [dependencies]
 arwa = { version = "0.1.0", path = "../../../../rudo/arwa" }
-console_error_panic_hook = "0.1.7"
 empa = { version = "0.1.0", path = "../../../empa", features = ["arwa"] }
 futures = "0.3.21"
 wasm-bindgen = "0.2.81"

@@ -75,7 +75,7 @@ impl ComputePipelineDescriptorBuilder<(), ()> {
 impl<Layout: TypedPipelineLayout> ComputePipelineDescriptorBuilder<PipelineLayout<Layout>, ()> {
     pub fn compute(
         mut self,
-        compute_stage: ComputeStage,
+        compute_stage: &ComputeStage,
     ) -> ComputePipelineDescriptorBuilder<PipelineLayout<Layout>, ComputeStage> {
         let layout = Layout::BIND_GROUP_LAYOUTS;
 
@@ -95,7 +95,7 @@ impl<Layout: TypedPipelineLayout> ComputePipelineDescriptorBuilder<PipelineLayou
                 );
             };
 
-            if !entry.visibility.intersects(ShaderStages::VERTEX) {
+            if !entry.visibility.intersects(ShaderStages::COMPUTE) {
                 panic!(
                     "binding `{}` in group `{}` is not visible to the compute stage",
                     resource_binding.binding, resource_binding.group
@@ -112,6 +112,15 @@ impl<Layout: TypedPipelineLayout> ComputePipelineDescriptorBuilder<PipelineLayou
         ComputePipelineDescriptorBuilder {
             inner: self.inner,
             _marker: Default::default(),
+        }
+    }
+}
+
+impl<Layout: TypedPipelineLayout> ComputePipelineDescriptorBuilder<PipelineLayout<Layout>, ComputeStage> {
+    pub fn finish(self) -> ComputePipelineDescriptor<Layout> {
+        ComputePipelineDescriptor {
+            inner: self.inner,
+            _marker: Default::default()
         }
     }
 }

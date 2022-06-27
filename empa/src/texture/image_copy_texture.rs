@@ -3,8 +3,7 @@ use std::sync::Arc;
 
 use web_sys::{GpuImageCopyTexture, GpuOrigin3dDict, GpuTextureAspect};
 
-use crate::command::ImageCopySize;
-use crate::texture::TextureDestroyer;
+use crate::texture::{TextureDestroyer, ImageCopySize3D};
 
 pub(crate) struct ImageCopyTexture<F> {
     pub(crate) texture: Arc<TextureDestroyer>,
@@ -22,8 +21,8 @@ pub(crate) struct ImageCopyTexture<F> {
 }
 
 impl<F> ImageCopyTexture<F> {
-    pub(crate) fn validate_src_with_size(&self, copy_size: ImageCopySize) {
-        let ImageCopySize {
+    pub(crate) fn validate_src_with_size(&self, copy_size: ImageCopySize3D) {
+        let ImageCopySize3D {
             width,
             height,
             depth_or_layers,
@@ -43,8 +42,8 @@ impl<F> ImageCopyTexture<F> {
         );
     }
 
-    pub(crate) fn validate_dst_with_size(&self, copy_size: ImageCopySize) {
-        let ImageCopySize {
+    pub(crate) fn validate_dst_with_size(&self, copy_size: ImageCopySize3D) {
+        let ImageCopySize3D {
             width,
             height,
             depth_or_layers,
@@ -81,19 +80,19 @@ impl<F> ImageCopyTexture<F> {
     }
 }
 
-pub struct ImageCopyFromBufferDst<F> {
+pub struct ImageCopyDst<F> {
     pub(crate) inner: ImageCopyTexture<F>,
 }
 
-pub struct SubImageCopyFromBufferDst<F> {
+pub struct SubImageCopyDst<F> {
     pub(crate) inner: ImageCopyTexture<F>,
 }
 
-pub struct ImageCopyToBufferSrc<F> {
+pub struct ImageCopySrc<F> {
     pub(crate) inner: ImageCopyTexture<F>,
 }
 
-pub struct SubImageCopyToBufferSrc<F> {
+pub struct SubImageCopySrc<F> {
     pub(crate) inner: ImageCopyTexture<F>,
 }
 

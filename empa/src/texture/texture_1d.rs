@@ -14,9 +14,9 @@ use crate::texture::format::{
     UnfilteredFloatSamplable, UnsignedIntegerSamplable, ViewFormat, ViewFormats,
 };
 use crate::texture::{
-    CopyDst, CopySrc, FormatKind, ImageCopyFromBufferDst, ImageCopyFromTextureDst,
-    ImageCopyTexture, ImageCopyToBufferSrc, ImageCopyToTextureSrc, StorageBinding,
-    SubImageCopyFromBufferDst, SubImageCopyFromTextureDst, SubImageCopyToBufferSrc,
+    CopyDst, CopySrc, FormatKind, ImageCopyDst, ImageCopyFromTextureDst,
+    ImageCopyTexture, ImageCopySrc, ImageCopyToTextureSrc, StorageBinding,
+    SubImageCopyDst, SubImageCopyFromTextureDst, SubImageCopySrc,
     SubImageCopyToTextureSrc, TextureBinding, TextureDestroyer, UnsupportedViewFormat, UsageFlags,
 };
 
@@ -269,22 +269,22 @@ where
         }
     }
 
-    pub fn image_copy_to_buffer_src(&self) -> ImageCopyToBufferSrc<F>
+    pub fn image_copy_to_buffer_src(&self) -> ImageCopySrc<F>
     where
         F: ImageCopyToBufferFormat,
         U: CopySrc,
     {
-        ImageCopyToBufferSrc {
+        ImageCopySrc {
             inner: self.image_copy_internal(0, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
         }
     }
 
-    pub fn image_copy_from_buffer_dst(&self) -> ImageCopyFromBufferDst<F>
+    pub fn image_copy_from_buffer_dst(&self) -> ImageCopyDst<F>
     where
         F: ImageCopyFromBufferFormat,
         U: CopyDst,
     {
-        ImageCopyFromBufferDst {
+        ImageCopyDst {
             inner: self.image_copy_internal(0, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
         }
     }
@@ -309,22 +309,22 @@ where
         }
     }
 
-    pub fn sub_image_copy_to_buffer_src(&self, origin: u32) -> SubImageCopyToBufferSrc<F>
+    pub fn sub_image_copy_to_buffer_src(&self, origin: u32) -> SubImageCopySrc<F>
     where
         F: ImageCopyToBufferFormat + SubImageCopyFormat,
         U: CopySrc,
     {
-        SubImageCopyToBufferSrc {
+        SubImageCopySrc {
             inner: self.image_copy_internal(origin, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
         }
     }
 
-    pub fn sub_image_copy_from_buffer_dst(&self, origin: u32) -> SubImageCopyFromBufferDst<F>
+    pub fn sub_image_copy_from_buffer_dst(&self, origin: u32) -> SubImageCopyDst<F>
     where
         F: ImageCopyFromBufferFormat + SubImageCopyFormat,
         U: CopyDst,
     {
-        SubImageCopyFromBufferDst {
+        SubImageCopyDst {
             inner: self.image_copy_internal(origin, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
         }
     }

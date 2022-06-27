@@ -17,9 +17,9 @@ use crate::texture::format::{
     TextureFormatId, UnfilteredFloatSamplable, UnsignedIntegerSamplable, ViewFormat, ViewFormats,
 };
 use crate::texture::{
-    CopyDst, CopySrc, FormatKind, ImageCopyFromBufferDst, ImageCopyFromTextureDst,
-    ImageCopyTexture, ImageCopyToBufferSrc, ImageCopyToTextureSrc, MipmapLevels, RenderAttachment,
-    StorageBinding, SubImageCopyFromBufferDst, SubImageCopyFromTextureDst, SubImageCopyToBufferSrc,
+    CopyDst, CopySrc, FormatKind, ImageCopyDst, ImageCopyFromTextureDst,
+    ImageCopyTexture, ImageCopySrc, ImageCopyToTextureSrc, MipmapLevels, RenderAttachment,
+    StorageBinding, SubImageCopyDst, SubImageCopyFromTextureDst, SubImageCopySrc,
     SubImageCopyToTextureSrc, TextureBinding, TextureDestroyer, UnsupportedViewFormat, UsageFlags,
 };
 
@@ -148,11 +148,11 @@ pub struct SubImageCopy2DDescriptor {
 }
 
 pub struct Texture2D<F, Usage> {
-    inner: Arc<TextureDestroyer>,
-    width: u32,
-    height: u32,
-    layers: u32,
-    mip_level_count: u8,
+    pub(crate) inner: Arc<TextureDestroyer>,
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+    pub(crate) layers: u32,
+    pub(crate) mip_level_count: u8,
     format: FormatKind<F>,
     view_formats: StaticVec<TextureFormatId, 8>,
     _usage: marker::PhantomData<Usage>,
@@ -233,7 +233,7 @@ where
 
         let mut desc = GpuTextureDescriptor::new(F::FORMAT_ID.to_web_sys(), &size.into(), U::BITS);
 
-        desc.dimension(GpuTextureDimension::N3d);
+        desc.dimension(GpuTextureDimension::N2d);
         desc.mip_level_count(mip_level_count);
 
         let inner = device.inner.create_texture(&desc);
@@ -1378,18 +1378,11 @@ where
 
     fn image_copy_internal(
         &self,
-        descriptor: SubImageCopy2DDescriptor,
+        mipmap_level: u8,
         bytes_per_block: u32,
         block_size: [u32; 2],
         aspect: GpuTextureAspect,
     ) -> ImageCopyTexture<F> {
-        let SubImageCopy2DDescriptor {
-            mipmap_level,
-            origin_x,
-            origin_y,
-            origin_layer,
-        } = descriptor;
-
         assert!(
             mipmap_level < self.mip_level_count,
             "mipmap level out of bounds"
@@ -1404,9 +1397,9 @@ where
             depth_or_layers: self.layers,
             bytes_per_block,
             block_size,
-            origin_x,
-            origin_y,
-            origin_z: origin_layer,
+            origin_x: 0,
+            origin_y: 0,
+            origin_z: 0,
             _marker: Default::default(),
         }
     }
@@ -1429,8 +1422,8 @@ where
             "mipmap level out of bounds"
         );
         assert!(origin_x < self.width, "`x` origin out of bounds");
-        assert!(origin_y < self.width, "`y` origin out of bounds");
-        assert!(origin_layer < self.width, "layer origin out of bounds");
+        assert!(origin_y < self.height, "`y` origin out of bounds");
+        assert!(origin_layer < self.layers, "layer origin out of bounds");
 
         let [block_width, block_height] = block_size;
 
@@ -1461,19 +1454,14 @@ where
         }
     }
 
-    pub fn image_copy_to_buffer_src(&self, mipmap_level: u8) -> ImageCopyToBufferSrc<F>
+    pub fn image_copy_to_buffer_src(&self, mipmap_level: u8) -> ImageCopySrc<F>
     where
         F: ImageCopyToBufferFormat,
         U: CopySrc,
     {
-        ImageCopyToBufferSrc {
+        ImageCopySrc {
             inner: self.image_copy_internal(
-                SubImageCopy2DDescriptor {
-                    mipmap_level,
-                    origin_x: 0,
-                    origin_y: 0,
-                    origin_layer: 0,
-                },
+                mipmap_level,
                 F::BYTES_PER_BLOCK,
                 F::BLOCK_SIZE,
                 GpuTextureAspect::All,
@@ -1481,20 +1469,15 @@ where
         }
     }
 
-    pub fn image_copy_to_buffer_src_depth(&self, mipmap_level: u8) -> ImageCopyToBufferSrc<F>
+    pub fn image_copy_to_buffer_src_depth(&self, mipmap_level: u8) -> ImageCopySrc<F>
     where
         F: DepthStencilFormat,
         F::DepthAspect: ImageCopyToBufferFormat,
         U: CopySrc,
     {
-        ImageCopyToBufferSrc {
+        ImageCopySrc {
             inner: self.image_copy_internal(
-                SubImageCopy2DDescriptor {
-                    mipmap_level,
-                    origin_x: 0,
-                    origin_y: 0,
-                    origin_layer: 0,
-                },
+                mipmap_level,
                 F::DepthAspect::BYTES_PER_BLOCK,
                 F::DepthAspect::BLOCK_SIZE,
                 GpuTextureAspect::DepthOnly,
@@ -1502,20 +1485,15 @@ where
         }
     }
 
-    pub fn image_copy_to_buffer_src_stencil(&self, mipmap_level: u8) -> ImageCopyToBufferSrc<F>
+    pub fn image_copy_to_buffer_src_stencil(&self, mipmap_level: u8) -> ImageCopySrc<F>
     where
         F: DepthStencilFormat,
         F::StencilAspect: ImageCopyToBufferFormat,
         U: CopySrc,
     {
-        ImageCopyToBufferSrc {
+        ImageCopySrc {
             inner: self.image_copy_internal(
-                SubImageCopy2DDescriptor {
-                    mipmap_level,
-                    origin_x: 0,
-                    origin_y: 0,
-                    origin_layer: 0,
-                },
+                mipmap_level,
                 F::StencilAspect::BYTES_PER_BLOCK,
                 F::StencilAspect::BLOCK_SIZE,
                 GpuTextureAspect::StencilOnly,
@@ -1523,19 +1501,14 @@ where
         }
     }
 
-    pub fn image_copy_from_buffer_dst(&self, mipmap_level: u8) -> ImageCopyFromBufferDst<F>
+    pub fn image_copy_from_buffer_dst(&self, mipmap_level: u8) -> ImageCopyDst<F>
     where
         F: ImageCopyFromBufferFormat,
         U: CopyDst,
     {
-        ImageCopyFromBufferDst {
+        ImageCopyDst {
             inner: self.image_copy_internal(
-                SubImageCopy2DDescriptor {
-                    mipmap_level,
-                    origin_x: 0,
-                    origin_y: 0,
-                    origin_layer: 0,
-                },
+                mipmap_level,
                 F::BYTES_PER_BLOCK,
                 F::BLOCK_SIZE,
                 GpuTextureAspect::All,
@@ -1545,20 +1518,15 @@ where
 
     // Note: including this function for completeness sake, but this should not currently be
     // invokable, no format meets the constraints.
-    pub fn image_copy_from_buffer_dst_depth(&self, mipmap_level: u8) -> ImageCopyFromBufferDst<F>
+    pub fn image_copy_from_buffer_dst_depth(&self, mipmap_level: u8) -> ImageCopyDst<F>
     where
         F: DepthStencilFormat,
         F::DepthAspect: ImageCopyFromBufferFormat,
         U: CopyDst,
     {
-        ImageCopyFromBufferDst {
+        ImageCopyDst {
             inner: self.image_copy_internal(
-                SubImageCopy2DDescriptor {
-                    mipmap_level,
-                    origin_x: 0,
-                    origin_y: 0,
-                    origin_layer: 0,
-                },
+                mipmap_level,
                 F::DepthAspect::BYTES_PER_BLOCK,
                 F::DepthAspect::BLOCK_SIZE,
                 GpuTextureAspect::DepthOnly,
@@ -1566,20 +1534,15 @@ where
         }
     }
 
-    pub fn image_copy_from_buffer_dst_stencil(&self, mipmap_level: u8) -> ImageCopyFromBufferDst<F>
+    pub fn image_copy_from_buffer_dst_stencil(&self, mipmap_level: u8) -> ImageCopyDst<F>
     where
         F: DepthStencilFormat,
         F::StencilAspect: ImageCopyFromBufferFormat,
         U: CopyDst,
     {
-        ImageCopyFromBufferDst {
+        ImageCopyDst {
             inner: self.image_copy_internal(
-                SubImageCopy2DDescriptor {
-                    mipmap_level,
-                    origin_x: 0,
-                    origin_y: 0,
-                    origin_layer: 0,
-                },
+                mipmap_level,
                 F::StencilAspect::BYTES_PER_BLOCK,
                 F::StencilAspect::BLOCK_SIZE,
                 GpuTextureAspect::StencilOnly,
@@ -1594,12 +1557,7 @@ where
     {
         ImageCopyToTextureSrc {
             inner: self.image_copy_internal(
-                SubImageCopy2DDescriptor {
-                    mipmap_level,
-                    origin_x: 0,
-                    origin_y: 0,
-                    origin_layer: 0,
-                },
+                mipmap_level,
                 0,
                 F::BLOCK_SIZE,
                 GpuTextureAspect::All,
@@ -1614,12 +1572,7 @@ where
     {
         ImageCopyFromTextureDst {
             inner: self.image_copy_internal(
-                SubImageCopy2DDescriptor {
-                    mipmap_level,
-                    origin_x: 0,
-                    origin_y: 0,
-                    origin_layer: 0,
-                },
+                mipmap_level,
                 0,
                 F::BLOCK_SIZE,
                 GpuTextureAspect::All,
@@ -1630,12 +1583,12 @@ where
     pub fn sub_image_copy_to_buffer_src(
         &self,
         descriptor: SubImageCopy2DDescriptor,
-    ) -> SubImageCopyToBufferSrc<F>
+    ) -> SubImageCopySrc<F>
     where
         F: ImageCopyToBufferFormat + SubImageCopyFormat,
         U: CopySrc,
     {
-        SubImageCopyToBufferSrc {
+        SubImageCopySrc {
             inner: self.sub_image_copy_internal(descriptor, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
         }
     }
@@ -1643,12 +1596,12 @@ where
     pub fn sub_image_copy_from_buffer_dst(
         &self,
         descriptor: SubImageCopy2DDescriptor,
-    ) -> SubImageCopyFromBufferDst<F>
+    ) -> SubImageCopyDst<F>
     where
         F: ImageCopyFromBufferFormat + SubImageCopyFormat,
         U: CopyDst,
     {
-        SubImageCopyFromBufferDst {
+        SubImageCopyDst {
             inner: self.sub_image_copy_internal(descriptor, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
         }
     }

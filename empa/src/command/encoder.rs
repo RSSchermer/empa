@@ -20,7 +20,7 @@ use crate::render_pipeline::{PipelineIndexFormat, PipelineIndexFormatCompatible,
 use crate::render_target::{RenderTargetEncoding, ValidRenderTarget};
 use crate::resource_binding::EntryDestroyer;
 use crate::texture::format::{ImageData, TextureFormat};
-use crate::texture::TextureDestroyer;
+use crate::texture::{TextureDestroyer, ImageCopySize3D};
 use crate::type_flag::{TypeFlag, O, X};
 use crate::{buffer, texture};
 
@@ -168,14 +168,14 @@ impl CommandEncoder {
     fn image_copy_buffer_to_texture_internal<F>(
         mut self,
         src: &buffer::ImageCopyBuffer,
-        dst: &texture::ImageCopyFromBufferDst<F>,
+        dst: &texture::ImageCopyDst<F>,
     ) -> Self {
         let width = dst.inner.width;
         let height = dst.inner.height;
         let depth_or_layers = dst.inner.depth_or_layers;
 
         src.validate_with_size_and_block_size(
-            ImageCopySize {
+            ImageCopySize3D {
                 width,
                 height,
                 depth_or_layers,
@@ -204,7 +204,7 @@ impl CommandEncoder {
     pub fn image_copy_buffer_to_texture<T, F>(
         self,
         src: &buffer::ImageCopySrc<T>,
-        dst: &texture::ImageCopyFromBufferDst<F>,
+        dst: &texture::ImageCopyDst<F>,
     ) -> Self
     where
         T: ImageData<F>,
@@ -216,7 +216,7 @@ impl CommandEncoder {
     pub fn image_copy_buffer_to_texture_raw<F>(
         self,
         src: &buffer::ImageCopySrcRaw,
-        dst: &texture::ImageCopyFromBufferDst<F>,
+        dst: &texture::ImageCopyDst<F>,
     ) -> Self {
         assert!(
             src.inner.bytes_per_block == dst.inner.bytes_per_block,
@@ -229,8 +229,8 @@ impl CommandEncoder {
     fn sub_image_copy_buffer_to_texture_internal<F>(
         mut self,
         src: &buffer::ImageCopyBuffer,
-        dst: &texture::SubImageCopyFromBufferDst<F>,
-        size: ImageCopySize,
+        dst: &texture::SubImageCopyDst<F>,
+        size: ImageCopySize3D,
     ) -> Self {
         size.validate_with_block_size(dst.inner.block_size);
         src.validate_with_size_and_block_size(size, dst.inner.block_size);
@@ -252,8 +252,8 @@ impl CommandEncoder {
     pub fn sub_image_copy_buffer_to_texture<T, F>(
         self,
         src: &buffer::ImageCopySrc<T>,
-        dst: &texture::SubImageCopyFromBufferDst<F>,
-        size: ImageCopySize,
+        dst: &texture::SubImageCopyDst<F>,
+        size: ImageCopySize3D,
     ) -> Self
     where
         T: ImageData<F>,
@@ -265,8 +265,8 @@ impl CommandEncoder {
     pub fn sub_image_copy_buffer_to_texture_raw<F>(
         self,
         src: &buffer::ImageCopySrcRaw,
-        dst: &texture::SubImageCopyFromBufferDst<F>,
-        size: ImageCopySize,
+        dst: &texture::SubImageCopyDst<F>,
+        size: ImageCopySize3D,
     ) -> Self {
         assert!(
             src.inner.bytes_per_block == dst.inner.bytes_per_block,
@@ -278,7 +278,7 @@ impl CommandEncoder {
 
     fn image_copy_texture_to_buffer_internal<F>(
         mut self,
-        src: &texture::ImageCopyToBufferSrc<F>,
+        src: &texture::ImageCopySrc<F>,
         dst: &buffer::ImageCopyBuffer,
     ) -> Self {
         let width = src.inner.width;
@@ -286,7 +286,7 @@ impl CommandEncoder {
         let depth_or_layers = src.inner.depth_or_layers;
 
         dst.validate_with_size_and_block_size(
-            ImageCopySize {
+            ImageCopySize3D {
                 width,
                 height,
                 depth_or_layers,
@@ -314,7 +314,7 @@ impl CommandEncoder {
 
     pub fn image_copy_texture_to_buffer<F, T>(
         self,
-        src: &texture::ImageCopyToBufferSrc<F>,
+        src: &texture::ImageCopySrc<F>,
         dst: &buffer::ImageCopyDst<T>,
     ) -> Self
     where
@@ -326,7 +326,7 @@ impl CommandEncoder {
 
     pub fn image_copy_texture_to_buffer_raw<F>(
         self,
-        src: &texture::ImageCopyToBufferSrc<F>,
+        src: &texture::ImageCopySrc<F>,
         dst: &buffer::ImageCopyDstRaw,
     ) -> Self {
         assert!(
@@ -339,9 +339,9 @@ impl CommandEncoder {
 
     fn sub_image_copy_texture_to_buffer_internal<F>(
         mut self,
-        src: &texture::SubImageCopyToBufferSrc<F>,
+        src: &texture::SubImageCopySrc<F>,
         dst: &buffer::ImageCopyBuffer,
-        size: ImageCopySize,
+        size: ImageCopySize3D,
     ) -> Self {
         size.validate_with_block_size(src.inner.block_size);
         src.inner.validate_src_with_size(size);
@@ -362,9 +362,9 @@ impl CommandEncoder {
 
     pub fn sub_image_copy_texture_to_buffer<F, T>(
         self,
-        src: &texture::SubImageCopyToBufferSrc<F>,
+        src: &texture::SubImageCopySrc<F>,
         dst: &buffer::ImageCopyDst<T>,
-        size: ImageCopySize,
+        size: ImageCopySize3D,
     ) -> Self
     where
         F: TextureFormat,
@@ -375,9 +375,9 @@ impl CommandEncoder {
 
     pub fn sub_image_copy_texture_to_buffer_raw<F>(
         self,
-        src: &texture::SubImageCopyToBufferSrc<F>,
+        src: &texture::SubImageCopySrc<F>,
         dst: &buffer::ImageCopyDstRaw,
-        size: ImageCopySize,
+        size: ImageCopySize3D,
     ) -> Self {
         assert!(
             src.inner.bytes_per_block == dst.inner.bytes_per_block,
@@ -428,7 +428,7 @@ impl CommandEncoder {
         self,
         src: &texture::SubImageCopyToTextureSrc<F>,
         dst: &texture::SubImageCopyFromTextureDst<F>,
-        size: ImageCopySize,
+        size: ImageCopySize3D,
     ) -> Self {
         size.validate_with_block_size(src.inner.block_size);
         src.inner.validate_src_with_size(size);
@@ -542,58 +542,6 @@ impl CommandEncoder {
             inner: inner.finish(),
             _resource_destroyers,
         }
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct ImageCopySize {
-    pub width: u32,
-    pub height: u32,
-    pub depth_or_layers: u32,
-}
-
-impl ImageCopySize {
-    pub(crate) fn validate_with_block_size(&self, block_size: [u32; 2]) {
-        let ImageCopySize {
-            width,
-            height,
-            depth_or_layers,
-        } = *self;
-
-        assert!(width != 0, "copy width cannot be `0`");
-        assert!(height != 0, "copy height cannot be `0`");
-        assert!(
-            depth_or_layers != 0,
-            "copy depth or layer count cannot be `0`"
-        );
-
-        let [block_width, block_height] = block_size;
-
-        assert!(
-            width.rem(block_width) == 0,
-            "copy width must be a multiple of the block width (`{}`)",
-            block_width
-        );
-        assert!(
-            height.rem(block_height) == 0,
-            "copy height must be a multiple of the block height (`{}`)",
-            block_height
-        );
-    }
-
-    pub(crate) fn to_web_sys(&self) -> GpuExtent3dDict {
-        let ImageCopySize {
-            width,
-            height,
-            depth_or_layers,
-        } = *self;
-
-        let mut extent = GpuExtent3dDict::new(width);
-
-        extent.height(height);
-        extent.depth_or_array_layers(depth_or_layers);
-
-        extent
     }
 }
 

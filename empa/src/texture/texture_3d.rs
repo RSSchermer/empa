@@ -1,6 +1,5 @@
 use std::cmp::max;
 use std::marker;
-use std::ops::Rem;
 use std::sync::Arc;
 
 use staticvec::StaticVec;
@@ -16,9 +15,9 @@ use crate::texture::format::{
     UnfilteredFloatSamplable, UnsignedIntegerSamplable, ViewFormat, ViewFormats,
 };
 use crate::texture::{
-    CopyDst, CopySrc, FormatKind, ImageCopyFromBufferDst, ImageCopyFromTextureDst,
-    ImageCopyTexture, ImageCopyToBufferSrc, ImageCopyToTextureSrc, MipmapLevels, StorageBinding,
-    SubImageCopyFromBufferDst, SubImageCopyFromTextureDst, SubImageCopyToBufferSrc,
+    CopyDst, CopySrc, FormatKind, ImageCopyDst, ImageCopyFromTextureDst,
+    ImageCopyTexture, ImageCopySrc, ImageCopyToTextureSrc, MipmapLevels, StorageBinding,
+    SubImageCopyDst, SubImageCopyFromTextureDst, SubImageCopySrc,
     SubImageCopyToTextureSrc, TextureBinding, TextureDestroyer, UnsupportedViewFormat, UsageFlags,
 };
 
@@ -333,36 +332,13 @@ where
 
     fn image_copy_internal(
         &self,
-        descriptor: SubImageCopy3DDescriptor,
+        mipmap_level: u8,
         bytes_per_block: u32,
         block_size: [u32; 2],
     ) -> ImageCopyTexture<F> {
-        let SubImageCopy3DDescriptor {
-            mipmap_level,
-            origin_x,
-            origin_y,
-            origin_z,
-        } = descriptor;
-
         assert!(
             mipmap_level < self.mip_level_count,
             "mipmap level out of bounds"
-        );
-        assert!(origin_x < self.width, "`x` origin out of bounds");
-        assert!(origin_y < self.width, "`y` origin out of bounds");
-        assert!(origin_z < self.width, "layer origin out of bounds");
-
-        let [block_width, block_height] = block_size;
-
-        assert!(
-            origin_x.rem(block_width) == 0,
-            "`x` origin must be a multiple of the format's block width (`{}`)",
-            block_width
-        );
-        assert!(
-            origin_y.rem(block_height) == 0,
-            "`x` origin must be a multiple of the format's block height (`{}`)",
-            block_height
         );
 
         ImageCopyTexture {
@@ -374,9 +350,9 @@ where
             depth_or_layers: self.depth,
             bytes_per_block,
             block_size,
-            origin_x,
-            origin_y,
-            origin_z,
+            origin_x: 0,
+            origin_y: 0,
+            origin_z: 0,
             _marker: Default::default(),
         }
     }
@@ -399,8 +375,8 @@ where
             "mipmap level out of bounds"
         );
         assert!(origin_x < self.width, "`x` origin out of bounds");
-        assert!(origin_y < self.width, "`y` origin out of bounds");
-        assert!(origin_z < self.width, "layer origin out of bounds");
+        assert!(origin_y < self.height, "`y` origin out of bounds");
+        assert!(origin_z < self.depth, "layer origin out of bounds");
 
         ImageCopyTexture {
             texture: self.inner.clone(),
@@ -418,38 +394,28 @@ where
         }
     }
 
-    pub fn image_copy_to_buffer_src(&self, mipmap_level: u8) -> ImageCopyToBufferSrc<F>
+    pub fn image_copy_to_buffer_src(&self, mipmap_level: u8) -> ImageCopySrc<F>
     where
         F: ImageCopyToBufferFormat,
         U: CopySrc,
     {
-        ImageCopyToBufferSrc {
+        ImageCopySrc {
             inner: self.image_copy_internal(
-                SubImageCopy3DDescriptor {
-                    mipmap_level,
-                    origin_x: 0,
-                    origin_y: 0,
-                    origin_z: 0,
-                },
+                mipmap_level,
                 F::BYTES_PER_BLOCK,
                 F::BLOCK_SIZE,
             ),
         }
     }
 
-    pub fn image_copy_from_buffer_dst(&self, mipmap_level: u8) -> ImageCopyFromBufferDst<F>
+    pub fn image_copy_from_buffer_dst(&self, mipmap_level: u8) -> ImageCopyDst<F>
     where
         F: ImageCopyFromBufferFormat,
         U: CopyDst,
     {
-        ImageCopyFromBufferDst {
+        ImageCopyDst {
             inner: self.image_copy_internal(
-                SubImageCopy3DDescriptor {
-                    mipmap_level,
-                    origin_x: 0,
-                    origin_y: 0,
-                    origin_z: 0,
-                },
+                mipmap_level,
                 F::BYTES_PER_BLOCK,
                 F::BLOCK_SIZE,
             ),
@@ -463,12 +429,7 @@ where
     {
         ImageCopyToTextureSrc {
             inner: self.image_copy_internal(
-                SubImageCopy3DDescriptor {
-                    mipmap_level,
-                    origin_x: 0,
-                    origin_y: 0,
-                    origin_z: 0,
-                },
+                mipmap_level,
                 0,
                 F::BLOCK_SIZE,
             ),
@@ -482,12 +443,7 @@ where
     {
         ImageCopyFromTextureDst {
             inner: self.image_copy_internal(
-                SubImageCopy3DDescriptor {
-                    mipmap_level,
-                    origin_x: 0,
-                    origin_y: 0,
-                    origin_z: 0,
-                },
+                mipmap_level,
                 0,
                 F::BLOCK_SIZE,
             ),
@@ -497,12 +453,12 @@ where
     pub fn sub_image_copy_to_buffer_src(
         &self,
         descriptor: SubImageCopy3DDescriptor,
-    ) -> SubImageCopyToBufferSrc<F>
+    ) -> SubImageCopySrc<F>
     where
         F: ImageCopyToBufferFormat + SubImageCopyFormat,
         U: CopySrc,
     {
-        SubImageCopyToBufferSrc {
+        SubImageCopySrc {
             inner: self.sub_image_copy_internal(descriptor, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
         }
     }
@@ -510,12 +466,12 @@ where
     pub fn sub_image_copy_from_buffer_dst(
         &self,
         descriptor: SubImageCopy3DDescriptor,
-    ) -> SubImageCopyFromBufferDst<F>
+    ) -> SubImageCopyDst<F>
     where
         F: ImageCopyFromBufferFormat + SubImageCopyFormat,
         U: CopyDst,
     {
-        SubImageCopyFromBufferDst {
+        SubImageCopyDst {
             inner: self.sub_image_copy_internal(descriptor, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
         }
     }

@@ -312,7 +312,10 @@ fn unsized_buffer_layout_tokens(layout: &UnsizedBufferLayout) -> proc_macro2::To
     };
 
     quote! {
-        empa::resource_binding::SizedBufferLayout(&[#(#head_recurse),*], #tail)
+        empa::resource_binding::UnsizedBufferLayout {
+            sized_head: &[#(#head_recurse),*],
+            unsized_tail: #tail
+        }
     }
 }
 

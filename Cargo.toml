@@ -4,5 +4,7 @@ members = [
     "empa_macros",
     "empa_reflect",
     "examples/web/0_triangle",
-    "examples/web/1_animated_triangle"
+    "examples/web/1_animated_triangle",
+    "examples/web/2_textured_triangle",
+    "examples/web/3_compute"
 ]

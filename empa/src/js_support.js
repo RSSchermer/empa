@@ -1,4 +1,4 @@
-export function __glitz_js_copy_buffer_to_memory(
+export function __empa_js_copy_buffer_to_memory(
     byte_buffer,
     offset,
     size,

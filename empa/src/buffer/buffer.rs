@@ -19,8 +19,8 @@ use crate::abi;
 use crate::buffer::{
     CopyDst, CopySrc, MapRead, MapWrite, StorageBinding, UniformBinding, ValidUsageFlags,
 };
-use crate::command::ImageCopySize;
 use crate::device::{Device, ID_GEN};
+use crate::texture::{ImageDataByteLayout, ImageDataLayout, ImageCopySize3D};
 
 /// Signals that an error occurred when trying to map a buffer.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -889,18 +889,18 @@ impl<'a, T, U> View<'a, [T], U> {
         U: MapRead,
     {
         let size_in_bytes = (mem::size_of::<T>() * self.len) as u32;
-        let start = size_in_bytes * self.offset as u32;
+        let start = (mem::size_of::<T>() * self.offset) as u32;
         let end = start + size_in_bytes;
 
         self.buffer.map_context.lock().unwrap().add(start..end);
 
         let mapped_bytes = Uint8Array::new(
-            &self
+            self
                 .as_web_sys()
-                .get_mapped_range_with_u32_and_u32(start, size_in_bytes),
+                .get_mapped_range_with_u32_and_u32(start, size_in_bytes).as_ref(),
         );
         let mut buffered = Box::<[T]>::new_uninit_slice(self.len);
-        let ptr = &mut buffered as *mut _ as *mut ();
+        let ptr = buffered.as_mut_ptr() as *mut ();
 
         copy_buffer_to_memory(
             &mapped_bytes,
@@ -924,7 +924,7 @@ impl<'a, T, U> View<'a, [T], U> {
         U: MapWrite,
     {
         let size_in_bytes = (mem::size_of::<T>() * self.len) as u32;
-        let start = size_in_bytes * self.offset as u32;
+        let start = (mem::size_of::<T>() * self.offset) as u32;
         let end = start + size_in_bytes;
 
         self.buffer.map_context.lock().unwrap().add(start..end);
@@ -935,7 +935,7 @@ impl<'a, T, U> View<'a, [T], U> {
                 .get_mapped_range_with_u32_and_u32(start, size_in_bytes),
         );
         let mut buffered = Box::<[T]>::new_uninit_slice(self.len);
-        let ptr = &mut buffered as *mut _ as *mut ();
+        let ptr = buffered.as_mut_ptr() as *mut ();
 
         copy_buffer_to_memory(
             &mapped_bytes,
@@ -1416,17 +1416,6 @@ where
     _marker: marker::PhantomData<*const T>,
 }
 
-pub struct ImageDataLayout {
-    pub blocks_per_row: u32,
-    pub rows_per_image: u32,
-}
-
-pub struct ImageDataByteLayout {
-    pub bytes_per_block: u32,
-    pub blocks_per_row: u32,
-    pub rows_per_image: u32,
-}
-
 pub(crate) struct ImageCopyBuffer {
     pub(crate) buffer: Arc<BufferDestroyer>,
     pub(crate) offset: usize,
@@ -1439,10 +1428,10 @@ pub(crate) struct ImageCopyBuffer {
 impl ImageCopyBuffer {
     pub(crate) fn validate_with_size_and_block_size(
         &self,
-        size: ImageCopySize,
+        size: ImageCopySize3D,
         block_size: [u32; 2],
     ) {
-        let ImageCopySize {
+        let ImageCopySize3D {
             width,
             height,
             depth_or_layers,
@@ -1461,7 +1450,7 @@ impl ImageCopyBuffer {
         let height_in_blocks = height / block_height;
 
         assert!(
-            self.blocks_per_row >= width_in_blocks,
+            self.rows_per_image >= height_in_blocks,
             "rows per image must be at least the copy height in blocks (`{}`)",
             height_in_blocks
         );
@@ -1556,7 +1545,7 @@ impl MapContext {
 
 #[wasm_bindgen(module = "/src/js_support.js")]
 extern "C" {
-    #[wasm_bindgen(js_name = __glitz_js_copy_buffer_to_memory)]
+    #[wasm_bindgen(js_name = __empa_js_copy_buffer_to_memory)]
     fn copy_buffer_to_memory(
         buffer: &Uint8Array,
         offset: u32,
