@@ -1,41 +1,54 @@
 #![feature(const_ptr_offset_from)]
 
 use std::error::Error;
+use std::f32::consts::PI;
 
 use arwa::dom::{selector, ParentNode};
 use arwa::html::HtmlCanvasElement;
 use arwa::window::window;
+use cgmath::{Matrix4, PerspectiveFov, Rad, SquareMatrix, Vector3};
+use empa::abi;
 use empa::arwa::{
     CanvasConfiguration, CompositingAlphaMode, HtmlCanvasElementExt, NavigatorExt,
     PredefinedColorSpace, RequestAdapterOptions,
 };
 use empa::buffer::{Buffer, Uniform};
-use empa::command::{Draw, RenderPassDescriptor};
+use empa::command::{DrawIndexed, RenderPassDescriptor};
 use empa::device::DeviceDescriptor;
 use empa::render_pipeline::{
-    ColorOutput, ColorWriteMask, FragmentStageBuilder, RenderPipelineDescriptorBuilder,
-    VertexStageBuilder,
+    ColorOutput, ColorWriteMask, DepthStencilTest, FragmentStageBuilder,
+    RenderPipelineDescriptorBuilder, VertexStageBuilder,
 };
-use empa::render_target::{FloatAttachment, LoadOp, RenderTarget, StoreOp};
+use empa::render_target::{
+    DepthAttachment, DepthValue, FloatAttachment, LoadOp, RenderTarget, StoreOp,
+};
 use empa::resource_binding::Resources;
 use empa::shader_module::{shader_source, ShaderSource};
-use empa::texture::format::rgba8unorm;
-use empa::texture::AttachableImageDescriptor;
-use empa::{buffer, texture};
+use empa::texture::format::{depth24plus, rgba8unorm};
+use empa::texture::{AttachableImageDescriptor, MipmapLevels, Texture2DDescriptor};
+use empa::{buffer, texture, CompareFunction};
+use empa_cgmath::ToAbi;
 use futures::FutureExt;
 
 #[derive(empa::render_pipeline::Vertex, Clone, Copy)]
 struct MyVertex {
-    #[vertex_attribute(location = 0, format = "float32x2")]
-    position: [f32; 2],
+    #[vertex_attribute(location = 0, format = "float32x4")]
+    position: [f32; 4],
     #[vertex_attribute(location = 1, format = "unorm8x4")]
     color: [u8; 4],
+}
+
+#[derive(empa::abi::Sized, Clone, Copy)]
+struct Uniforms {
+    model: abi::Mat4x4,
+    view: abi::Mat4x4,
+    projection: abi::Mat4x4,
 }
 
 #[derive(empa::resource_binding::Resources)]
 struct MyResources<'a> {
     #[resource(binding = 0, visibility = "VERTEX")]
-    uniform_buffer: &'a Uniform<f32>,
+    uniform_buffer: &'a Uniform<Uniforms>,
 }
 
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
@@ -91,29 +104,88 @@ async fn render() -> Result<(), Box<dyn Error>> {
                     })
                     .finish(),
             )
+            .depth_stencil_test(
+                DepthStencilTest::read_write::<depth24plus>()
+                    .depth_compare(CompareFunction::LessEqual),
+            )
             .finish(),
     );
 
     let vertex_data = [
         MyVertex {
-            position: [0.0, 0.5],
+            position: [-5.0, -5.0, -5.0, 1.0],
             color: [255, 0, 0, 255],
         },
         MyVertex {
-            position: [-0.5, -0.5],
+            position: [5.0, -5.0, -5.0, 1.0],
             color: [0, 255, 0, 255],
         },
         MyVertex {
-            position: [0.5, -0.5],
+            position: [-5.0, 5.0, -5.0, 1.0],
             color: [0, 0, 255, 255],
+        },
+        MyVertex {
+            position: [5.0, 5.0, -5.0, 1.0],
+            color: [255, 0, 0, 255],
+        },
+        MyVertex {
+            position: [-5.0, -5.0, 5.0, 1.0],
+            color: [0, 255, 255, 255],
+        },
+        MyVertex {
+            position: [5.0, -5.0, 5.0, 1.0],
+            color: [0, 0, 255, 255],
+        },
+        MyVertex {
+            position: [-5.0, 5.0, 5.0, 1.0],
+            color: [255, 255, 0, 255],
+        },
+        MyVertex {
+            position: [5.0, 5.0, 5.0, 1.0],
+            color: [0, 255, 0, 255],
         },
     ];
 
     let vertex_buffer: Buffer<[MyVertex], _> =
         device.create_buffer(vertex_data, buffer::Usages::vertex());
 
+    let index_data: Vec<u16> = vec![
+        0, 2, 1, // Back
+        1, 2, 3, //
+        0, 6, 2, // Left
+        0, 4, 6, //
+        1, 3, 7, // Right
+        1, 7, 5, //
+        2, 7, 3, // Top
+        2, 6, 7, //
+        0, 1, 5, // Bottom
+        0, 5, 4, //
+        4, 5, 7, // Front
+        6, 4, 7, //
+    ];
+
+    let index_buffer: Buffer<[u16], _> = device.create_buffer(index_data, buffer::Usages::index());
+
+    let view = Matrix4::from_translation(Vector3::new(0.0, 0.0, 30.0))
+        .invert()
+        .unwrap()
+        .to_abi();
+    let projection = Matrix4::from(PerspectiveFov {
+        fovy: Rad(0.3 * PI),
+        aspect: 1.0,
+        near: 1.0,
+        far: 100.0,
+    })
+    .to_abi();
+    let uniforms = Uniforms {
+        model: Matrix4::identity().to_abi(),
+        view,
+        projection,
+    };
+
     let uniform_buffer =
-        device.create_buffer(1.0, buffer::Usages::uniform_binding().and_copy_dst());
+        device.create_buffer(uniforms, buffer::Usages::uniform_binding().and_copy_dst());
+
     let bind_group = device.create_bind_group(
         &bind_group_layout,
         MyResources {
@@ -121,12 +193,32 @@ async fn render() -> Result<(), Box<dyn Error>> {
         },
     );
 
+    let depth_texture = device.create_texture_2d(&Texture2DDescriptor {
+        format: depth24plus,
+        usage: texture::Usages::render_attachment(),
+        view_formats: (depth24plus,),
+        width: canvas.width(),
+        height: canvas.height(),
+        layers: 1,
+        mipmap_levels: MipmapLevels::Partial(1),
+    });
+
     let queue = device.queue();
 
     loop {
         let time = window.request_animation_frame().await;
+        let time = time as f32;
 
-        queue.write_buffer(uniform_buffer.view(), &f32::sin(time as f32 * 0.001));
+        let rotate_x = Matrix4::from_angle_x(Rad(time / 1000.0));
+        let rotate_y = Matrix4::from_angle_y(Rad(time / 1000.0));
+        let model = rotate_y * rotate_x;
+        let uniforms = Uniforms {
+            model: model.to_abi(),
+            view,
+            projection,
+        };
+
+        queue.write_buffer(uniform_buffer.view(), &uniforms);
 
         let command_buffer = device
             .create_command_encoder()
@@ -138,16 +230,22 @@ async fn render() -> Result<(), Box<dyn Error>> {
                     load_op: LoadOp::Clear([0.0; 4]),
                     store_op: StoreOp::Store,
                 },
-                depth_stencil: (),
+                depth_stencil: DepthAttachment {
+                    image: &depth_texture.attachable_image(&AttachableImageDescriptor::default()),
+                    load_op: LoadOp::Clear(DepthValue::ONE),
+                    store_op: StoreOp::Store,
+                },
             }))
             .set_pipeline(&pipeline)
             .set_vertex_buffers(&vertex_buffer)
+            .set_index_buffer(&index_buffer)
             .set_bind_groups(&bind_group)
-            .draw(Draw {
-                vertex_count: vertex_buffer.len() as u32,
+            .draw_indexed(DrawIndexed {
+                index_count: index_buffer.len() as u32,
                 instance_count: 1,
-                first_vertex: 0,
+                first_index: 0,
                 first_instance: 0,
+                base_vertex: 0,
             })
             .end()
             .finish();

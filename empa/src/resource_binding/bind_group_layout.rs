@@ -15,6 +15,10 @@ use web_sys::{
     GpuTextureViewDimension,
 };
 
+pub struct BindGroupLayoutEncoding {
+    pub(crate) inner: web_sys::GpuBindGroupLayout,
+}
+
 pub struct BindGroupLayout<T = Untyped> {
     pub(crate) inner: web_sys::GpuBindGroupLayout,
     _marker: marker::PhantomData<*const T>,
@@ -218,6 +222,12 @@ impl<T> BindGroupLayout<T> {
         BindGroupLayout {
             inner,
             _marker: marker::PhantomData,
+        }
+    }
+
+    pub fn to_encoding(&self) -> BindGroupLayoutEncoding {
+        BindGroupLayoutEncoding {
+            inner: self.inner.clone(),
         }
     }
 

@@ -642,6 +642,16 @@ impl DepthStencilFormat for depth32float_stencil8 {
     type StencilAspect = stencil8;
 }
 
+pub trait DepthStencilTestFormat: TextureFormat {}
+
+impl DepthStencilTestFormat for depth16unorm {}
+impl DepthStencilTestFormat for depth24plus {}
+impl DepthStencilTestFormat for depth32float {}
+impl DepthStencilTestFormat for depth24plus_stencil8 {}
+impl DepthStencilTestFormat for depth24unorm_stencil8 {}
+impl DepthStencilTestFormat for depth32float_stencil8 {}
+impl DepthStencilTestFormat for stencil8 {}
+
 pub trait Storable: TextureFormat {}
 
 impl Storable for rgba8unorm {}

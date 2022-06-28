@@ -1,3 +1,5 @@
+pub use empa_macros::Sized;
+
 pub unsafe trait Sized {
     const LAYOUT: &'static [MemoryUnit];
 }
@@ -155,6 +157,7 @@ unsafe impl<const N: usize> Sized for [u32; N] {
     }];
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C, align(8))]
 pub struct Vec2<T>(pub T, pub T);
 
@@ -200,6 +203,7 @@ unsafe impl<const N: usize> Sized for [Vec2<u32>; N] {
     }];
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C, align(16))]
 pub struct Vec3<T>(pub T, pub T, pub T);
 
@@ -245,6 +249,7 @@ unsafe impl<const N: usize> Sized for [Vec3<u32>; N] {
     }];
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C, align(16))]
 pub struct Vec4<T>(pub T, pub T, pub T, pub T);
 
@@ -290,6 +295,7 @@ unsafe impl<const N: usize> Sized for [Vec4<u32>; N] {
     }];
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
 pub struct Mat2x2(pub Vec2<f32>, pub Vec2<f32>);
 
@@ -307,6 +313,7 @@ unsafe impl<const N: usize> Sized for [Mat2x2; N] {
     }];
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
 pub struct Mat2x3(pub Vec3<f32>, pub Vec3<f32>);
 
@@ -324,6 +331,7 @@ unsafe impl<const N: usize> Sized for [Mat2x3; N] {
     }];
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
 pub struct Mat2x4(pub Vec4<f32>, pub Vec4<f32>);
 
@@ -341,6 +349,7 @@ unsafe impl<const N: usize> Sized for [Mat2x4; N] {
     }];
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
 pub struct Mat3x2(pub Vec2<f32>, pub Vec2<f32>, pub Vec2<f32>);
 
@@ -358,6 +367,7 @@ unsafe impl<const N: usize> Sized for [Mat3x2; N] {
     }];
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
 pub struct Mat3x3(pub Vec3<f32>, pub Vec3<f32>, pub Vec3<f32>);
 
@@ -375,6 +385,7 @@ unsafe impl<const N: usize> Sized for [Mat3x3; N] {
     }];
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
 pub struct Mat3x4(pub Vec4<f32>, pub Vec4<f32>, pub Vec4<f32>);
 
@@ -392,6 +403,7 @@ unsafe impl<const N: usize> Sized for [Mat3x4; N] {
     }];
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
 pub struct Mat4x2(pub Vec2<f32>, pub Vec2<f32>, pub Vec2<f32>, pub Vec2<f32>);
 
@@ -409,6 +421,7 @@ unsafe impl<const N: usize> Sized for [Mat4x2; N] {
     }];
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
 pub struct Mat4x3(pub Vec3<f32>, pub Vec3<f32>, pub Vec3<f32>, pub Vec3<f32>);
 
@@ -426,6 +439,7 @@ unsafe impl<const N: usize> Sized for [Mat4x3; N] {
     }];
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
 pub struct Mat4x4(pub Vec4<f32>, pub Vec4<f32>, pub Vec4<f32>, pub Vec4<f32>);
 

@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use web_sys::{GpuImageCopyTexture, GpuOrigin3dDict, GpuTextureAspect};
 
-use crate::texture::{TextureDestroyer, ImageCopySize3D};
+use crate::texture::{ImageCopySize3D, TextureDestroyer};
 
 pub(crate) struct ImageCopyTexture<F> {
     pub(crate) texture: Arc<TextureDestroyer>,

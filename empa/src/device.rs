@@ -11,8 +11,8 @@ use crate::compute_pipeline::{ComputePipeline, ComputePipelineDescriptor};
 use crate::query::OcclusionQuerySet;
 use crate::render_pipeline::{RenderPipeline, RenderPipelineDescriptor};
 use crate::resource_binding::{
-    BindGroup, BindGroupLayout, BindGroupLayoutEntry, PipelineLayout, Resources,
-    TypedBindGroupLayout, TypedPipelineLayout,
+    BindGroup, BindGroupLayout, BindGroupLayoutEntry, BindGroupLayouts, PipelineLayout, Resources,
+    TypedBindGroupLayout,
 };
 use crate::sampler::{
     AnisotropicSamplerDescriptor, ComparisonSampler, ComparisonSamplerDescriptor,
@@ -23,7 +23,11 @@ use crate::texture::format::{
     ImageData, MultisampleFormat, Texture1DFormat, Texture2DFormat, Texture3DFormat, TextureFormat,
     ViewFormats,
 };
-use crate::texture::{ImageDataLayout, Texture1D, Texture1DDescriptor, Texture2D, Texture2DDescriptor, Texture3D, Texture3DDescriptor, TextureMultisampled2D, TextureMultisampled2DDescriptor, ImageDataByteLayout, ImageCopySize3D};
+use crate::texture::{
+    ImageCopySize3D, ImageDataByteLayout, ImageDataLayout, Texture1D, Texture1DDescriptor,
+    Texture2D, Texture2DDescriptor, Texture3D, Texture3DDescriptor, TextureMultisampled2D,
+    TextureMultisampled2DDescriptor,
+};
 use crate::{buffer, texture};
 use std::{mem, slice};
 
@@ -114,11 +118,14 @@ impl Device {
         BindGroupLayout::untyped(self, layout)
     }
 
-    pub fn create_pipeline_layout<T>(&self) -> PipelineLayout<T>
+    pub fn create_pipeline_layout<B>(
+        &self,
+        bind_group_layouts: B,
+    ) -> PipelineLayout<B::PipelineLayout>
     where
-        T: TypedPipelineLayout,
+        B: BindGroupLayouts,
     {
-        PipelineLayout::typed(self)
+        PipelineLayout::typed(self, bind_group_layouts)
     }
 
     pub fn create_bind_group<T, R>(&self, layout: &BindGroupLayout<T>, resources: R) -> BindGroup<T>
@@ -328,12 +335,13 @@ impl Queue {
 
         let bytes = unsafe { slice::from_raw_parts(ptr, len) };
 
-        self.inner.write_texture_with_u8_array_and_gpu_extent_3d_dict(
-            &dst.to_web_sys(),
-            bytes,
-            &layout.to_web_sys(),
-            &size.to_web_sys()
-        );
+        self.inner
+            .write_texture_with_u8_array_and_gpu_extent_3d_dict(
+                &dst.to_web_sys(),
+                bytes,
+                &layout.to_web_sys(),
+                &size.to_web_sys(),
+            );
     }
 
     pub fn write_texture<F, T>(
@@ -409,7 +417,10 @@ impl Queue {
             height_in_blocks
         );
 
-        let min_size = layout.bytes_per_block * layout.blocks_per_row * layout.rows_per_image * depth_or_layers;
+        let min_size = layout.bytes_per_block
+            * layout.blocks_per_row
+            * layout.rows_per_image
+            * depth_or_layers;
 
         assert!(
             bytes.len() >= min_size as usize,
@@ -417,12 +428,13 @@ impl Queue {
             min_size
         );
 
-        self.inner.write_texture_with_u8_array_and_gpu_extent_3d_dict(
-            &dst.to_web_sys(),
-            bytes,
-            &layout.to_web_sys(),
-            &size.to_web_sys()
-        );
+        self.inner
+            .write_texture_with_u8_array_and_gpu_extent_3d_dict(
+                &dst.to_web_sys(),
+                bytes,
+                &layout.to_web_sys(),
+                &size.to_web_sys(),
+            );
     }
 
     pub fn write_texture_raw<F>(

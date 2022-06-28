@@ -20,7 +20,7 @@ use crate::render_pipeline::{PipelineIndexFormat, PipelineIndexFormatCompatible,
 use crate::render_target::{RenderTargetEncoding, ValidRenderTarget};
 use crate::resource_binding::EntryDestroyer;
 use crate::texture::format::{ImageData, TextureFormat};
-use crate::texture::{TextureDestroyer, ImageCopySize3D};
+use crate::texture::{ImageCopySize3D, TextureDestroyer};
 use crate::type_flag::{TypeFlag, O, X};
 use crate::{buffer, texture};
 

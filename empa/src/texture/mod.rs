@@ -92,13 +92,14 @@ pub struct ImageDataLayout {
 impl ImageDataLayout {
     pub(crate) fn to_byte_layout(&self, bytes_per_block: u32) -> ImageDataByteLayout {
         let ImageDataLayout {
-            blocks_per_row, rows_per_image
+            blocks_per_row,
+            rows_per_image,
         } = *self;
 
         ImageDataByteLayout {
             bytes_per_block,
             blocks_per_row,
-            rows_per_image
+            rows_per_image,
         }
     }
 }
@@ -131,10 +132,7 @@ pub struct ImageCopySize2D {
 
 impl ImageCopySize2D {
     pub(crate) fn to_web_sys(&self) -> GpuExtent3dDict {
-        let ImageCopySize2D {
-            width,
-            height,
-        } = *self;
+        let ImageCopySize2D { width, height } = *self;
 
         let mut extent = GpuExtent3dDict::new(width);
 
@@ -148,7 +146,7 @@ impl Default for ImageCopySize2D {
     fn default() -> Self {
         ImageCopySize2D {
             width: 1,
-            height: 1
+            height: 1,
         }
     }
 }
@@ -165,7 +163,7 @@ impl Default for ImageCopySize3D {
         ImageCopySize3D {
             width: 1,
             height: 1,
-            depth_or_layers: 1
+            depth_or_layers: 1,
         }
     }
 }

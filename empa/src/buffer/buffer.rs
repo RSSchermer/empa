@@ -20,7 +20,7 @@ use crate::buffer::{
     CopyDst, CopySrc, MapRead, MapWrite, StorageBinding, UniformBinding, ValidUsageFlags,
 };
 use crate::device::{Device, ID_GEN};
-use crate::texture::{ImageDataByteLayout, ImageDataLayout, ImageCopySize3D};
+use crate::texture::{ImageCopySize3D, ImageDataByteLayout, ImageDataLayout};
 
 /// Signals that an error occurred when trying to map a buffer.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -895,9 +895,9 @@ impl<'a, T, U> View<'a, [T], U> {
         self.buffer.map_context.lock().unwrap().add(start..end);
 
         let mapped_bytes = Uint8Array::new(
-            self
-                .as_web_sys()
-                .get_mapped_range_with_u32_and_u32(start, size_in_bytes).as_ref(),
+            self.as_web_sys()
+                .get_mapped_range_with_u32_and_u32(start, size_in_bytes)
+                .as_ref(),
         );
         let mut buffered = Box::<[T]>::new_uninit_slice(self.len);
         let ptr = buffered.as_mut_ptr() as *mut ();

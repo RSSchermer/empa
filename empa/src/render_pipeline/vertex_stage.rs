@@ -1,5 +1,4 @@
 use std::marker;
-use std::sync::Arc;
 
 use wasm_bindgen::{JsValue, UnwrapThrowExt};
 use web_sys::{GpuVertexBufferLayout, GpuVertexState};

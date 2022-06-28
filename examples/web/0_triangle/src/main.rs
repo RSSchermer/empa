@@ -63,7 +63,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
 
     let shader = device.create_shader_module(&SHADER);
 
-    let pipeline_layout = device.create_pipeline_layout::<()>();
+    let pipeline_layout = device.create_pipeline_layout(());
 
     let pipeline = device.create_render_pipeline(
         &RenderPipelineDescriptorBuilder::begin()

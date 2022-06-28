@@ -14,10 +14,10 @@ use crate::texture::format::{
     UnfilteredFloatSamplable, UnsignedIntegerSamplable, ViewFormat, ViewFormats,
 };
 use crate::texture::{
-    CopyDst, CopySrc, FormatKind, ImageCopyDst, ImageCopyFromTextureDst,
-    ImageCopyTexture, ImageCopySrc, ImageCopyToTextureSrc, StorageBinding,
-    SubImageCopyDst, SubImageCopyFromTextureDst, SubImageCopySrc,
-    SubImageCopyToTextureSrc, TextureBinding, TextureDestroyer, UnsupportedViewFormat, UsageFlags,
+    CopyDst, CopySrc, FormatKind, ImageCopyDst, ImageCopyFromTextureDst, ImageCopySrc,
+    ImageCopyTexture, ImageCopyToTextureSrc, StorageBinding, SubImageCopyDst,
+    SubImageCopyFromTextureDst, SubImageCopySrc, SubImageCopyToTextureSrc, TextureBinding,
+    TextureDestroyer, UnsupportedViewFormat, UsageFlags,
 };
 
 pub struct Texture1DDescriptor<F, U, V>

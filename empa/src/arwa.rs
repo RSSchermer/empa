@@ -1,26 +1,31 @@
 use std::future::Future;
 use std::marker;
 use std::pin::Pin;
-use std::task::{Context, Poll};
 use std::sync::Arc;
+use std::task::{Context, Poll};
 
 use arwa::html::HtmlCanvasElement;
+use arwa::image_bitmap::ImageBitmap;
 use arwa::window::WindowNavigator;
 use arwa::worker::WorkerNavigator;
 use staticvec::StaticVec;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{GpuImageCopyTextureTagged,
-    Gpu, GpuCanvasCompositingAlphaMode, GpuCanvasConfiguration, GpuCanvasContext,GpuOrigin3dDict,
-    GpuPowerPreference, GpuPredefinedColorSpace, GpuRequestAdapterOptions,GpuOrigin2dDict, GpuImageCopyExternalImage
+use web_sys::{
+    Gpu, GpuCanvasCompositingAlphaMode, GpuCanvasConfiguration, GpuCanvasContext,
+    GpuImageCopyExternalImage, GpuImageCopyTextureTagged, GpuOrigin2dDict, GpuOrigin3dDict,
+    GpuPowerPreference, GpuPredefinedColorSpace, GpuRequestAdapterOptions,
 };
-use arwa::image_bitmap::ImageBitmap;
 
 use crate::adapter::Adapter;
 use crate::device::{Device, Queue};
 use crate::texture;
-use crate::texture::format::{bgra8unorm, rgba16float, rgba8unorm, TextureFormat, TextureFormatId, ViewFormats, r8unorm, r16float, r32float, rg8unorm, rg16float, rg32float, rgba8unorm_srgb, bgra8unorm_srgb, rgb10a2unorm, rgba32float};
-use crate::texture::{Texture2D, TextureDestroyer, ImageCopySize2D};
+use crate::texture::format::{
+    bgra8unorm, bgra8unorm_srgb, r16float, r32float, r8unorm, rg16float, rg32float, rg8unorm,
+    rgb10a2unorm, rgba16float, rgba32float, rgba8unorm, rgba8unorm_srgb, TextureFormat,
+    TextureFormatId, ViewFormats,
+};
+use crate::texture::{ImageCopySize2D, Texture2D, TextureDestroyer};
 
 mod navigator_ext_seal {
     pub trait Seal {}
@@ -304,22 +309,35 @@ mod queue_ext_seal {
 }
 
 pub trait QueueExt: queue_ext_seal::Seal {
-    fn copy_external_image_to_texture(&self, src: &ExternalImageCopySrc, dst: &ExternalImageCopyDst, size: ImageCopySize2D);
+    fn copy_external_image_to_texture(
+        &self,
+        src: &ExternalImageCopySrc,
+        dst: &ExternalImageCopyDst,
+        size: ImageCopySize2D,
+    );
 }
 
 impl queue_ext_seal::Seal for Queue {}
 impl QueueExt for Queue {
-    fn copy_external_image_to_texture(&self, src: &ExternalImageCopySrc, dst: &ExternalImageCopyDst, size: ImageCopySize2D) {
-        let ImageCopySize2D {
-            width, height
-        } = size;
+    fn copy_external_image_to_texture(
+        &self,
+        src: &ExternalImageCopySrc,
+        dst: &ExternalImageCopyDst,
+        size: ImageCopySize2D,
+    ) {
+        let ImageCopySize2D { width, height } = size;
 
         assert!(width <= src.width, "copy width outside of `src` bounds");
         assert!(height <= src.height, "copy height outside of `src` bounds");
         assert!(width <= dst.width, "copy width outside of `dst` bounds");
         assert!(height <= dst.height, "copy height outside of `dst` bounds");
 
-        self.inner.copy_external_image_to_texture_with_gpu_extent_3d_dict(&src.inner, &dst.inner, &size.to_web_sys());
+        self.inner
+            .copy_external_image_to_texture_with_gpu_extent_3d_dict(
+                &src.inner,
+                &dst.inner,
+                &size.to_web_sys(),
+            );
     }
 }
 
@@ -327,7 +345,7 @@ impl QueueExt for Queue {
 pub struct ExternalImageCopySrcOptions {
     pub origin_x: u32,
     pub origin_y: u32,
-    pub flip_y: bool
+    pub flip_y: bool,
 }
 
 pub struct ExternalImageCopySrc {
@@ -337,9 +355,16 @@ pub struct ExternalImageCopySrc {
 }
 
 impl ExternalImageCopySrc {
-    fn new(source: &js_sys::Object, options: ExternalImageCopySrcOptions, width: u32, height: u32) -> Self {
+    fn new(
+        source: &js_sys::Object,
+        options: ExternalImageCopySrcOptions,
+        width: u32,
+        height: u32,
+    ) -> Self {
         let ExternalImageCopySrcOptions {
-            origin_x, origin_y, flip_y
+            origin_x,
+            origin_y,
+            flip_y,
         } = options;
 
         let mut origin = GpuOrigin2dDict::new();
@@ -355,7 +380,7 @@ impl ExternalImageCopySrc {
         ExternalImageCopySrc {
             inner,
             width,
-            height
+            height,
         }
     }
 
@@ -368,7 +393,10 @@ impl ExternalImageCopySrc {
         Self::new(image_bitmap.as_ref(), options, width, height)
     }
 
-    pub fn html_canvas_element(html_canvas_element: &HtmlCanvasElement, options: ExternalImageCopySrcOptions) -> Self {
+    pub fn html_canvas_element(
+        html_canvas_element: &HtmlCanvasElement,
+        options: ExternalImageCopySrcOptions,
+    ) -> Self {
         let width = html_canvas_element.width();
         let height = html_canvas_element.height();
 
@@ -381,15 +409,21 @@ impl ExternalImageCopySrc {
 fn validate_size_origin(width: u32, height: u32, origin_x: u32, origin_y: u32) {
     assert!(width > 0, "the image width must be greater than `0`");
     assert!(height > 0, "the image height must be greater than `0`");
-    assert!(origin_x < width, "the `x` origin must be less than the width");
-    assert!(origin_y < height, "the `y` origin must be less than the height");
+    assert!(
+        origin_x < width,
+        "the `x` origin must be less than the width"
+    );
+    assert!(
+        origin_y < height,
+        "the `y` origin must be less than the height"
+    );
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub struct ExternalImageCopyDstDescriptor {
     pub mipmap_level: u8,
     pub color_space: PredefinedColorSpace,
-    pub premultiplied_alpha: bool
+    pub premultiplied_alpha: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -399,7 +433,7 @@ pub struct ExternalSubImageCopyDstDescriptor {
     pub origin_y: u32,
     pub origin_layer: u32,
     pub color_space: PredefinedColorSpace,
-    pub premultiplied_alpha: bool
+    pub premultiplied_alpha: bool,
 }
 
 pub struct ExternalImageCopyDst {
@@ -430,16 +464,37 @@ mod texture_2d_ext_seal {
 }
 
 pub trait Texture2DExt<F, U>: texture_2d_ext_seal::Seal {
-    fn external_image_copy_dst(&self, descriptor: ExternalImageCopyDstDescriptor) -> ExternalImageCopyDst where F: ExternalImageCopyFormat, U: texture::CopyDst + texture::RenderAttachment;
+    fn external_image_copy_dst(
+        &self,
+        descriptor: ExternalImageCopyDstDescriptor,
+    ) -> ExternalImageCopyDst
+    where
+        F: ExternalImageCopyFormat,
+        U: texture::CopyDst + texture::RenderAttachment;
 
-    fn external_sub_image_copy_dst(&self, descriptor: ExternalSubImageCopyDstDescriptor) -> ExternalImageCopyDst where F: ExternalImageCopyFormat, U: texture::CopyDst + texture::RenderAttachment;
+    fn external_sub_image_copy_dst(
+        &self,
+        descriptor: ExternalSubImageCopyDstDescriptor,
+    ) -> ExternalImageCopyDst
+    where
+        F: ExternalImageCopyFormat,
+        U: texture::CopyDst + texture::RenderAttachment;
 }
 
 impl<F, U> texture_2d_ext_seal::Seal for Texture2D<F, U> {}
 impl<F, U> Texture2DExt<F, U> for Texture2D<F, U> {
-    fn external_image_copy_dst(&self, descriptor: ExternalImageCopyDstDescriptor) -> ExternalImageCopyDst where F: ExternalImageCopyFormat, U: texture::CopyDst + texture::RenderAttachment {
+    fn external_image_copy_dst(
+        &self,
+        descriptor: ExternalImageCopyDstDescriptor,
+    ) -> ExternalImageCopyDst
+    where
+        F: ExternalImageCopyFormat,
+        U: texture::CopyDst + texture::RenderAttachment,
+    {
         let ExternalImageCopyDstDescriptor {
-            mipmap_level, color_space, premultiplied_alpha,
+            mipmap_level,
+            color_space,
+            premultiplied_alpha,
         } = descriptor;
 
         assert!(
@@ -457,16 +512,25 @@ impl<F, U> Texture2DExt<F, U> for Texture2D<F, U> {
             inner,
             _texture: self.inner.clone(),
             width: self.width,
-            height: self.height
+            height: self.height,
         }
     }
 
-    fn external_sub_image_copy_dst(&self, descriptor: ExternalSubImageCopyDstDescriptor) -> ExternalImageCopyDst where F: ExternalImageCopyFormat, U: texture::CopyDst + texture::RenderAttachment {
+    fn external_sub_image_copy_dst(
+        &self,
+        descriptor: ExternalSubImageCopyDstDescriptor,
+    ) -> ExternalImageCopyDst
+    where
+        F: ExternalImageCopyFormat,
+        U: texture::CopyDst + texture::RenderAttachment,
+    {
         let ExternalSubImageCopyDstDescriptor {
             mipmap_level,
             origin_x,
             origin_y,
-            origin_layer, color_space, premultiplied_alpha,
+            origin_layer,
+            color_space,
+            premultiplied_alpha,
         } = descriptor;
 
         assert!(
@@ -494,7 +558,7 @@ impl<F, U> Texture2DExt<F, U> for Texture2D<F, U> {
             inner,
             _texture: self.inner.clone(),
             width: self.width - origin_x,
-            height: self.height - origin_y
+            height: self.height - origin_y,
         }
     }
 }

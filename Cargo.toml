@@ -1,10 +1,12 @@
 [workspace]
 members = [
     "empa",
+    "empa_cgmath",
     "empa_macros",
     "empa_reflect",
     "examples/web/0_triangle",
     "examples/web/1_animated_triangle",
     "examples/web/2_textured_triangle",
-    "examples/web/3_compute"
+    "examples/web/3_compute",
+    "examples/web/4_cube_3d"
 ]

@@ -4,8 +4,12 @@ use std::error::Error;
 
 use arwa::dom::{selector, ParentNode};
 use arwa::html::{HtmlCanvasElement, HtmlImgElement};
+use arwa::image_bitmap::{create_image_bitmap, ImageBitmapOptions, ImageRegion};
 use arwa::window::window;
-use empa::arwa::{CanvasConfiguration, CompositingAlphaMode, HtmlCanvasElementExt, NavigatorExt, PredefinedColorSpace, RequestAdapterOptions, QueueExt, ExternalImageCopySrc, ExternalImageCopySrcOptions, Texture2DExt, ExternalImageCopyDstDescriptor};
+use empa::arwa::{
+    CanvasConfiguration, CompositingAlphaMode, ExternalImageCopySrc, HtmlCanvasElementExt,
+    NavigatorExt, PredefinedColorSpace, QueueExt, RequestAdapterOptions, Texture2DExt,
+};
 use empa::buffer::Buffer;
 use empa::command::{Draw, RenderPassDescriptor};
 use empa::device::DeviceDescriptor;
@@ -14,14 +18,15 @@ use empa::render_pipeline::{
     VertexStageBuilder,
 };
 use empa::render_target::{FloatAttachment, LoadOp, RenderTarget, StoreOp};
+use empa::resource_binding::Resources;
+use empa::sampler::{FilterMode, MipmapFilterMode, Sampler, SamplerDescriptor};
 use empa::shader_module::{shader_source, ShaderSource};
 use empa::texture::format::{rgba8unorm, rgba8unorm_srgb};
-use empa::texture::{AttachableImageDescriptor, Texture2DDescriptor, MipmapLevels, ImageCopySize2D, Sampled2DFloat, View2DDescriptor};
+use empa::texture::{
+    AttachableImageDescriptor, ImageCopySize2D, MipmapLevels, Sampled2DFloat, Texture2DDescriptor,
+};
 use empa::{buffer, texture};
 use futures::FutureExt;
-use arwa::image_bitmap::{create_image_bitmap, ImageRegion, ImageBitmapOptions};
-use empa::resource_binding::Resources;
-use empa::sampler::{Sampler, SamplerDescriptor, FilterMode, AddressMode, MipmapFilterMode};
 
 #[derive(empa::render_pipeline::Vertex, Clone, Copy)]
 struct MyVertex {
@@ -74,7 +79,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
     type BindGroupLayout<'a> = <MyResources<'a> as Resources>::Layout;
 
     let bind_group_layout = device.create_bind_group_layout::<BindGroupLayout>();
-    let pipeline_layout = device.create_pipeline_layout::<(BindGroupLayout,)>();
+    let pipeline_layout = device.create_pipeline_layout(&bind_group_layout);
 
     let pipeline = device.create_render_pipeline(
         &RenderPipelineDescriptorBuilder::begin()
@@ -99,12 +104,17 @@ async fn render() -> Result<(), Box<dyn Error>> {
         .query_selector(&selector!("#checkerboard_gradient"))
         .ok_or("texture image not found")?
         .try_into()?;
-    let bitmap = create_image_bitmap(&img, ImageRegion {
-        x: 0,
-        y: 0,
-        width: 256,
-        height: 256
-    }, ImageBitmapOptions::default()).await?;
+    let bitmap = create_image_bitmap(
+        &img,
+        ImageRegion {
+            x: 0,
+            y: 0,
+            width: 256,
+            height: 256,
+        },
+        ImageBitmapOptions::default(),
+    )
+    .await?;
 
     let vertex_data = [
         MyVertex {
@@ -125,12 +135,14 @@ async fn render() -> Result<(), Box<dyn Error>> {
         device.create_buffer(vertex_data, buffer::Usages::vertex());
     let texture = device.create_texture_2d(&Texture2DDescriptor {
         format: rgba8unorm_srgb,
-        usage: texture::Usages::copy_dst().and_render_attachment().and_texture_binding(),
+        usage: texture::Usages::copy_dst()
+            .and_render_attachment()
+            .and_texture_binding(),
         view_formats: (rgba8unorm_srgb,),
         width: 256,
         height: 256,
         layers: 1,
-        mipmap_levels: MipmapLevels::Partial(1)
+        mipmap_levels: MipmapLevels::Partial(1),
     });
     let sampler = device.create_sampler(&SamplerDescriptor {
         magnification_filter: FilterMode::Linear,
@@ -143,7 +155,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
         &bind_group_layout,
         MyResources {
             texture: &texture.sampled_float(&Default::default()),
-            sampler: &sampler
+            sampler: &sampler,
         },
     );
 
@@ -152,10 +164,14 @@ async fn render() -> Result<(), Box<dyn Error>> {
     let texture_src = ExternalImageCopySrc::image_bitmap(&bitmap, Default::default());
     let texture_dst = texture.external_image_copy_dst(Default::default());
 
-    queue.copy_external_image_to_texture(&texture_src, &texture_dst, ImageCopySize2D {
-        width: 256,
-        height: 256
-    });
+    queue.copy_external_image_to_texture(
+        &texture_src,
+        &texture_dst,
+        ImageCopySize2D {
+            width: 256,
+            height: 256,
+        },
+    );
 
     let command_buffer = device
         .create_command_encoder()

@@ -116,11 +116,13 @@ impl<Layout: TypedPipelineLayout> ComputePipelineDescriptorBuilder<PipelineLayou
     }
 }
 
-impl<Layout: TypedPipelineLayout> ComputePipelineDescriptorBuilder<PipelineLayout<Layout>, ComputeStage> {
+impl<Layout: TypedPipelineLayout>
+    ComputePipelineDescriptorBuilder<PipelineLayout<Layout>, ComputeStage>
+{
     pub fn finish(self) -> ComputePipelineDescriptor<Layout> {
         ComputePipelineDescriptor {
             inner: self.inner,
-            _marker: Default::default()
+            _marker: Default::default(),
         }
     }
 }

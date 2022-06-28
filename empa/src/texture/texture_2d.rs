@@ -17,10 +17,10 @@ use crate::texture::format::{
     TextureFormatId, UnfilteredFloatSamplable, UnsignedIntegerSamplable, ViewFormat, ViewFormats,
 };
 use crate::texture::{
-    CopyDst, CopySrc, FormatKind, ImageCopyDst, ImageCopyFromTextureDst,
-    ImageCopyTexture, ImageCopySrc, ImageCopyToTextureSrc, MipmapLevels, RenderAttachment,
-    StorageBinding, SubImageCopyDst, SubImageCopyFromTextureDst, SubImageCopySrc,
-    SubImageCopyToTextureSrc, TextureBinding, TextureDestroyer, UnsupportedViewFormat, UsageFlags,
+    CopyDst, CopySrc, FormatKind, ImageCopyDst, ImageCopyFromTextureDst, ImageCopySrc,
+    ImageCopyTexture, ImageCopyToTextureSrc, MipmapLevels, RenderAttachment, StorageBinding,
+    SubImageCopyDst, SubImageCopyFromTextureDst, SubImageCopySrc, SubImageCopyToTextureSrc,
+    TextureBinding, TextureDestroyer, UnsupportedViewFormat, UsageFlags,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -1556,12 +1556,7 @@ where
         U: CopySrc,
     {
         ImageCopyToTextureSrc {
-            inner: self.image_copy_internal(
-                mipmap_level,
-                0,
-                F::BLOCK_SIZE,
-                GpuTextureAspect::All,
-            ),
+            inner: self.image_copy_internal(mipmap_level, 0, F::BLOCK_SIZE, GpuTextureAspect::All),
         }
     }
 
@@ -1571,12 +1566,7 @@ where
         U: CopyDst,
     {
         ImageCopyFromTextureDst {
-            inner: self.image_copy_internal(
-                mipmap_level,
-                0,
-                F::BLOCK_SIZE,
-                GpuTextureAspect::All,
-            ),
+            inner: self.image_copy_internal(mipmap_level, 0, F::BLOCK_SIZE, GpuTextureAspect::All),
         }
     }
 

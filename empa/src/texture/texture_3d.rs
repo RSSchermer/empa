@@ -15,10 +15,10 @@ use crate::texture::format::{
     UnfilteredFloatSamplable, UnsignedIntegerSamplable, ViewFormat, ViewFormats,
 };
 use crate::texture::{
-    CopyDst, CopySrc, FormatKind, ImageCopyDst, ImageCopyFromTextureDst,
-    ImageCopyTexture, ImageCopySrc, ImageCopyToTextureSrc, MipmapLevels, StorageBinding,
-    SubImageCopyDst, SubImageCopyFromTextureDst, SubImageCopySrc,
-    SubImageCopyToTextureSrc, TextureBinding, TextureDestroyer, UnsupportedViewFormat, UsageFlags,
+    CopyDst, CopySrc, FormatKind, ImageCopyDst, ImageCopyFromTextureDst, ImageCopySrc,
+    ImageCopyTexture, ImageCopyToTextureSrc, MipmapLevels, StorageBinding, SubImageCopyDst,
+    SubImageCopyFromTextureDst, SubImageCopySrc, SubImageCopyToTextureSrc, TextureBinding,
+    TextureDestroyer, UnsupportedViewFormat, UsageFlags,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -400,11 +400,7 @@ where
         U: CopySrc,
     {
         ImageCopySrc {
-            inner: self.image_copy_internal(
-                mipmap_level,
-                F::BYTES_PER_BLOCK,
-                F::BLOCK_SIZE,
-            ),
+            inner: self.image_copy_internal(mipmap_level, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
         }
     }
 
@@ -414,11 +410,7 @@ where
         U: CopyDst,
     {
         ImageCopyDst {
-            inner: self.image_copy_internal(
-                mipmap_level,
-                F::BYTES_PER_BLOCK,
-                F::BLOCK_SIZE,
-            ),
+            inner: self.image_copy_internal(mipmap_level, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
         }
     }
 
@@ -428,11 +420,7 @@ where
         U: CopySrc,
     {
         ImageCopyToTextureSrc {
-            inner: self.image_copy_internal(
-                mipmap_level,
-                0,
-                F::BLOCK_SIZE,
-            ),
+            inner: self.image_copy_internal(mipmap_level, 0, F::BLOCK_SIZE),
         }
     }
 
@@ -442,11 +430,7 @@ where
         U: CopyDst,
     {
         ImageCopyFromTextureDst {
-            inner: self.image_copy_internal(
-                mipmap_level,
-                0,
-                F::BLOCK_SIZE,
-            ),
+            inner: self.image_copy_internal(mipmap_level, 0, F::BLOCK_SIZE),
         }
     }
 
