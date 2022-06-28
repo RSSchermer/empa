@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types)]
 
-use std::fmt;
+use std::{fmt, iter};
 
 use web_sys::GpuTextureFormat;
 
@@ -1444,6 +1444,15 @@ pub trait ViewFormats<F>: view_formats_seal::Seal<F> {
     type Formats: Iterator<Item = TextureFormatId>;
 
     fn formats(&self) -> Self::Formats;
+}
+
+impl<F> view_formats_seal::Seal<F> for () {}
+impl<F> ViewFormats<F> for () {
+    type Formats = iter::Empty<TextureFormatId>;
+
+    fn formats(&self) -> Self::Formats {
+        iter::empty()
+    }
 }
 
 macro_rules! impl_view_formats {

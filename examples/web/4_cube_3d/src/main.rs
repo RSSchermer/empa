@@ -76,7 +76,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
         device: &device,
         format: rgba8unorm,
         usage: texture::Usages::render_attachment(),
-        view_formats: (rgba8unorm,),
+        view_formats: (),
         color_space: PredefinedColorSpace::srgb,
         compositing_alpha_mode: CompositingAlphaMode::Opaque,
     });
@@ -196,7 +196,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
     let depth_texture = device.create_texture_2d(&Texture2DDescriptor {
         format: depth24plus,
         usage: texture::Usages::render_attachment(),
-        view_formats: (depth24plus,),
+        view_formats: (),
         width: canvas.width(),
         height: canvas.height(),
         layers: 1,

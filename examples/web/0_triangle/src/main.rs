@@ -56,7 +56,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
         device: &device,
         format: rgba8unorm,
         usage: texture::Usages::render_attachment(),
-        view_formats: (rgba8unorm,),
+        view_formats: (),
         color_space: PredefinedColorSpace::srgb,
         compositing_alpha_mode: CompositingAlphaMode::Opaque,
     });
