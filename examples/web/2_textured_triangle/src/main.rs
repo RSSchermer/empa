@@ -11,7 +11,10 @@ use empa::arwa::{
     NavigatorExt, PredefinedColorSpace, QueueExt, RequestAdapterOptions, Texture2DExt,
 };
 use empa::buffer::Buffer;
-use empa::command::{Draw, RenderPassDescriptor};
+use empa::command::{
+    Draw, DrawCommandEncoder, RenderPassDescriptor, RenderStateEncoder,
+    ResourceBindingCommandEncoder,
+};
 use empa::device::DeviceDescriptor;
 use empa::render_pipeline::{
     ColorOutput, ColorWriteMask, FragmentStageBuilder, RenderPipelineDescriptorBuilder,

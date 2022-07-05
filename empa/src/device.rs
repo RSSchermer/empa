@@ -6,7 +6,9 @@ use web_sys::{GpuDevice, GpuQueue};
 
 use crate::adapter::{Features, Limits};
 use crate::buffer::{AsBuffer, Buffer};
-use crate::command::{CommandBuffer, CommandEncoder};
+use crate::command::{
+    CommandBuffer, CommandEncoder, RenderBundleEncoder, RenderBundleEncoderDescriptor,
+};
 use crate::compute_pipeline::{ComputePipeline, ComputePipelineDescriptor};
 use crate::query::OcclusionQuerySet;
 use crate::render_pipeline::{RenderPipeline, RenderPipelineDescriptor};
@@ -229,6 +231,13 @@ impl Device {
 
     pub fn create_command_encoder(&self) -> CommandEncoder {
         CommandEncoder::new(self)
+    }
+
+    pub fn create_render_bundle_encoder<T>(
+        &self,
+        descriptor: &RenderBundleEncoderDescriptor<T>,
+    ) -> RenderBundleEncoder<T, (), (), (), ()> {
+        RenderBundleEncoder::new(self, descriptor)
     }
 
     pub fn queue(&self) -> Queue {

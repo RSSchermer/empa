@@ -12,10 +12,11 @@ pub use self::render_target::*;
 
 use std::error::Error;
 use std::fmt;
+use std::sync::Arc;
+
+use web_sys::{GpuColorDict, GpuLoadOp, GpuStoreOp};
 
 use crate::texture::TextureDestroyer;
-use std::sync::Arc;
-use web_sys::{GpuColorDict, GpuLoadOp, GpuStoreOp};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct InvalidDepthValue(f32);

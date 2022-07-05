@@ -13,7 +13,10 @@ use empa::arwa::{
     PredefinedColorSpace, RequestAdapterOptions,
 };
 use empa::buffer::{Buffer, Uniform};
-use empa::command::{DrawIndexed, RenderPassDescriptor};
+use empa::command::{
+    DrawIndexed, DrawIndexedCommandEncoder, RenderBundleEncoderDescriptor, RenderPassDescriptor,
+    RenderStateEncoder, ResourceBindingCommandEncoder,
+};
 use empa::device::DeviceDescriptor;
 use empa::render_pipeline::{
     ColorOutput, ColorWriteMask, DepthStencilTest, FragmentStageBuilder,
@@ -203,6 +206,39 @@ async fn render() -> Result<(), Box<dyn Error>> {
         mipmap_levels: MipmapLevels::Partial(1),
     });
 
+    let render_bundle_encoder = device.create_render_bundle_encoder(
+        &RenderBundleEncoderDescriptor::new::<rgba8unorm>().depth_stencil_format::<depth24plus>(),
+    );
+
+    let render_bundle = render_bundle_encoder
+        .set_pipeline(&pipeline)
+        .set_vertex_buffers(&vertex_buffer)
+        .set_index_buffer(&index_buffer)
+        .set_bind_groups(&bind_group)
+        .draw_indexed(DrawIndexed {
+            index_count: index_buffer.len() as u32,
+            instance_count: 1,
+            first_index: 0,
+            first_instance: 0,
+            base_vertex: 0,
+        })
+        .finish();
+
+    let render_pass_descriptor = RenderPassDescriptor::new(&RenderTarget {
+        color: FloatAttachment {
+            image: &context
+                .get_current_texture()
+                .attachable_image(&AttachableImageDescriptor::default()),
+            load_op: LoadOp::Clear([0.0; 4]),
+            store_op: StoreOp::Store,
+        },
+        depth_stencil: DepthAttachment {
+            image: &depth_texture.attachable_image(&AttachableImageDescriptor::default()),
+            load_op: LoadOp::Clear(DepthValue::ONE),
+            store_op: StoreOp::Store,
+        },
+    });
+
     let queue = device.queue();
 
     loop {
@@ -222,31 +258,8 @@ async fn render() -> Result<(), Box<dyn Error>> {
 
         let command_buffer = device
             .create_command_encoder()
-            .begin_render_pass(&RenderPassDescriptor::new(&RenderTarget {
-                color: FloatAttachment {
-                    image: &context
-                        .get_current_texture()
-                        .attachable_image(&AttachableImageDescriptor::default()),
-                    load_op: LoadOp::Clear([0.0; 4]),
-                    store_op: StoreOp::Store,
-                },
-                depth_stencil: DepthAttachment {
-                    image: &depth_texture.attachable_image(&AttachableImageDescriptor::default()),
-                    load_op: LoadOp::Clear(DepthValue::ONE),
-                    store_op: StoreOp::Store,
-                },
-            }))
-            .set_pipeline(&pipeline)
-            .set_vertex_buffers(&vertex_buffer)
-            .set_index_buffer(&index_buffer)
-            .set_bind_groups(&bind_group)
-            .draw_indexed(DrawIndexed {
-                index_count: index_buffer.len() as u32,
-                instance_count: 1,
-                first_index: 0,
-                first_instance: 0,
-                base_vertex: 0,
-            })
+            .begin_render_pass(&render_pass_descriptor)
+            .execute_bundle(&render_bundle)
             .end()
             .finish();
 

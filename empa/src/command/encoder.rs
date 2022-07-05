@@ -1,10 +1,13 @@
+use std::borrow::Borrow;
 use std::ops::Rem;
 use std::sync::Arc;
 use std::{marker, mem};
 
 use staticvec::StaticVec;
+use wasm_bindgen::JsValue;
 use web_sys::{
     GpuColorDict, GpuCommandBuffer, GpuCommandEncoder, GpuComputePassEncoder, GpuExtent3dDict,
+    GpuRenderBundle, GpuRenderBundleEncoder, GpuRenderBundleEncoderDescriptor,
     GpuRenderPassDescriptor, GpuRenderPassEncoder,
 };
 
@@ -17,9 +20,12 @@ use crate::compute_pipeline::ComputePipeline;
 use crate::device::Device;
 use crate::query::OcclusionQuerySet;
 use crate::render_pipeline::{PipelineIndexFormat, PipelineIndexFormatCompatible, RenderPipeline};
-use crate::render_target::{RenderTargetEncoding, ValidRenderTarget};
+use crate::render_target::{
+    MultisampleRenderLayout, ReadOnly, RenderLayout, RenderTargetEncoding, TypedColorLayout,
+    TypedMultisampleColorLayout, ValidRenderTarget,
+};
 use crate::resource_binding::EntryDestroyer;
-use crate::texture::format::{ImageData, TextureFormat};
+use crate::texture::format::{DepthStencilRenderable, ImageData, TextureFormat};
 use crate::texture::{ImageCopySize3D, TextureDestroyer};
 use crate::type_flag::{TypeFlag, O, X};
 use crate::{buffer, texture};
@@ -490,7 +496,7 @@ impl CommandEncoder {
     pub fn begin_render_pass<T, Q>(
         mut self,
         descriptor: &RenderPassDescriptor<T, Q>,
-    ) -> RenderPassEncoder<T, (), (), (), (), Q> {
+    ) -> ClearRenderPassEncoder<T, Q> {
         let inner = self.inner.begin_render_pass(&descriptor.inner);
 
         self._resource_destroyers
@@ -545,6 +551,18 @@ impl CommandEncoder {
     }
 }
 
+mod resource_binding_command_encoder_seal {
+    pub trait Seal {}
+}
+
+pub trait ResourceBindingCommandEncoder {
+    type WithResources<RNew>;
+
+    fn set_bind_groups<RNew>(self, bind_groups: RNew) -> Self::WithResources<RNew>
+    where
+        RNew: BindGroups;
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C)]
 pub struct DispatchWorkgroups {
@@ -561,33 +579,11 @@ pub struct ComputePassEncoder<Pipeline, Resources> {
     _marker: marker::PhantomData<(*const Pipeline, *const Resources)>,
 }
 
-impl<P, R> ComputePassEncoder<P, R> {
-    pub fn set_pipeline<PR>(
-        self,
-        pipeline: &ComputePipeline<PR>,
-    ) -> ComputePassEncoder<ComputePipeline<PR>, R> {
-        let ComputePassEncoder {
-            inner,
-            command_encoder,
-            current_pipeline_id,
-            current_bind_group_ids,
-            ..
-        } = self;
+impl<P, R> resource_binding_command_encoder_seal::Seal for ComputePassEncoder<P, R> {}
+impl<P, R> ResourceBindingCommandEncoder for ComputePassEncoder<P, R> {
+    type WithResources<RNew> = ComputePassEncoder<P, RNew>;
 
-        if Some(pipeline.id()) != current_pipeline_id {
-            inner.set_pipeline(pipeline.as_web_sys());
-        }
-
-        ComputePassEncoder {
-            inner,
-            command_encoder,
-            current_pipeline_id: Some(pipeline.id()),
-            current_bind_group_ids,
-            _marker: Default::default(),
-        }
-    }
-
-    pub fn set_bind_groups<RNew>(self, bind_groups: RNew) -> ComputePassEncoder<P, RNew>
+    fn set_bind_groups<RNew>(self, bind_groups: RNew) -> Self::WithResources<RNew>
     where
         RNew: BindGroups,
     {
@@ -620,6 +616,33 @@ impl<P, R> ComputePassEncoder<P, R> {
             inner,
             command_encoder,
             current_pipeline_id,
+            current_bind_group_ids,
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<P, R> ComputePassEncoder<P, R> {
+    pub fn set_pipeline<PR>(
+        self,
+        pipeline: &ComputePipeline<PR>,
+    ) -> ComputePassEncoder<ComputePipeline<PR>, R> {
+        let ComputePassEncoder {
+            inner,
+            command_encoder,
+            current_pipeline_id,
+            current_bind_group_ids,
+            ..
+        } = self;
+
+        if Some(pipeline.id()) != current_pipeline_id {
+            inner.set_pipeline(pipeline.as_web_sys());
+        }
+
+        ComputePassEncoder {
+            inner,
+            command_encoder,
+            current_pipeline_id: Some(pipeline.id()),
             current_bind_group_ids,
             _marker: Default::default(),
         }
@@ -679,6 +702,55 @@ pub struct DrawIndexed {
     pub first_index: u32,
     pub base_vertex: u32,
     pub first_instance: u32,
+}
+
+mod render_state_encoder_seal {
+    pub trait Seal {}
+}
+
+pub trait RenderStateEncoder<T>: render_state_encoder_seal::Seal {
+    type WithPipeline<P>;
+
+    type WithVertexBuffers<V>;
+
+    type WithIndexBuffer<I>;
+
+    fn set_pipeline<PV, PI, PR>(
+        self,
+        pipeline: &RenderPipeline<T, PV, PI, PR>,
+    ) -> Self::WithPipeline<RenderPipeline<T, PV, PI, PR>>;
+
+    fn set_vertex_buffers<V>(self, vertex_buffers: V) -> Self::WithVertexBuffers<V>
+    where
+        V: VertexBuffers;
+
+    fn set_index_buffer<I>(self, index_buffer: I) -> Self::WithIndexBuffer<I>
+    where
+        I: IndexBuffer;
+}
+
+mod draw_command_encoder_seal {
+    pub trait Seal {}
+}
+
+pub trait DrawCommandEncoder: draw_command_encoder_seal::Seal {
+    fn draw(self, draw: Draw) -> Self;
+
+    fn draw_indirect<U>(self, view: buffer::View<Draw, U>) -> Self
+    where
+        U: buffer::Indirect;
+}
+
+mod draw_indexed_command_encoder_seal {
+    pub trait Seal {}
+}
+
+pub trait DrawIndexedCommandEncoder: draw_indexed_command_encoder_seal::Seal {
+    fn draw_indexed(self, draw_indexed: DrawIndexed) -> Self;
+
+    fn draw_indexed_indirect<U>(self, view: buffer::View<DrawIndexed, U>) -> Self
+    where
+        U: buffer::Indirect;
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -833,6 +905,8 @@ impl<T> RenderPassDescriptor<T, ()> {
     }
 }
 
+pub type ClearRenderPassEncoder<Target, Q> = RenderPassEncoder<Target, (), (), (), (), Q>;
+
 pub struct RenderPassEncoder<Target, Pipeline, Vertex, Index, Resources, OcclusionQueryState> {
     inner: GpuRenderPassEncoder,
     command_encoder: CommandEncoder,
@@ -848,6 +922,177 @@ pub struct RenderPassEncoder<Target, Pipeline, Vertex, Index, Resources, Occlusi
         *const Resources,
         OcclusionQueryState,
     )>,
+}
+
+impl<T, P, V, I, R, Q> resource_binding_command_encoder_seal::Seal
+    for RenderPassEncoder<T, P, V, I, R, Q>
+{
+}
+impl<T, P, V, I, R, Q> ResourceBindingCommandEncoder for RenderPassEncoder<T, P, V, I, R, Q> {
+    type WithResources<RNew> = RenderPassEncoder<T, P, V, I, RNew, Q>;
+
+    fn set_bind_groups<RNew>(self, bind_groups: RNew) -> Self::WithResources<RNew>
+    where
+        RNew: BindGroups,
+    {
+        let RenderPassEncoder {
+            inner,
+            mut command_encoder,
+            current_pipeline_id,
+            current_vertex_buffers,
+            current_index_buffer,
+            mut current_bind_group_ids,
+            ..
+        } = self;
+
+        for (i, encoding) in bind_groups.encodings().enumerate() {
+            let BindGroupEncoding {
+                bind_group,
+                id,
+                _resource_destroyers,
+            } = encoding;
+
+            if current_bind_group_ids[i] != Some(id) {
+                inner.set_bind_group(i as u32, &bind_group);
+                command_encoder
+                    ._resource_destroyers
+                    .push(_resource_destroyers.into());
+
+                current_bind_group_ids[i] = Some(id);
+            }
+        }
+
+        RenderPassEncoder {
+            inner,
+            command_encoder,
+            current_pipeline_id,
+            current_vertex_buffers,
+            current_index_buffer,
+            current_bind_group_ids,
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<T, P, V, I, R, Q> render_state_encoder_seal::Seal for RenderPassEncoder<T, P, V, I, R, Q> {}
+impl<T, P, V, I, R, Q> RenderStateEncoder<T> for RenderPassEncoder<T, P, V, I, R, Q> {
+    type WithPipeline<PNew> = RenderPassEncoder<T, PNew, V, I, R, Q>;
+    type WithVertexBuffers<VNew> = RenderPassEncoder<T, P, VNew, I, R, Q>;
+    type WithIndexBuffer<INew> = RenderPassEncoder<T, P, V, INew, R, Q>;
+
+    fn set_pipeline<PV, PI, PR>(
+        self,
+        pipeline: &RenderPipeline<T, PV, PI, PR>,
+    ) -> Self::WithPipeline<RenderPipeline<T, PV, PI, PR>> {
+        let RenderPassEncoder {
+            inner,
+            command_encoder,
+            current_pipeline_id,
+            current_vertex_buffers,
+            current_index_buffer,
+            current_bind_group_ids,
+            ..
+        } = self;
+
+        if Some(pipeline.id()) != current_pipeline_id {
+            inner.set_pipeline(pipeline.as_web_sys());
+        }
+
+        RenderPassEncoder {
+            inner,
+            command_encoder,
+            current_pipeline_id: Some(pipeline.id()),
+            current_vertex_buffers,
+            current_index_buffer,
+            current_bind_group_ids,
+            _marker: Default::default(),
+        }
+    }
+
+    fn set_vertex_buffers<VNew>(self, vertex_buffers: VNew) -> Self::WithVertexBuffers<VNew>
+    where
+        VNew: VertexBuffers,
+    {
+        let RenderPassEncoder {
+            inner,
+            mut command_encoder,
+            current_pipeline_id,
+            mut current_vertex_buffers,
+            current_index_buffer,
+            current_bind_group_ids,
+            ..
+        } = self;
+
+        for (i, encoding) in vertex_buffers.encodings().enumerate() {
+            let VertexBufferEncoding {
+                buffer,
+                id,
+                offset,
+                size,
+            } = encoding;
+
+            let range = CurrentBufferRange { id, offset, size };
+
+            if current_vertex_buffers[i] != Some(range) {
+                inner.set_vertex_buffer_with_u32_and_u32(i as u32, &buffer.buffer, offset, size);
+                command_encoder._resource_destroyers.push(buffer.into());
+
+                current_vertex_buffers[i] = Some(range);
+            }
+        }
+
+        RenderPassEncoder {
+            inner,
+            command_encoder,
+            current_pipeline_id,
+            current_vertex_buffers,
+            current_index_buffer,
+            current_bind_group_ids,
+            _marker: Default::default(),
+        }
+    }
+
+    fn set_index_buffer<INew>(self, index_buffer: INew) -> Self::WithIndexBuffer<INew>
+    where
+        INew: IndexBuffer,
+    {
+        let RenderPassEncoder {
+            inner,
+            mut command_encoder,
+            current_pipeline_id,
+            current_vertex_buffers,
+            mut current_index_buffer,
+            current_bind_group_ids,
+            ..
+        } = self;
+
+        let IndexBufferEncoding {
+            buffer,
+            id,
+            format,
+            offset,
+            size,
+        } = index_buffer.to_encoding();
+
+        let range = CurrentBufferRange { id, offset, size };
+
+        if current_index_buffer != Some(range) {
+            inner.set_index_buffer_with_u32_and_u32(&buffer.buffer, format, offset, size);
+            command_encoder._resource_destroyers.push(buffer.into());
+
+            current_index_buffer = Some(range);
+        }
+
+        RenderPassEncoder {
+            inner,
+            command_encoder,
+            current_pipeline_id,
+            current_vertex_buffers,
+            current_index_buffer,
+            current_bind_group_ids,
+            _marker: Default::default(),
+        }
+    }
 }
 
 impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
@@ -896,10 +1141,7 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
         self
     }
 
-    pub fn set_pipeline<PV, PI, PR>(
-        self,
-        pipeline: &RenderPipeline<T, PV, PI, PR>,
-    ) -> RenderPassEncoder<T, RenderPipeline<T, PV, PI, PR>, V, I, R, Q> {
+    pub fn clear_state(self) -> ClearRenderPassEncoder<T, Q> {
         let RenderPassEncoder {
             inner,
             command_encoder,
@@ -909,56 +1151,6 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
             current_bind_group_ids,
             ..
         } = self;
-
-        if Some(pipeline.id()) != current_pipeline_id {
-            inner.set_pipeline(pipeline.as_web_sys());
-        }
-
-        RenderPassEncoder {
-            inner,
-            command_encoder,
-            current_pipeline_id: Some(pipeline.id()),
-            current_vertex_buffers,
-            current_index_buffer,
-            current_bind_group_ids,
-            _marker: Default::default(),
-        }
-    }
-
-    pub fn set_vertex_buffers<VNew>(
-        self,
-        vertex_buffers: VNew,
-    ) -> RenderPassEncoder<T, P, VNew, I, R, Q>
-    where
-        VNew: VertexBuffers,
-    {
-        let RenderPassEncoder {
-            inner,
-            mut command_encoder,
-            current_pipeline_id,
-            mut current_vertex_buffers,
-            current_index_buffer,
-            current_bind_group_ids,
-            ..
-        } = self;
-
-        for (i, encoding) in vertex_buffers.encodings().enumerate() {
-            let VertexBufferEncoding {
-                buffer,
-                id,
-                offset,
-                size,
-            } = encoding;
-
-            let range = CurrentBufferRange { id, offset, size };
-
-            if current_vertex_buffers[i] != Some(range) {
-                inner.set_vertex_buffer_with_u32_and_u32(i as u32, &buffer.buffer, offset, size);
-                command_encoder._resource_destroyers.push(buffer.into());
-
-                current_vertex_buffers[i] = Some(range);
-            }
-        }
 
         RenderPassEncoder {
             inner,
@@ -971,39 +1163,22 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
         }
     }
 
-    pub fn set_index_buffer<INew>(
-        self,
-        index_buffer: INew,
-    ) -> RenderPassEncoder<T, P, V, INew, R, Q>
-    where
-        INew: IndexBuffer,
-    {
+    pub fn execute_bundle(self, render_bundle: &RenderBundle<T>) -> ClearRenderPassEncoder<T, Q> {
         let RenderPassEncoder {
             inner,
-            mut command_encoder,
+            command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
-            mut current_index_buffer,
+            current_index_buffer,
             current_bind_group_ids,
             ..
         } = self;
 
-        let IndexBufferEncoding {
-            buffer,
-            id,
-            format,
-            offset,
-            size,
-        } = index_buffer.to_encoding();
+        let array = js_sys::Array::new();
 
-        let range = CurrentBufferRange { id, offset, size };
+        array.push(render_bundle.inner.as_ref());
 
-        if current_index_buffer != Some(range) {
-            inner.set_index_buffer_with_u32_and_u32(&buffer.buffer, format, offset, size);
-            command_encoder._resource_destroyers.push(buffer.into());
-
-            current_index_buffer = Some(range);
-        }
+        inner.execute_bundles(array.as_ref());
 
         RenderPassEncoder {
             inner,
@@ -1016,36 +1191,28 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
         }
     }
 
-    pub fn set_bind_groups<RNew>(self, bind_groups: RNew) -> RenderPassEncoder<T, P, V, I, RNew, Q>
+    pub fn execute_bundles<B>(self, render_bundles: B) -> ClearRenderPassEncoder<T, Q>
     where
-        RNew: BindGroups,
+        B: IntoIterator,
+        B::Item: Borrow<RenderBundle<T>>,
     {
         let RenderPassEncoder {
             inner,
-            mut command_encoder,
+            command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
             current_index_buffer,
-            mut current_bind_group_ids,
+            current_bind_group_ids,
             ..
         } = self;
 
-        for (i, encoding) in bind_groups.encodings().enumerate() {
-            let BindGroupEncoding {
-                bind_group,
-                id,
-                _resource_destroyers,
-            } = encoding;
+        let array = js_sys::Array::new();
 
-            if current_bind_group_ids[i] != Some(id) {
-                inner.set_bind_group(i as u32, &bind_group);
-                command_encoder
-                    ._resource_destroyers
-                    .push(_resource_destroyers.into());
-
-                current_bind_group_ids[i] = Some(id);
-            }
+        for bundle in render_bundles {
+            array.push(bundle.borrow().inner.as_ref());
         }
+
+        inner.execute_bundles(array.as_ref());
 
         RenderPassEncoder {
             inner,
@@ -1059,13 +1226,14 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
     }
 }
 
-impl<T, VLayout, IFormat, RLayout, V, I, R, Q>
-    RenderPassEncoder<T, RenderPipeline<T, VLayout, IFormat, RLayout>, V, I, R, Q>
+impl<T, P, V, I, R, Q> draw_command_encoder_seal::Seal for RenderPassEncoder<T, P, V, I, R, Q> {}
+impl<T, PV, PI, PR, V, I, R, Q> DrawCommandEncoder
+    for RenderPassEncoder<T, RenderPipeline<T, PV, PI, PR>, V, I, R, Q>
 where
-    V: VertexBuffers<Layout = VLayout>,
-    R: BindGroups<Layout = RLayout>,
+    V: VertexBuffers<Layout = PV>,
+    R: BindGroups<Layout = PR>,
 {
-    pub fn draw(self, draw: Draw) -> Self {
+    fn draw(self, draw: Draw) -> Self {
         let Draw {
             vertex_count,
             instance_count,
@@ -1084,7 +1252,7 @@ where
         self
     }
 
-    pub fn draw_indirect<U>(self, view: buffer::View<Draw, U>) -> Self
+    fn draw_indirect<U>(self, view: buffer::View<Draw, U>) -> Self
     where
         U: buffer::Indirect,
     {
@@ -1095,8 +1263,12 @@ where
     }
 }
 
-impl<T, VLayout, IFormat, RLayout, V, I, R, Q>
-    RenderPassEncoder<T, RenderPipeline<T, VLayout, IFormat, RLayout>, V, I, R, Q>
+impl<T, P, V, I, R, Q> draw_indexed_command_encoder_seal::Seal
+    for RenderPassEncoder<T, P, V, I, R, Q>
+{
+}
+impl<T, VLayout, IFormat, RLayout, V, I, R, Q> DrawIndexedCommandEncoder
+    for RenderPassEncoder<T, RenderPipeline<T, VLayout, IFormat, RLayout>, V, I, R, Q>
 where
     IFormat: PipelineIndexFormat,
     V: VertexBuffers<Layout = VLayout>,
@@ -1104,7 +1276,7 @@ where
     I::IndexData: PipelineIndexFormatCompatible<IFormat>,
     R: BindGroups<Layout = RLayout>,
 {
-    pub fn draw_indexed(self, draw_indexed: DrawIndexed) -> Self {
+    fn draw_indexed(self, draw_indexed: DrawIndexed) -> Self {
         let DrawIndexed {
             index_count,
             instance_count,
@@ -1128,7 +1300,7 @@ where
         self
     }
 
-    pub fn draw_indexed_indirect<U>(self, view: buffer::View<DrawIndexed, U>) -> Self
+    fn draw_indexed_indirect<U>(self, view: buffer::View<DrawIndexed, U>) -> Self
     where
         U: buffer::Indirect,
     {
@@ -1205,5 +1377,414 @@ where
         self.inner.end();
 
         self.command_encoder
+    }
+}
+
+pub struct RenderBundle<Target> {
+    inner: GpuRenderBundle,
+    _marker: marker::PhantomData<Target>,
+}
+
+pub struct RenderBundleEncoderDescriptor<Target> {
+    inner: GpuRenderBundleEncoderDescriptor,
+    _marker: marker::PhantomData<Target>,
+}
+
+impl RenderBundleEncoderDescriptor<()> {
+    pub fn new<C>() -> RenderBundleEncoderDescriptor<RenderLayout<C, ()>>
+    where
+        C: TypedColorLayout,
+    {
+        let color_formats = js_sys::Array::new();
+
+        for format in C::COLOR_FORMATS {
+            color_formats.push(&JsValue::from(format.as_str()));
+        }
+
+        let inner = GpuRenderBundleEncoderDescriptor::new(&color_formats);
+
+        RenderBundleEncoderDescriptor {
+            inner,
+            _marker: Default::default(),
+        }
+    }
+
+    pub fn multisample<C, const SAMPLES: u8>(
+    ) -> RenderBundleEncoderDescriptor<MultisampleRenderLayout<C, (), SAMPLES>>
+    where
+        C: TypedMultisampleColorLayout,
+    {
+        let color_formats = js_sys::Array::new();
+
+        for format in C::COLOR_FORMATS {
+            color_formats.push(&JsValue::from(format.as_str()));
+        }
+
+        let mut inner = GpuRenderBundleEncoderDescriptor::new(&color_formats);
+
+        inner.sample_count(SAMPLES as u32);
+
+        RenderBundleEncoderDescriptor {
+            inner,
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<C> RenderBundleEncoderDescriptor<RenderLayout<C, ()>> {
+    pub fn depth_stencil_format<Ds>(self) -> RenderBundleEncoderDescriptor<RenderLayout<C, Ds>>
+    where
+        Ds: DepthStencilRenderable,
+    {
+        let RenderBundleEncoderDescriptor { mut inner, .. } = self;
+
+        inner.depth_stencil_format(Ds::FORMAT_ID.to_web_sys());
+
+        RenderBundleEncoderDescriptor {
+            inner,
+            _marker: Default::default(),
+        }
+    }
+
+    pub fn depth_stencil_format_read_only<Ds>(
+        self,
+    ) -> RenderBundleEncoderDescriptor<RenderLayout<C, ReadOnly<Ds>>>
+    where
+        Ds: DepthStencilRenderable,
+    {
+        let RenderBundleEncoderDescriptor { mut inner, .. } = self;
+
+        inner.depth_stencil_format(Ds::FORMAT_ID.to_web_sys());
+
+        RenderBundleEncoderDescriptor {
+            inner,
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<C, const SAMPLES: u8> RenderBundleEncoderDescriptor<MultisampleRenderLayout<C, (), SAMPLES>> {
+    pub fn depth_stencil_format<Ds>(
+        self,
+    ) -> RenderBundleEncoderDescriptor<MultisampleRenderLayout<C, Ds, SAMPLES>>
+    where
+        Ds: DepthStencilRenderable,
+    {
+        let RenderBundleEncoderDescriptor { mut inner, .. } = self;
+
+        inner.depth_stencil_format(Ds::FORMAT_ID.to_web_sys());
+
+        RenderBundleEncoderDescriptor {
+            inner,
+            _marker: Default::default(),
+        }
+    }
+
+    pub fn depth_stencil_format_read_only<Ds>(
+        self,
+    ) -> RenderBundleEncoderDescriptor<MultisampleRenderLayout<C, ReadOnly<Ds>, SAMPLES>>
+    where
+        Ds: DepthStencilRenderable,
+    {
+        let RenderBundleEncoderDescriptor { mut inner, .. } = self;
+
+        inner.depth_stencil_format(Ds::FORMAT_ID.to_web_sys());
+
+        RenderBundleEncoderDescriptor {
+            inner,
+            _marker: Default::default(),
+        }
+    }
+}
+
+pub struct RenderBundleEncoder<Target, Pipeline, Vertex, Index, Resources> {
+    inner: GpuRenderBundleEncoder,
+    current_pipeline_id: Option<usize>,
+    current_vertex_buffers: [Option<CurrentBufferRange>; 8],
+    current_index_buffer: Option<CurrentBufferRange>,
+    current_bind_group_ids: [Option<usize>; 4],
+    _resource_destroyers: Vec<ResourceDestroyer>,
+    _marker: marker::PhantomData<(
+        *const Target,
+        *const Pipeline,
+        *const Vertex,
+        *const Index,
+        *const Resources,
+    )>,
+}
+
+impl<T, P, V, I, R> RenderBundleEncoder<T, P, V, I, R> {
+    pub fn new(device: &Device, descriptor: &RenderBundleEncoderDescriptor<T>) -> Self {
+        let inner = device.inner.create_render_bundle_encoder(&descriptor.inner);
+
+        RenderBundleEncoder {
+            inner,
+            current_pipeline_id: None,
+            current_vertex_buffers: [None; 8],
+            current_index_buffer: None,
+            current_bind_group_ids: [None; 4],
+            _resource_destroyers: Vec::new(),
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<T, P, V, I, R> RenderBundleEncoder<T, P, V, I, R> {
+    pub fn finish(self) -> RenderBundle<T> {
+        RenderBundle {
+            inner: self.inner.finish(),
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<T, P, V, I, R> resource_binding_command_encoder_seal::Seal
+    for RenderBundleEncoder<T, P, V, I, R>
+{
+}
+impl<T, P, V, I, R> ResourceBindingCommandEncoder for RenderBundleEncoder<T, P, V, I, R> {
+    type WithResources<RNew> = RenderBundleEncoder<T, P, V, I, RNew>;
+
+    fn set_bind_groups<RNew>(self, bind_groups: RNew) -> Self::WithResources<RNew>
+    where
+        RNew: BindGroups,
+    {
+        let RenderBundleEncoder {
+            inner,
+            current_pipeline_id,
+            current_vertex_buffers,
+            current_index_buffer,
+            mut current_bind_group_ids,
+            mut _resource_destroyers,
+            ..
+        } = self;
+
+        for (i, encoding) in bind_groups.encodings().enumerate() {
+            let BindGroupEncoding {
+                bind_group,
+                id,
+                _resource_destroyers: bind_group_resource_destroyers,
+            } = encoding;
+
+            if current_bind_group_ids[i] != Some(id) {
+                inner.set_bind_group(i as u32, &bind_group);
+                _resource_destroyers.push(bind_group_resource_destroyers.into());
+
+                current_bind_group_ids[i] = Some(id);
+            }
+        }
+
+        RenderBundleEncoder {
+            inner,
+            current_pipeline_id,
+            current_vertex_buffers,
+            current_index_buffer,
+            current_bind_group_ids,
+            _resource_destroyers,
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<T, P, V, I, R> render_state_encoder_seal::Seal for RenderBundleEncoder<T, P, V, I, R> {}
+impl<T, P, V, I, R> RenderStateEncoder<T> for RenderBundleEncoder<T, P, V, I, R> {
+    type WithPipeline<PNew> = RenderBundleEncoder<T, PNew, V, I, R>;
+    type WithVertexBuffers<VNew> = RenderBundleEncoder<T, P, VNew, I, R>;
+    type WithIndexBuffer<INew> = RenderBundleEncoder<T, P, V, INew, R>;
+
+    fn set_pipeline<PV, PI, PR>(
+        self,
+        pipeline: &RenderPipeline<T, PV, PI, PR>,
+    ) -> Self::WithPipeline<RenderPipeline<T, PV, PI, PR>> {
+        let RenderBundleEncoder {
+            inner,
+            current_pipeline_id,
+            current_vertex_buffers,
+            current_index_buffer,
+            current_bind_group_ids,
+            _resource_destroyers,
+            ..
+        } = self;
+
+        if Some(pipeline.id()) != current_pipeline_id {
+            inner.set_pipeline(pipeline.as_web_sys());
+        }
+
+        RenderBundleEncoder {
+            inner,
+            current_pipeline_id: Some(pipeline.id()),
+            current_vertex_buffers,
+            current_index_buffer,
+            current_bind_group_ids,
+            _resource_destroyers,
+            _marker: Default::default(),
+        }
+    }
+
+    fn set_vertex_buffers<VNew>(self, vertex_buffers: VNew) -> Self::WithVertexBuffers<VNew>
+    where
+        VNew: VertexBuffers,
+    {
+        let RenderBundleEncoder {
+            inner,
+            current_pipeline_id,
+            mut current_vertex_buffers,
+            current_index_buffer,
+            current_bind_group_ids,
+            mut _resource_destroyers,
+            ..
+        } = self;
+
+        for (i, encoding) in vertex_buffers.encodings().enumerate() {
+            let VertexBufferEncoding {
+                buffer,
+                id,
+                offset,
+                size,
+            } = encoding;
+
+            let range = CurrentBufferRange { id, offset, size };
+
+            if current_vertex_buffers[i] != Some(range) {
+                inner.set_vertex_buffer_with_u32_and_u32(i as u32, &buffer.buffer, offset, size);
+                _resource_destroyers.push(buffer.into());
+
+                current_vertex_buffers[i] = Some(range);
+            }
+        }
+
+        RenderBundleEncoder {
+            inner,
+            current_pipeline_id,
+            current_vertex_buffers,
+            current_index_buffer,
+            current_bind_group_ids,
+            _resource_destroyers,
+            _marker: Default::default(),
+        }
+    }
+
+    fn set_index_buffer<INew>(self, index_buffer: INew) -> Self::WithIndexBuffer<INew>
+    where
+        INew: IndexBuffer,
+    {
+        let RenderBundleEncoder {
+            inner,
+            current_pipeline_id,
+            current_vertex_buffers,
+            mut current_index_buffer,
+            current_bind_group_ids,
+            mut _resource_destroyers,
+            ..
+        } = self;
+
+        let IndexBufferEncoding {
+            buffer,
+            id,
+            format,
+            offset,
+            size,
+        } = index_buffer.to_encoding();
+
+        let range = CurrentBufferRange { id, offset, size };
+
+        if current_index_buffer != Some(range) {
+            inner.set_index_buffer_with_u32_and_u32(&buffer.buffer, format, offset, size);
+            _resource_destroyers.push(buffer.into());
+
+            current_index_buffer = Some(range);
+        }
+
+        RenderBundleEncoder {
+            inner,
+            current_pipeline_id,
+            current_vertex_buffers,
+            current_index_buffer,
+            current_bind_group_ids,
+            _resource_destroyers,
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<T, P, V, I, R> draw_command_encoder_seal::Seal for RenderBundleEncoder<T, P, V, I, R> {}
+impl<T, PV, PI, PR, V, I, R> DrawCommandEncoder
+    for RenderBundleEncoder<T, RenderPipeline<T, PV, PI, PR>, V, I, R>
+where
+    V: VertexBuffers<Layout = PV>,
+    R: BindGroups<Layout = PR>,
+{
+    fn draw(self, draw: Draw) -> Self {
+        let Draw {
+            vertex_count,
+            instance_count,
+            first_vertex,
+            first_instance,
+        } = draw;
+
+        self.inner
+            .draw_with_instance_count_and_first_vertex_and_first_instance(
+                vertex_count,
+                instance_count,
+                first_vertex,
+                first_instance,
+            );
+
+        self
+    }
+
+    fn draw_indirect<U>(self, view: buffer::View<Draw, U>) -> Self
+    where
+        U: buffer::Indirect,
+    {
+        self.inner
+            .draw_indirect_with_u32(view.as_web_sys(), view.size_in_bytes() as u32);
+
+        self
+    }
+}
+
+impl<T, P, V, I, R> draw_indexed_command_encoder_seal::Seal for RenderBundleEncoder<T, P, V, I, R> {}
+impl<T, VLayout, IFormat, RLayout, V, I, R> DrawIndexedCommandEncoder
+    for RenderBundleEncoder<T, RenderPipeline<T, VLayout, IFormat, RLayout>, V, I, R>
+where
+    IFormat: PipelineIndexFormat,
+    V: VertexBuffers<Layout = VLayout>,
+    I: IndexBuffer,
+    I::IndexData: PipelineIndexFormatCompatible<IFormat>,
+    R: BindGroups<Layout = RLayout>,
+{
+    fn draw_indexed(self, draw_indexed: DrawIndexed) -> Self {
+        let DrawIndexed {
+            index_count,
+            instance_count,
+            first_index,
+            base_vertex,
+            first_instance,
+        } = draw_indexed;
+
+        // TODO: base_vertex in specced to be a signed integer here, but specced to be an unsigned
+        // integer in the indirect version. Going with unsigned for both for now (what's the
+        // use-case for a negative base vertex number?), but should investigate.
+        self.inner
+            .draw_indexed_with_instance_count_and_first_index_and_base_vertex_and_first_instance(
+                index_count,
+                instance_count,
+                first_index,
+                base_vertex as i32,
+                first_instance,
+            );
+
+        self
+    }
+
+    fn draw_indexed_indirect<U>(self, view: buffer::View<DrawIndexed, U>) -> Self
+    where
+        U: buffer::Indirect,
+    {
+        self.inner
+            .draw_indexed_indirect_with_u32(view.as_web_sys(), view.size_in_bytes() as u32);
+
+        self
     }
 }

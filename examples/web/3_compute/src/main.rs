@@ -7,7 +7,7 @@ use arwa::window::window;
 use empa::arwa::{NavigatorExt, RequestAdapterOptions};
 use empa::buffer;
 use empa::buffer::{Buffer, Storage};
-use empa::command::DispatchWorkgroups;
+use empa::command::{DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{ComputePipelineDescriptorBuilder, ComputeStageBuilder};
 use empa::device::DeviceDescriptor;
 use empa::resource_binding::Resources;

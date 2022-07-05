@@ -10,7 +10,10 @@ use empa::arwa::{
     PredefinedColorSpace, RequestAdapterOptions,
 };
 use empa::buffer::{Buffer, Uniform};
-use empa::command::{Draw, RenderPassDescriptor};
+use empa::command::{
+    Draw, DrawCommandEncoder, RenderPassDescriptor, RenderStateEncoder,
+    ResourceBindingCommandEncoder,
+};
 use empa::device::DeviceDescriptor;
 use empa::render_pipeline::{
     ColorOutput, ColorWriteMask, FragmentStageBuilder, RenderPipelineDescriptorBuilder,
