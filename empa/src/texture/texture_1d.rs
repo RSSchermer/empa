@@ -79,6 +79,10 @@ where
         }
     }
 
+    pub fn size(&self) -> u32 {
+        self.size
+    }
+
     fn view_internal(&self, format: GpuTextureFormat) -> GpuTextureView {
         let mut desc = GpuTextureViewDescriptor::new();
 

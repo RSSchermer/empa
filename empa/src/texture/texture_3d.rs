@@ -125,6 +125,18 @@ where
         }
     }
 
+    pub fn width(&self) -> u32 {
+        self.width
+    }
+
+    pub fn height(&self) -> u32 {
+        self.height
+    }
+
+    pub fn depth(&self) -> u32 {
+        self.depth
+    }
+
     fn view_internal(
         &self,
         format: GpuTextureFormat,
