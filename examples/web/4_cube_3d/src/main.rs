@@ -224,21 +224,6 @@ async fn render() -> Result<(), Box<dyn Error>> {
         })
         .finish();
 
-    let render_pass_descriptor = RenderPassDescriptor::new(&RenderTarget {
-        color: FloatAttachment {
-            image: &context
-                .get_current_texture()
-                .attachable_image(&AttachableImageDescriptor::default()),
-            load_op: LoadOp::Clear([0.0; 4]),
-            store_op: StoreOp::Store,
-        },
-        depth_stencil: DepthAttachment {
-            image: &depth_texture.attachable_image(&AttachableImageDescriptor::default()),
-            load_op: LoadOp::Clear(DepthValue::ONE),
-            store_op: StoreOp::Store,
-        },
-    });
-
     let queue = device.queue();
 
     loop {
@@ -258,7 +243,20 @@ async fn render() -> Result<(), Box<dyn Error>> {
 
         let command_buffer = device
             .create_command_encoder()
-            .begin_render_pass(&render_pass_descriptor)
+            .begin_render_pass(&RenderPassDescriptor::new(&RenderTarget {
+                color: FloatAttachment {
+                    image: &context
+                        .get_current_texture()
+                        .attachable_image(&AttachableImageDescriptor::default()),
+                    load_op: LoadOp::Clear([0.0; 4]),
+                    store_op: StoreOp::Store,
+                },
+                depth_stencil: DepthAttachment {
+                    image: &depth_texture.attachable_image(&AttachableImageDescriptor::default()),
+                    load_op: LoadOp::Clear(DepthValue::ONE),
+                    store_op: StoreOp::Store,
+                },
+            }))
             .execute_bundle(&render_bundle)
             .end()
             .finish();
