@@ -35,6 +35,7 @@ enum ResourceDestroyer {
     Texture(Arc<TextureDestroyer>),
     BindGroup(Arc<Vec<EntryDestroyer>>),
     RenderTarget(Arc<StaticVec<Arc<TextureDestroyer>, 9>>),
+    RenderBundle(Arc<Vec<ResourceDestroyer>>)
 }
 
 impl From<Arc<BufferDestroyer>> for ResourceDestroyer {
@@ -58,6 +59,12 @@ impl From<Arc<Vec<EntryDestroyer>>> for ResourceDestroyer {
 impl From<Arc<StaticVec<Arc<TextureDestroyer>, 9_usize>>> for ResourceDestroyer {
     fn from(destroyer: Arc<StaticVec<Arc<TextureDestroyer>, 9>>) -> Self {
         ResourceDestroyer::RenderTarget(destroyer)
+    }
+}
+
+impl From<Arc<Vec<ResourceDestroyer>>> for ResourceDestroyer {
+    fn from(destroyer: Arc<Vec<ResourceDestroyer>>) -> Self {
+        ResourceDestroyer::RenderBundle(destroyer)
     }
 }
 
@@ -1166,7 +1173,7 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
     pub fn execute_bundle(self, render_bundle: &RenderBundle<T>) -> ClearRenderPassEncoder<T, Q> {
         let RenderPassEncoder {
             inner,
-            command_encoder,
+            mut command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
             current_index_buffer,
@@ -1179,6 +1186,8 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
         array.push(render_bundle.inner.as_ref());
 
         inner.execute_bundles(array.as_ref());
+
+        command_encoder._resource_destroyers.push(render_bundle._resource_destroyers.clone().into());
 
         RenderPassEncoder {
             inner,
@@ -1198,7 +1207,7 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
     {
         let RenderPassEncoder {
             inner,
-            command_encoder,
+            mut command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
             current_index_buffer,
@@ -1209,7 +1218,11 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
         let array = js_sys::Array::new();
 
         for bundle in render_bundles {
-            array.push(bundle.borrow().inner.as_ref());
+            let bundle = bundle.borrow();
+
+            array.push(bundle.inner.as_ref());
+
+            command_encoder._resource_destroyers.push(bundle._resource_destroyers.clone().into());
         }
 
         inner.execute_bundles(array.as_ref());
@@ -1382,6 +1395,7 @@ where
 
 pub struct RenderBundle<Target> {
     inner: GpuRenderBundle,
+    _resource_destroyers: Arc<Vec<ResourceDestroyer>>,
     _marker: marker::PhantomData<Target>,
 }
 
@@ -1533,6 +1547,7 @@ impl<T, P, V, I, R> RenderBundleEncoder<T, P, V, I, R> {
     pub fn finish(self) -> RenderBundle<T> {
         RenderBundle {
             inner: self.inner.finish(),
+            _resource_destroyers: Arc::new(self._resource_destroyers),
             _marker: Default::default(),
         }
     }
