@@ -142,7 +142,15 @@ pub unsafe trait Resource {
     fn to_entry(&self) -> BindGroupEntry;
 }
 
-unsafe impl<'a> Resource for &'a Sampled1DFloat {
+unsafe impl<T> Resource for &'_ T where T: Resource {
+    type Binding = T::Binding;
+
+    fn to_entry(&self) -> BindGroupEntry {
+        <T as Resource>::to_entry(self)
+    }
+}
+
+unsafe impl Resource for Sampled1DFloat {
     type Binding = typed_bind_group_entry::Texture1D<f32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -153,7 +161,7 @@ unsafe impl<'a> Resource for &'a Sampled1DFloat {
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampled1DUnfilteredFloat {
+unsafe impl Resource for Sampled1DUnfilteredFloat {
     type Binding = typed_bind_group_entry::Texture1D<f32_unfiltered, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -164,7 +172,7 @@ unsafe impl<'a> Resource for &'a Sampled1DUnfilteredFloat {
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampled1DSignedInteger {
+unsafe impl Resource for Sampled1DSignedInteger {
     type Binding = typed_bind_group_entry::Texture1D<i32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -175,7 +183,7 @@ unsafe impl<'a> Resource for &'a Sampled1DSignedInteger {
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampled1DUnsignedInteger {
+unsafe impl Resource for Sampled1DUnsignedInteger {
     type Binding = typed_bind_group_entry::Texture1D<u32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -186,7 +194,7 @@ unsafe impl<'a> Resource for &'a Sampled1DUnsignedInteger {
     }
 }
 
-unsafe impl<'a, F> Resource for &'a Storage1D<F>
+unsafe impl<F> Resource for Storage1D<F>
 where
     F: Storable,
 {
@@ -200,7 +208,7 @@ where
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampled2DFloat {
+unsafe impl Resource for Sampled2DFloat {
     type Binding = typed_bind_group_entry::Texture2D<f32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -211,7 +219,7 @@ unsafe impl<'a> Resource for &'a Sampled2DFloat {
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampled2DUnfilteredFloat {
+unsafe impl Resource for Sampled2DUnfilteredFloat {
     type Binding = typed_bind_group_entry::Texture2D<f32_unfiltered, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -222,7 +230,7 @@ unsafe impl<'a> Resource for &'a Sampled2DUnfilteredFloat {
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampled2DSignedInteger {
+unsafe impl Resource for Sampled2DSignedInteger {
     type Binding = typed_bind_group_entry::Texture2D<i32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -233,7 +241,7 @@ unsafe impl<'a> Resource for &'a Sampled2DSignedInteger {
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampled2DUnsignedInteger {
+unsafe impl Resource for Sampled2DUnsignedInteger {
     type Binding = typed_bind_group_entry::Texture2D<u32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -244,7 +252,7 @@ unsafe impl<'a> Resource for &'a Sampled2DUnsignedInteger {
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampled2DDepth {
+unsafe impl Resource for Sampled2DDepth {
     type Binding = typed_bind_group_entry::TextureDepth2D<ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -255,7 +263,7 @@ unsafe impl<'a> Resource for &'a Sampled2DDepth {
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampled2DArrayFloat {
+unsafe impl Resource for Sampled2DArrayFloat {
     type Binding = typed_bind_group_entry::Texture2DArray<f32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -266,7 +274,7 @@ unsafe impl<'a> Resource for &'a Sampled2DArrayFloat {
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampled2DArrayUnfilteredFloat {
+unsafe impl Resource for Sampled2DArrayUnfilteredFloat {
     type Binding = typed_bind_group_entry::Texture2DArray<f32_unfiltered, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -277,7 +285,7 @@ unsafe impl<'a> Resource for &'a Sampled2DArrayUnfilteredFloat {
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampled2DArraySignedInteger {
+unsafe impl Resource for Sampled2DArraySignedInteger {
     type Binding = typed_bind_group_entry::Texture2DArray<i32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -288,7 +296,7 @@ unsafe impl<'a> Resource for &'a Sampled2DArraySignedInteger {
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampled2DArrayUnsignedInteger {
+unsafe impl Resource for Sampled2DArrayUnsignedInteger {
     type Binding = typed_bind_group_entry::Texture2DArray<u32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -299,7 +307,7 @@ unsafe impl<'a> Resource for &'a Sampled2DArrayUnsignedInteger {
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampled2DArrayDepth {
+unsafe impl Resource for Sampled2DArrayDepth {
     type Binding = typed_bind_group_entry::TextureDepth2DArray<ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -310,7 +318,7 @@ unsafe impl<'a> Resource for &'a Sampled2DArrayDepth {
     }
 }
 
-unsafe impl<'a> Resource for &'a SampledCubeFloat {
+unsafe impl Resource for SampledCubeFloat {
     type Binding = typed_bind_group_entry::TextureCube<f32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -321,7 +329,7 @@ unsafe impl<'a> Resource for &'a SampledCubeFloat {
     }
 }
 
-unsafe impl<'a> Resource for &'a SampledCubeUnfilteredFloat {
+unsafe impl Resource for SampledCubeUnfilteredFloat {
     type Binding = typed_bind_group_entry::TextureCube<f32_unfiltered, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -332,7 +340,7 @@ unsafe impl<'a> Resource for &'a SampledCubeUnfilteredFloat {
     }
 }
 
-unsafe impl<'a> Resource for &'a SampledCubeSignedInteger {
+unsafe impl Resource for SampledCubeSignedInteger {
     type Binding = typed_bind_group_entry::TextureCube<i32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -343,7 +351,7 @@ unsafe impl<'a> Resource for &'a SampledCubeSignedInteger {
     }
 }
 
-unsafe impl<'a> Resource for &'a SampledCubeUnsignedInteger {
+unsafe impl Resource for SampledCubeUnsignedInteger {
     type Binding = typed_bind_group_entry::TextureCube<u32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -354,7 +362,7 @@ unsafe impl<'a> Resource for &'a SampledCubeUnsignedInteger {
     }
 }
 
-unsafe impl<'a> Resource for &'a SampledCubeDepth {
+unsafe impl Resource for SampledCubeDepth {
     type Binding = typed_bind_group_entry::TextureDepthCube<ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -365,7 +373,7 @@ unsafe impl<'a> Resource for &'a SampledCubeDepth {
     }
 }
 
-unsafe impl<'a> Resource for &'a SampledCubeArrayFloat {
+unsafe impl Resource for SampledCubeArrayFloat {
     type Binding = typed_bind_group_entry::TextureCubeArray<f32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -376,7 +384,7 @@ unsafe impl<'a> Resource for &'a SampledCubeArrayFloat {
     }
 }
 
-unsafe impl<'a> Resource for &'a SampledCubeArrayUnfilteredFloat {
+unsafe impl Resource for SampledCubeArrayUnfilteredFloat {
     type Binding = typed_bind_group_entry::TextureCubeArray<f32_unfiltered, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -387,7 +395,7 @@ unsafe impl<'a> Resource for &'a SampledCubeArrayUnfilteredFloat {
     }
 }
 
-unsafe impl<'a> Resource for &'a SampledCubeArraySignedInteger {
+unsafe impl Resource for SampledCubeArraySignedInteger {
     type Binding = typed_bind_group_entry::TextureCubeArray<i32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -398,7 +406,7 @@ unsafe impl<'a> Resource for &'a SampledCubeArraySignedInteger {
     }
 }
 
-unsafe impl<'a> Resource for &'a SampledCubeArrayUnsignedInteger {
+unsafe impl Resource for SampledCubeArrayUnsignedInteger {
     type Binding = typed_bind_group_entry::TextureCubeArray<u32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -409,7 +417,7 @@ unsafe impl<'a> Resource for &'a SampledCubeArrayUnsignedInteger {
     }
 }
 
-unsafe impl<'a> Resource for &'a SampledCubeArrayDepth {
+unsafe impl Resource for SampledCubeArrayDepth {
     type Binding = typed_bind_group_entry::TextureDepthCubeArray<ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -420,7 +428,7 @@ unsafe impl<'a> Resource for &'a SampledCubeArrayDepth {
     }
 }
 
-unsafe impl<'a, F> Resource for &'a Storage2D<F>
+unsafe impl<F> Resource for Storage2D<F>
 where
     F: Storable,
 {
@@ -434,7 +442,7 @@ where
     }
 }
 
-unsafe impl<'a, F> Resource for &'a Storage2DArray<F>
+unsafe impl<F> Resource for Storage2DArray<F>
 where
     F: Storable,
 {
@@ -448,7 +456,7 @@ where
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampled3DFloat {
+unsafe impl Resource for Sampled3DFloat {
     type Binding = typed_bind_group_entry::Texture3D<f32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -459,7 +467,7 @@ unsafe impl<'a> Resource for &'a Sampled3DFloat {
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampled3DUnfilteredFloat {
+unsafe impl Resource for Sampled3DUnfilteredFloat {
     type Binding = typed_bind_group_entry::Texture3D<f32_unfiltered, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -470,7 +478,7 @@ unsafe impl<'a> Resource for &'a Sampled3DUnfilteredFloat {
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampled3DSignedInteger {
+unsafe impl Resource for Sampled3DSignedInteger {
     type Binding = typed_bind_group_entry::Texture3D<i32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -481,7 +489,7 @@ unsafe impl<'a> Resource for &'a Sampled3DSignedInteger {
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampled3DUnsignedInteger {
+unsafe impl Resource for Sampled3DUnsignedInteger {
     type Binding = typed_bind_group_entry::Texture3D<u32, ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -492,7 +500,7 @@ unsafe impl<'a> Resource for &'a Sampled3DUnsignedInteger {
     }
 }
 
-unsafe impl<'a, F> Resource for &'a Storage3D<F>
+unsafe impl<F> Resource for Storage3D<F>
 where
     F: Storable,
 {
@@ -506,7 +514,7 @@ where
     }
 }
 
-unsafe impl<'a> Resource for &'a Sampler {
+unsafe impl Resource for Sampler {
     type Binding = typed_bind_group_entry::FilteringSampler<ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -516,7 +524,7 @@ unsafe impl<'a> Resource for &'a Sampler {
     }
 }
 
-unsafe impl<'a> Resource for &'a ComparisonSampler {
+unsafe impl Resource for ComparisonSampler {
     type Binding = typed_bind_group_entry::ComparisonSampler<ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -526,7 +534,7 @@ unsafe impl<'a> Resource for &'a ComparisonSampler {
     }
 }
 
-unsafe impl<'a> Resource for &'a NonFilteringSampler {
+unsafe impl Resource for NonFilteringSampler {
     type Binding = typed_bind_group_entry::NonFilteringSampler<ShaderStages<O, O, O>>;
 
     fn to_entry(&self) -> BindGroupEntry {
@@ -536,7 +544,7 @@ unsafe impl<'a> Resource for &'a NonFilteringSampler {
     }
 }
 
-unsafe impl<'a, T> Resource for &'a Uniform<T>
+unsafe impl<T> Resource for Uniform<T>
 where
     T: abi::Sized,
 {
@@ -555,7 +563,7 @@ where
     }
 }
 
-unsafe impl<'a, T> Resource for &'a Storage<T>
+unsafe impl<T> Resource for Storage<T>
 where
     T: abi::Unsized + ?Sized,
 {
@@ -574,7 +582,7 @@ where
     }
 }
 
-unsafe impl<'a, T> Resource for &'a ReadOnlyStorage<T>
+unsafe impl<T> Resource for ReadOnlyStorage<T>
 where
     T: abi::Unsized + ?Sized,
 {
