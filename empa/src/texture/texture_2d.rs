@@ -184,16 +184,10 @@ where
     }
 }
 
-impl<F, U> Texture2D<F, U> {
-    pub(crate) fn as_web_sys(&self) -> &GpuTexture {
-        &self.inner.texture
-    }
-}
-
 impl<F, U> Texture2D<F, U>
-where
-    F: Texture2DFormat,
-    U: UsageFlags,
+    where
+        F: Texture2DFormat,
+        U: UsageFlags,
 {
     pub(crate) fn new<V: ViewFormats<F>>(
         device: &Device,
@@ -250,6 +244,12 @@ where
             _usage: Default::default(),
         }
     }
+}
+
+impl<F, U> Texture2D<F, U> {
+    pub(crate) fn as_web_sys(&self) -> &GpuTexture {
+        &self.inner.texture
+    }
 
     pub fn width(&self) -> u32 {
         self.width
@@ -262,6 +262,7 @@ where
     pub fn layers(&self) -> u32 {
         self.layers
     }
+
 
     fn view_2d_internal(
         &self,
@@ -304,9 +305,9 @@ where
     }
 
     pub fn sampled_float(&self, descriptor: &View2DDescriptor) -> Sampled2DFloat
-    where
-        F: FloatSamplable,
-        U: TextureBinding,
+        where
+            F: FloatSamplable,
+            U: TextureBinding,
     {
         Sampled2DFloat {
             inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -318,9 +319,9 @@ where
         &self,
         descriptor: &View2DDescriptor,
     ) -> Result<Sampled2DFloat, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + FloatSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + FloatSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DFloat {
@@ -339,9 +340,9 @@ where
         &self,
         descriptor: &View2DDescriptor,
     ) -> Sampled2DUnfilteredFloat
-    where
-        F: UnfilteredFloatSamplable,
-        U: TextureBinding,
+        where
+            F: UnfilteredFloatSamplable,
+            U: TextureBinding,
     {
         Sampled2DUnfilteredFloat {
             inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -353,9 +354,9 @@ where
         &self,
         descriptor: &View2DDescriptor,
     ) -> Result<Sampled2DUnfilteredFloat, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DUnfilteredFloat {
@@ -371,9 +372,9 @@ where
     }
 
     pub fn sampled_signed_integer(&self, descriptor: &View2DDescriptor) -> Sampled2DSignedInteger
-    where
-        F: SignedIntegerSamplable,
-        U: TextureBinding,
+        where
+            F: SignedIntegerSamplable,
+            U: TextureBinding,
     {
         Sampled2DSignedInteger {
             inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -385,9 +386,9 @@ where
         &self,
         descriptor: &View2DDescriptor,
     ) -> Result<Sampled2DSignedInteger, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DSignedInteger {
@@ -406,9 +407,9 @@ where
         &self,
         descriptor: &View2DDescriptor,
     ) -> Sampled2DUnsignedInteger
-    where
-        F: UnsignedIntegerSamplable,
-        U: TextureBinding,
+        where
+            F: UnsignedIntegerSamplable,
+            U: TextureBinding,
     {
         Sampled2DUnsignedInteger {
             inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -420,9 +421,9 @@ where
         &self,
         descriptor: &View2DDescriptor,
     ) -> Result<Sampled2DUnsignedInteger, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DUnsignedInteger {
@@ -438,9 +439,9 @@ where
     }
 
     pub fn sampled_depth(&self, descriptor: &View2DDescriptor) -> Sampled2DDepth
-    where
-        F: DepthSamplable,
-        U: TextureBinding,
+        where
+            F: DepthSamplable,
+            U: TextureBinding,
     {
         Sampled2DDepth {
             inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -452,9 +453,9 @@ where
         &self,
         descriptor: &View2DDescriptor,
     ) -> Result<Sampled2DDepth, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + DepthSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + DepthSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DDepth {
@@ -470,9 +471,9 @@ where
     }
 
     pub fn sampled_depth_aspect(&self, descriptor: &View2DDescriptor) -> Sampled2DDepth
-    where
-        F: DepthStencilFormat,
-        U: TextureBinding,
+        where
+            F: DepthStencilFormat,
+            U: TextureBinding,
     {
         Sampled2DDepth {
             inner: self.view_2d_internal(F::DepthAspect::FORMAT_ID.to_web_sys(), descriptor),
@@ -533,9 +534,9 @@ where
     }
 
     pub fn sampled_array_float(&self, descriptor: &View2DArrayDescriptor) -> Sampled2DArrayFloat
-    where
-        F: FloatSamplable,
-        U: TextureBinding,
+        where
+            F: FloatSamplable,
+            U: TextureBinding,
     {
         Sampled2DArrayFloat {
             inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -547,9 +548,9 @@ where
         &self,
         descriptor: &View2DArrayDescriptor,
     ) -> Result<Sampled2DArrayFloat, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + FloatSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + FloatSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DArrayFloat {
@@ -569,9 +570,9 @@ where
         &self,
         descriptor: &View2DArrayDescriptor,
     ) -> Sampled2DArrayUnfilteredFloat
-    where
-        F: UnfilteredFloatSamplable,
-        U: TextureBinding,
+        where
+            F: UnfilteredFloatSamplable,
+            U: TextureBinding,
     {
         Sampled2DArrayUnfilteredFloat {
             inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -583,9 +584,9 @@ where
         &self,
         descriptor: &View2DArrayDescriptor,
     ) -> Result<Sampled2DArrayUnfilteredFloat, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DArrayUnfilteredFloat {
@@ -605,9 +606,9 @@ where
         &self,
         descriptor: &View2DArrayDescriptor,
     ) -> Sampled2DArraySignedInteger
-    where
-        F: SignedIntegerSamplable,
-        U: TextureBinding,
+        where
+            F: SignedIntegerSamplable,
+            U: TextureBinding,
     {
         Sampled2DArraySignedInteger {
             inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -619,9 +620,9 @@ where
         &self,
         descriptor: &View2DArrayDescriptor,
     ) -> Result<Sampled2DArraySignedInteger, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DArraySignedInteger {
@@ -641,9 +642,9 @@ where
         &self,
         descriptor: &View2DArrayDescriptor,
     ) -> Sampled2DArrayUnsignedInteger
-    where
-        F: UnsignedIntegerSamplable,
-        U: TextureBinding,
+        where
+            F: UnsignedIntegerSamplable,
+            U: TextureBinding,
     {
         Sampled2DArrayUnsignedInteger {
             inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -655,9 +656,9 @@ where
         &self,
         descriptor: &View2DArrayDescriptor,
     ) -> Result<Sampled2DArrayUnsignedInteger, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DArrayUnsignedInteger {
@@ -674,9 +675,9 @@ where
     }
 
     pub fn sampled_array_depth(&self, descriptor: &View2DArrayDescriptor) -> Sampled2DArrayDepth
-    where
-        F: DepthSamplable,
-        U: TextureBinding,
+        where
+            F: DepthSamplable,
+            U: TextureBinding,
     {
         Sampled2DArrayDepth {
             inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -688,9 +689,9 @@ where
         &self,
         descriptor: &View2DArrayDescriptor,
     ) -> Result<Sampled2DArrayDepth, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + DepthSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + DepthSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DArrayDepth {
@@ -710,9 +711,9 @@ where
         &self,
         descriptor: &View2DArrayDescriptor,
     ) -> Sampled2DArrayDepth
-    where
-        F: DepthStencilFormat,
-        U: TextureBinding,
+        where
+            F: DepthStencilFormat,
+            U: TextureBinding,
     {
         Sampled2DArrayDepth {
             inner: self.view_2d_array_internal(F::DepthAspect::FORMAT_ID.to_web_sys(), descriptor),
@@ -766,9 +767,9 @@ where
     }
 
     pub fn sampled_cube_float(&self, descriptor: &ViewCubeDescriptor) -> SampledCubeFloat
-    where
-        F: FloatSamplable,
-        U: TextureBinding,
+        where
+            F: FloatSamplable,
+            U: TextureBinding,
     {
         SampledCubeFloat {
             inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -780,9 +781,9 @@ where
         &self,
         descriptor: &ViewCubeDescriptor,
     ) -> Result<SampledCubeFloat, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + FloatSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + FloatSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeFloat {
@@ -801,9 +802,9 @@ where
         &self,
         descriptor: &ViewCubeDescriptor,
     ) -> SampledCubeUnfilteredFloat
-    where
-        F: UnfilteredFloatSamplable,
-        U: TextureBinding,
+        where
+            F: UnfilteredFloatSamplable,
+            U: TextureBinding,
     {
         SampledCubeUnfilteredFloat {
             inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -815,9 +816,9 @@ where
         &self,
         descriptor: &ViewCubeDescriptor,
     ) -> Result<SampledCubeUnfilteredFloat, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeUnfilteredFloat {
@@ -836,9 +837,9 @@ where
         &self,
         descriptor: &ViewCubeDescriptor,
     ) -> SampledCubeSignedInteger
-    where
-        F: SignedIntegerSamplable,
-        U: TextureBinding,
+        where
+            F: SignedIntegerSamplable,
+            U: TextureBinding,
     {
         SampledCubeSignedInteger {
             inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -850,9 +851,9 @@ where
         &self,
         descriptor: &ViewCubeDescriptor,
     ) -> Result<SampledCubeSignedInteger, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeSignedInteger {
@@ -871,9 +872,9 @@ where
         &self,
         descriptor: &ViewCubeDescriptor,
     ) -> SampledCubeUnsignedInteger
-    where
-        F: UnsignedIntegerSamplable,
-        U: TextureBinding,
+        where
+            F: UnsignedIntegerSamplable,
+            U: TextureBinding,
     {
         SampledCubeUnsignedInteger {
             inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -885,9 +886,9 @@ where
         &self,
         descriptor: &ViewCubeDescriptor,
     ) -> Result<SampledCubeUnsignedInteger, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeUnsignedInteger {
@@ -903,9 +904,9 @@ where
     }
 
     pub fn sampled_cube_depth(&self, descriptor: &ViewCubeDescriptor) -> SampledCubeDepth
-    where
-        F: DepthSamplable,
-        U: TextureBinding,
+        where
+            F: DepthSamplable,
+            U: TextureBinding,
     {
         SampledCubeDepth {
             inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -917,9 +918,9 @@ where
         &self,
         descriptor: &ViewCubeDescriptor,
     ) -> Result<SampledCubeDepth, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + DepthSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + DepthSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeDepth {
@@ -935,9 +936,9 @@ where
     }
 
     pub fn sampled_cube_depth_aspect(&self, descriptor: &ViewCubeDescriptor) -> SampledCubeDepth
-    where
-        F: DepthStencilFormat,
-        U: TextureBinding,
+        where
+            F: DepthStencilFormat,
+            U: TextureBinding,
     {
         SampledCubeDepth {
             inner: self.view_cube_internal(F::DepthAspect::FORMAT_ID.to_web_sys(), descriptor),
@@ -1006,9 +1007,9 @@ where
         &self,
         descriptor: &ViewCubeArrayDescriptor,
     ) -> SampledCubeArrayFloat
-    where
-        F: FloatSamplable,
-        U: TextureBinding,
+        where
+            F: FloatSamplable,
+            U: TextureBinding,
     {
         SampledCubeArrayFloat {
             inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -1020,9 +1021,9 @@ where
         &self,
         descriptor: &ViewCubeArrayDescriptor,
     ) -> Result<SampledCubeArrayFloat, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + FloatSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + FloatSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeArrayFloat {
@@ -1042,9 +1043,9 @@ where
         &self,
         descriptor: &ViewCubeArrayDescriptor,
     ) -> SampledCubeArrayUnfilteredFloat
-    where
-        F: UnfilteredFloatSamplable,
-        U: TextureBinding,
+        where
+            F: UnfilteredFloatSamplable,
+            U: TextureBinding,
     {
         SampledCubeArrayUnfilteredFloat {
             inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -1056,9 +1057,9 @@ where
         &self,
         descriptor: &ViewCubeArrayDescriptor,
     ) -> Result<SampledCubeArrayUnfilteredFloat, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeArrayUnfilteredFloat {
@@ -1078,9 +1079,9 @@ where
         &self,
         descriptor: &ViewCubeArrayDescriptor,
     ) -> SampledCubeArraySignedInteger
-    where
-        F: SignedIntegerSamplable,
-        U: TextureBinding,
+        where
+            F: SignedIntegerSamplable,
+            U: TextureBinding,
     {
         SampledCubeArraySignedInteger {
             inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -1092,9 +1093,9 @@ where
         &self,
         descriptor: &ViewCubeArrayDescriptor,
     ) -> Result<SampledCubeArraySignedInteger, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeArraySignedInteger {
@@ -1114,9 +1115,9 @@ where
         &self,
         descriptor: &ViewCubeArrayDescriptor,
     ) -> SampledCubeArrayUnsignedInteger
-    where
-        F: UnsignedIntegerSamplable,
-        U: TextureBinding,
+        where
+            F: UnsignedIntegerSamplable,
+            U: TextureBinding,
     {
         SampledCubeArrayUnsignedInteger {
             inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -1128,9 +1129,9 @@ where
         &self,
         descriptor: &ViewCubeArrayDescriptor,
     ) -> Result<SampledCubeArrayUnsignedInteger, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeArrayUnsignedInteger {
@@ -1150,9 +1151,9 @@ where
         &self,
         descriptor: &ViewCubeArrayDescriptor,
     ) -> SampledCubeArrayDepth
-    where
-        F: DepthSamplable,
-        U: TextureBinding,
+        where
+            F: DepthSamplable,
+            U: TextureBinding,
     {
         SampledCubeArrayDepth {
             inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -1164,9 +1165,9 @@ where
         &self,
         descriptor: &ViewCubeArrayDescriptor,
     ) -> Result<SampledCubeArrayDepth, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + DepthSamplable,
-        U: TextureBinding,
+        where
+            ViewedFormat: ViewFormat<F> + DepthSamplable,
+            U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeArrayDepth {
@@ -1186,9 +1187,9 @@ where
         &self,
         descriptor: &ViewCubeArrayDescriptor,
     ) -> SampledCubeArrayDepth
-    where
-        F: DepthStencilFormat,
-        U: TextureBinding,
+        where
+            F: DepthStencilFormat,
+            U: TextureBinding,
     {
         SampledCubeArrayDepth {
             inner: self
@@ -1201,9 +1202,9 @@ where
         &self,
         descriptor: &AttachableImageDescriptor,
     ) -> AttachableImage<ViewedFormat>
-    where
-        ViewedFormat: Renderable,
-        U: RenderAttachment,
+        where
+            ViewedFormat: Renderable,
+            U: RenderAttachment,
     {
         let AttachableImageDescriptor {
             layer,
@@ -1235,9 +1236,9 @@ where
     }
 
     pub fn attachable_image(&self, descriptor: &AttachableImageDescriptor) -> AttachableImage<F>
-    where
-        F: Renderable,
-        U: RenderAttachment,
+        where
+            F: Renderable,
+            U: RenderAttachment,
     {
         self.attachable_image_internal(descriptor)
     }
@@ -1246,9 +1247,9 @@ where
         &self,
         descriptor: &AttachableImageDescriptor,
     ) -> Result<AttachableImage<ViewedFormat>, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + Renderable,
-        U: RenderAttachment,
+        where
+            ViewedFormat: ViewFormat<F> + Renderable,
+            U: RenderAttachment,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(self.attachable_image_internal(descriptor))
@@ -1264,9 +1265,9 @@ where
         &self,
         descriptor: &Storage2DDescriptor,
     ) -> Storage2D<ViewedFormat>
-    where
-        ViewedFormat: Storable,
-        U: StorageBinding,
+        where
+            ViewedFormat: Storable,
+            U: StorageBinding,
     {
         let Storage2DDescriptor {
             layer,
@@ -1296,9 +1297,9 @@ where
     }
 
     pub fn storage(&self, descriptor: &Storage2DDescriptor) -> Storage2D<F>
-    where
-        F: Storable,
-        U: StorageBinding,
+        where
+            F: Storable,
+            U: StorageBinding,
     {
         self.storage_internal(descriptor)
     }
@@ -1307,9 +1308,9 @@ where
         &self,
         descriptor: &Storage2DDescriptor,
     ) -> Result<Storage2D<ViewedFormat>, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + Storable,
-        U: StorageBinding,
+        where
+            ViewedFormat: ViewFormat<F> + Storable,
+            U: StorageBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(self.storage_internal(descriptor))
@@ -1325,9 +1326,9 @@ where
         &self,
         descriptor: &Storage2DArrayDescriptor,
     ) -> Storage2DArray<ViewedFormat>
-    where
-        ViewedFormat: Storable,
-        U: StorageBinding,
+        where
+            ViewedFormat: Storable,
+            U: StorageBinding,
     {
         let Storage2DArrayDescriptor {
             base_layer,
@@ -1363,9 +1364,9 @@ where
     }
 
     pub fn storage_array(&self, descriptor: &Storage2DArrayDescriptor) -> Storage2DArray<F>
-    where
-        F: Storable,
-        U: StorageBinding,
+        where
+            F: Storable,
+            U: StorageBinding,
     {
         self.storage_array_internal(descriptor)
     }
@@ -1374,9 +1375,9 @@ where
         &self,
         descriptor: &Storage2DArrayDescriptor,
     ) -> Result<Storage2DArray<ViewedFormat>, UnsupportedViewFormat>
-    where
-        ViewedFormat: ViewFormat<F> + Storable,
-        U: StorageBinding,
+        where
+            ViewedFormat: ViewFormat<F> + Storable,
+            U: StorageBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(self.storage_array_internal(descriptor))
@@ -1467,9 +1468,9 @@ where
     }
 
     pub fn image_copy_to_buffer_src(&self, mipmap_level: u8) -> ImageCopySrc<F>
-    where
-        F: ImageCopyToBufferFormat,
-        U: CopySrc,
+        where
+            F: ImageCopyToBufferFormat,
+            U: CopySrc,
     {
         ImageCopySrc {
             inner: self.image_copy_internal(
@@ -1482,10 +1483,10 @@ where
     }
 
     pub fn image_copy_to_buffer_src_depth(&self, mipmap_level: u8) -> ImageCopySrc<F>
-    where
-        F: DepthStencilFormat,
-        F::DepthAspect: ImageCopyToBufferFormat,
-        U: CopySrc,
+        where
+            F: DepthStencilFormat,
+            F::DepthAspect: ImageCopyToBufferFormat,
+            U: CopySrc,
     {
         ImageCopySrc {
             inner: self.image_copy_internal(
@@ -1498,10 +1499,10 @@ where
     }
 
     pub fn image_copy_to_buffer_src_stencil(&self, mipmap_level: u8) -> ImageCopySrc<F>
-    where
-        F: DepthStencilFormat,
-        F::StencilAspect: ImageCopyToBufferFormat,
-        U: CopySrc,
+        where
+            F: DepthStencilFormat,
+            F::StencilAspect: ImageCopyToBufferFormat,
+            U: CopySrc,
     {
         ImageCopySrc {
             inner: self.image_copy_internal(
@@ -1514,9 +1515,9 @@ where
     }
 
     pub fn image_copy_from_buffer_dst(&self, mipmap_level: u8) -> ImageCopyDst<F>
-    where
-        F: ImageCopyFromBufferFormat,
-        U: CopyDst,
+        where
+            F: ImageCopyFromBufferFormat,
+            U: CopyDst,
     {
         ImageCopyDst {
             inner: self.image_copy_internal(
@@ -1531,10 +1532,10 @@ where
     // Note: including this function for completeness sake, but this should not currently be
     // invokable, no format meets the constraints.
     pub fn image_copy_from_buffer_dst_depth(&self, mipmap_level: u8) -> ImageCopyDst<F>
-    where
-        F: DepthStencilFormat,
-        F::DepthAspect: ImageCopyFromBufferFormat,
-        U: CopyDst,
+        where
+            F: DepthStencilFormat,
+            F::DepthAspect: ImageCopyFromBufferFormat,
+            U: CopyDst,
     {
         ImageCopyDst {
             inner: self.image_copy_internal(
@@ -1547,10 +1548,10 @@ where
     }
 
     pub fn image_copy_from_buffer_dst_stencil(&self, mipmap_level: u8) -> ImageCopyDst<F>
-    where
-        F: DepthStencilFormat,
-        F::StencilAspect: ImageCopyFromBufferFormat,
-        U: CopyDst,
+        where
+            F: DepthStencilFormat,
+            F::StencilAspect: ImageCopyFromBufferFormat,
+            U: CopyDst,
     {
         ImageCopyDst {
             inner: self.image_copy_internal(
@@ -1563,9 +1564,9 @@ where
     }
 
     pub fn image_copy_to_texture_src(&self, mipmap_level: u8) -> ImageCopyToTextureSrc<F>
-    where
-        F: ImageCopyTextureFormat,
-        U: CopySrc,
+        where
+            F: ImageCopyTextureFormat,
+            U: CopySrc,
     {
         ImageCopyToTextureSrc {
             inner: self.image_copy_internal(mipmap_level, 0, F::BLOCK_SIZE, GpuTextureAspect::All),
@@ -1573,9 +1574,9 @@ where
     }
 
     pub fn image_copy_from_texture_dst(&self, mipmap_level: u8) -> ImageCopyFromTextureDst<F>
-    where
-        F: ImageCopyTextureFormat,
-        U: CopyDst,
+        where
+            F: ImageCopyTextureFormat,
+            U: CopyDst,
     {
         ImageCopyFromTextureDst {
             inner: self.image_copy_internal(mipmap_level, 0, F::BLOCK_SIZE, GpuTextureAspect::All),
@@ -1586,9 +1587,9 @@ where
         &self,
         descriptor: SubImageCopy2DDescriptor,
     ) -> SubImageCopySrc<F>
-    where
-        F: ImageCopyToBufferFormat + SubImageCopyFormat,
-        U: CopySrc,
+        where
+            F: ImageCopyToBufferFormat + SubImageCopyFormat,
+            U: CopySrc,
     {
         SubImageCopySrc {
             inner: self.sub_image_copy_internal(descriptor, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
@@ -1599,9 +1600,9 @@ where
         &self,
         descriptor: SubImageCopy2DDescriptor,
     ) -> SubImageCopyDst<F>
-    where
-        F: ImageCopyFromBufferFormat + SubImageCopyFormat,
-        U: CopyDst,
+        where
+            F: ImageCopyFromBufferFormat + SubImageCopyFormat,
+            U: CopyDst,
     {
         SubImageCopyDst {
             inner: self.sub_image_copy_internal(descriptor, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
@@ -1612,9 +1613,9 @@ where
         &self,
         descriptor: SubImageCopy2DDescriptor,
     ) -> SubImageCopyToTextureSrc<F>
-    where
-        F: ImageCopyTextureFormat + SubImageCopyFormat,
-        U: CopySrc,
+        where
+            F: ImageCopyTextureFormat + SubImageCopyFormat,
+            U: CopySrc,
     {
         SubImageCopyToTextureSrc {
             inner: self.sub_image_copy_internal(descriptor, 0, F::BLOCK_SIZE),
@@ -1625,9 +1626,9 @@ where
         &self,
         descriptor: SubImageCopy2DDescriptor,
     ) -> SubImageCopyFromTextureDst<F>
-    where
-        F: ImageCopyTextureFormat + SubImageCopyFormat,
-        U: CopyDst,
+        where
+            F: ImageCopyTextureFormat + SubImageCopyFormat,
+            U: CopyDst,
     {
         SubImageCopyFromTextureDst {
             inner: self.sub_image_copy_internal(descriptor, 0, F::BLOCK_SIZE),
