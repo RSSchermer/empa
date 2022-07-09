@@ -43,6 +43,7 @@ pub struct DeviceDescriptor {
     pub required_limits: Limits,
 }
 
+#[derive(Clone)]
 pub struct Device {
     pub(crate) inner: GpuDevice,
 }
