@@ -128,7 +128,7 @@ pub struct PrimitiveAssembly<I> {
 }
 
 impl PrimitiveAssembly<()> {
-    pub fn point_list() -> PrimitiveAssembly<()> {
+    pub fn point_list() -> PrimitiveAssembly<IndexAny> {
         let mut inner = GpuPrimitiveState::new();
 
         inner.topology(GpuPrimitiveTopology::PointList);
@@ -139,7 +139,7 @@ impl PrimitiveAssembly<()> {
         }
     }
 
-    pub fn line_list() -> PrimitiveAssembly<()> {
+    pub fn line_list() -> PrimitiveAssembly<IndexAny> {
         let mut inner = GpuPrimitiveState::new();
 
         inner.topology(GpuPrimitiveTopology::LineList);
@@ -150,7 +150,7 @@ impl PrimitiveAssembly<()> {
         }
     }
 
-    pub fn triangle_list() -> PrimitiveAssembly<()> {
+    pub fn triangle_list() -> PrimitiveAssembly<IndexAny> {
         let mut inner = GpuPrimitiveState::new();
 
         inner.topology(GpuPrimitiveTopology::TriangleList);
