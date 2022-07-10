@@ -106,6 +106,7 @@ features = [
     "GpuShaderModuleDescriptor",
     "GpuStencilFaceState",
     "GpuStencilOperation",
+    "GpuStorageTextureAccess",
     "GpuStorageTextureBindingLayout",
     "GpuStoreOp",
     "GpuSupportedFeatures",

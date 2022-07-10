@@ -9,7 +9,7 @@ use crate::Untyped;
 
 use crate::texture::format::TextureFormatId;
 use web_sys::{
-    GpuBindGroupLayout, GpuBindGroupLayoutDescriptor, GpuBindGroupLayoutEntry,
+    GpuBindGroupLayout, GpuBindGroupLayoutDescriptor, GpuBindGroupLayoutEntry, GpuStorageTextureAccess,
     GpuBufferBindingLayout, GpuBufferBindingType, GpuSamplerBindingLayout, GpuSamplerBindingType,
     GpuStorageTextureBindingLayout, GpuTextureBindingLayout, GpuTextureSampleType,
     GpuTextureViewDimension,
@@ -138,6 +138,7 @@ impl<T> BindGroupLayout<T> {
                         let mut storage_texture =
                             GpuStorageTextureBindingLayout::new(format.to_web_sys());
 
+                        storage_texture.access(GpuStorageTextureAccess::WriteOnly);
                         storage_texture.view_dimension(GpuTextureViewDimension::N1d);
 
                         entry.storage_texture(&storage_texture);
@@ -146,6 +147,7 @@ impl<T> BindGroupLayout<T> {
                         let mut storage_texture =
                             GpuStorageTextureBindingLayout::new(format.to_web_sys());
 
+                        storage_texture.access(GpuStorageTextureAccess::WriteOnly);
                         storage_texture.view_dimension(GpuTextureViewDimension::N2d);
 
                         entry.storage_texture(&storage_texture);
@@ -154,6 +156,7 @@ impl<T> BindGroupLayout<T> {
                         let mut storage_texture =
                             GpuStorageTextureBindingLayout::new(format.to_web_sys());
 
+                        storage_texture.access(GpuStorageTextureAccess::WriteOnly);
                         storage_texture.view_dimension(GpuTextureViewDimension::N2dArray);
 
                         entry.storage_texture(&storage_texture);
@@ -162,6 +165,7 @@ impl<T> BindGroupLayout<T> {
                         let mut storage_texture =
                             GpuStorageTextureBindingLayout::new(format.to_web_sys());
 
+                        storage_texture.access(GpuStorageTextureAccess::WriteOnly);
                         storage_texture.view_dimension(GpuTextureViewDimension::N3d);
 
                         entry.storage_texture(&storage_texture);
