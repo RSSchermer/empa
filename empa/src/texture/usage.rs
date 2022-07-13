@@ -7,7 +7,7 @@ mod usage_flags_seal {
     }
 }
 
-pub trait UsageFlags: usage_flags_seal::Seal {}
+pub trait UsageFlags: usage_flags_seal::Seal + Clone + Copy {}
 
 pub struct Usages<
     RenderAttachment: TypeFlag,
@@ -23,6 +23,31 @@ pub struct Usages<
         CopyDst,
         CopySrc,
     )>,
+}
+
+impl<
+        RenderAttachment: TypeFlag,
+        StorageBinding: TypeFlag,
+        TextureBinding: TypeFlag,
+        CopyDst: TypeFlag,
+        CopySrc: TypeFlag,
+    > Clone for Usages<RenderAttachment, StorageBinding, TextureBinding, CopyDst, CopySrc>
+{
+    fn clone(&self) -> Self {
+        Usages {
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<
+        RenderAttachment: TypeFlag,
+        StorageBinding: TypeFlag,
+        TextureBinding: TypeFlag,
+        CopyDst: TypeFlag,
+        CopySrc: TypeFlag,
+    > Copy for Usages<RenderAttachment, StorageBinding, TextureBinding, CopyDst, CopySrc>
+{
 }
 
 impl<

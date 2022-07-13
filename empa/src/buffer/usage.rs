@@ -7,7 +7,7 @@ mod usage_flags_seal {
     }
 }
 
-pub trait UsageFlags: usage_flags_seal::Seal {}
+pub trait UsageFlags: usage_flags_seal::Seal + Clone + Copy {}
 
 pub trait ValidUsageFlags: UsageFlags {}
 
@@ -50,6 +50,65 @@ pub struct Usages<
         MapWrite,
         MapRead,
     )>,
+}
+
+impl<
+        QueryResolve: TypeFlag,
+        Indirect: TypeFlag,
+        StorageBinding: TypeFlag,
+        UniformBinding: TypeFlag,
+        Vertex: TypeFlag,
+        Index: TypeFlag,
+        CopyDst: TypeFlag,
+        CopySrc: TypeFlag,
+        MapWrite: TypeFlag,
+        MapRead: TypeFlag,
+    > Clone
+    for Usages<
+        QueryResolve,
+        Indirect,
+        StorageBinding,
+        UniformBinding,
+        Vertex,
+        Index,
+        CopyDst,
+        CopySrc,
+        MapWrite,
+        MapRead,
+    >
+{
+    fn clone(&self) -> Self {
+        Usages {
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<
+        QueryResolve: TypeFlag,
+        Indirect: TypeFlag,
+        StorageBinding: TypeFlag,
+        UniformBinding: TypeFlag,
+        Vertex: TypeFlag,
+        Index: TypeFlag,
+        CopyDst: TypeFlag,
+        CopySrc: TypeFlag,
+        MapWrite: TypeFlag,
+        MapRead: TypeFlag,
+    > Copy
+    for Usages<
+        QueryResolve,
+        Indirect,
+        StorageBinding,
+        UniformBinding,
+        Vertex,
+        Index,
+        CopyDst,
+        CopySrc,
+        MapWrite,
+        MapRead,
+    >
+{
 }
 
 impl<

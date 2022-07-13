@@ -68,13 +68,13 @@ pub struct Texture3D<F, Usage> {
     height: u32,
     depth: u32,
     view_formats: StaticVec<TextureFormatId, 8>,
-    _usage: marker::PhantomData<Usage>,
+    usage: Usage,
 }
 
 impl<F, U> Texture3D<F, U>
-    where
-        F: Texture3DFormat,
-        U: UsageFlags,
+where
+    F: Texture3DFormat,
+    U: UsageFlags,
 {
     pub(crate) fn new<V: ViewFormats<F>>(
         device: &Device,
@@ -86,6 +86,7 @@ impl<F, U> Texture3D<F, U>
             height,
             depth,
             mipmap_levels,
+            usage,
             ..
         } = descriptor;
 
@@ -115,8 +116,17 @@ impl<F, U> Texture3D<F, U>
             depth: *depth,
             mip_level_count: mip_level_count as u8,
             view_formats,
-            _usage: Default::default(),
+            usage: *usage,
         }
+    }
+}
+
+impl<F, U> Texture3D<F, U>
+where
+    U: UsageFlags,
+{
+    pub fn usage(&self) -> U {
+        self.usage
     }
 }
 
@@ -136,7 +146,6 @@ impl<F, U> Texture3D<F, U> {
     pub fn depth(&self) -> u32 {
         self.depth
     }
-
 
     fn view_internal(
         &self,
@@ -176,9 +185,9 @@ impl<F, U> Texture3D<F, U> {
     }
 
     pub fn sampled_float(&self, descriptor: &View3DDescriptor) -> Sampled3DFloat
-        where
-            F: FloatSamplable,
-            U: TextureBinding,
+    where
+        F: FloatSamplable,
+        U: TextureBinding,
     {
         Sampled3DFloat {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -190,9 +199,9 @@ impl<F, U> Texture3D<F, U> {
         &self,
         descriptor: &View3DDescriptor,
     ) -> Result<Sampled3DFloat, UnsupportedViewFormat>
-        where
-            ViewedFormat: ViewFormat<F> + FloatSamplable,
-            U: TextureBinding,
+    where
+        ViewedFormat: ViewFormat<F> + FloatSamplable,
+        U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled3DFloat {
@@ -211,9 +220,9 @@ impl<F, U> Texture3D<F, U> {
         &self,
         descriptor: &View3DDescriptor,
     ) -> Sampled3DUnfilteredFloat
-        where
-            F: UnfilteredFloatSamplable,
-            U: TextureBinding,
+    where
+        F: UnfilteredFloatSamplable,
+        U: TextureBinding,
     {
         Sampled3DUnfilteredFloat {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -225,9 +234,9 @@ impl<F, U> Texture3D<F, U> {
         &self,
         descriptor: &View3DDescriptor,
     ) -> Result<Sampled3DUnfilteredFloat, UnsupportedViewFormat>
-        where
-            ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
-            U: TextureBinding,
+    where
+        ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
+        U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled3DUnfilteredFloat {
@@ -243,9 +252,9 @@ impl<F, U> Texture3D<F, U> {
     }
 
     pub fn sampled_signed_integer(&self, descriptor: &View3DDescriptor) -> Sampled3DSignedInteger
-        where
-            F: SignedIntegerSamplable,
-            U: TextureBinding,
+    where
+        F: SignedIntegerSamplable,
+        U: TextureBinding,
     {
         Sampled3DSignedInteger {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -257,9 +266,9 @@ impl<F, U> Texture3D<F, U> {
         &self,
         descriptor: &View3DDescriptor,
     ) -> Result<Sampled3DSignedInteger, UnsupportedViewFormat>
-        where
-            ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
-            U: TextureBinding,
+    where
+        ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
+        U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled3DSignedInteger {
@@ -278,9 +287,9 @@ impl<F, U> Texture3D<F, U> {
         &self,
         descriptor: &View3DDescriptor,
     ) -> Sampled3DUnsignedInteger
-        where
-            F: UnsignedIntegerSamplable,
-            U: TextureBinding,
+    where
+        F: UnsignedIntegerSamplable,
+        U: TextureBinding,
     {
         Sampled3DUnsignedInteger {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -292,9 +301,9 @@ impl<F, U> Texture3D<F, U> {
         &self,
         descriptor: &View3DDescriptor,
     ) -> Result<Sampled3DUnsignedInteger, UnsupportedViewFormat>
-        where
-            ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
-            U: TextureBinding,
+    where
+        ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
+        U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled3DUnsignedInteger {
@@ -310,9 +319,9 @@ impl<F, U> Texture3D<F, U> {
     }
 
     pub fn storage(&self, descriptor: &View3DDescriptor) -> Storage3D<F>
-        where
-            F: Storable,
-            U: StorageBinding,
+    where
+        F: Storable,
+        U: StorageBinding,
     {
         Storage3D {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
@@ -325,9 +334,9 @@ impl<F, U> Texture3D<F, U> {
         &self,
         descriptor: &View3DDescriptor,
     ) -> Result<Storage3D<ViewedFormat>, UnsupportedViewFormat>
-        where
-            ViewedFormat: ViewFormat<F> + Storable,
-            U: StorageBinding,
+    where
+        ViewedFormat: ViewFormat<F> + Storable,
+        U: StorageBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Storage3D {
@@ -408,9 +417,9 @@ impl<F, U> Texture3D<F, U> {
     }
 
     pub fn image_copy_to_buffer_src(&self, mipmap_level: u8) -> ImageCopySrc<F>
-        where
-            F: ImageCopyToBufferFormat,
-            U: CopySrc,
+    where
+        F: ImageCopyToBufferFormat,
+        U: CopySrc,
     {
         ImageCopySrc {
             inner: self.image_copy_internal(mipmap_level, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
@@ -418,9 +427,9 @@ impl<F, U> Texture3D<F, U> {
     }
 
     pub fn image_copy_from_buffer_dst(&self, mipmap_level: u8) -> ImageCopyDst<F>
-        where
-            F: ImageCopyFromBufferFormat,
-            U: CopyDst,
+    where
+        F: ImageCopyFromBufferFormat,
+        U: CopyDst,
     {
         ImageCopyDst {
             inner: self.image_copy_internal(mipmap_level, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
@@ -428,9 +437,9 @@ impl<F, U> Texture3D<F, U> {
     }
 
     pub fn image_copy_to_texture_src(&self, mipmap_level: u8) -> ImageCopyToTextureSrc<F>
-        where
-            F: ImageCopyTextureFormat,
-            U: CopySrc,
+    where
+        F: ImageCopyTextureFormat,
+        U: CopySrc,
     {
         ImageCopyToTextureSrc {
             inner: self.image_copy_internal(mipmap_level, 0, F::BLOCK_SIZE),
@@ -438,9 +447,9 @@ impl<F, U> Texture3D<F, U> {
     }
 
     pub fn image_copy_from_texture_dst(&self, mipmap_level: u8) -> ImageCopyFromTextureDst<F>
-        where
-            F: ImageCopyTextureFormat,
-            U: CopyDst,
+    where
+        F: ImageCopyTextureFormat,
+        U: CopyDst,
     {
         ImageCopyFromTextureDst {
             inner: self.image_copy_internal(mipmap_level, 0, F::BLOCK_SIZE),
@@ -451,9 +460,9 @@ impl<F, U> Texture3D<F, U> {
         &self,
         descriptor: SubImageCopy3DDescriptor,
     ) -> SubImageCopySrc<F>
-        where
-            F: ImageCopyToBufferFormat + SubImageCopyFormat,
-            U: CopySrc,
+    where
+        F: ImageCopyToBufferFormat + SubImageCopyFormat,
+        U: CopySrc,
     {
         SubImageCopySrc {
             inner: self.sub_image_copy_internal(descriptor, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
@@ -464,9 +473,9 @@ impl<F, U> Texture3D<F, U> {
         &self,
         descriptor: SubImageCopy3DDescriptor,
     ) -> SubImageCopyDst<F>
-        where
-            F: ImageCopyFromBufferFormat + SubImageCopyFormat,
-            U: CopyDst,
+    where
+        F: ImageCopyFromBufferFormat + SubImageCopyFormat,
+        U: CopyDst,
     {
         SubImageCopyDst {
             inner: self.sub_image_copy_internal(descriptor, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
@@ -477,9 +486,9 @@ impl<F, U> Texture3D<F, U> {
         &self,
         descriptor: SubImageCopy3DDescriptor,
     ) -> SubImageCopyToTextureSrc<F>
-        where
-            F: ImageCopyTextureFormat + SubImageCopyFormat,
-            U: CopySrc,
+    where
+        F: ImageCopyTextureFormat + SubImageCopyFormat,
+        U: CopySrc,
     {
         SubImageCopyToTextureSrc {
             inner: self.sub_image_copy_internal(descriptor, 0, F::BLOCK_SIZE),
@@ -490,9 +499,9 @@ impl<F, U> Texture3D<F, U> {
         &self,
         descriptor: SubImageCopy3DDescriptor,
     ) -> SubImageCopyFromTextureDst<F>
-        where
-            F: ImageCopyTextureFormat + SubImageCopyFormat,
-            U: CopyDst,
+    where
+        F: ImageCopyTextureFormat + SubImageCopyFormat,
+        U: CopyDst,
     {
         SubImageCopyFromTextureDst {
             inner: self.sub_image_copy_internal(descriptor, 0, F::BLOCK_SIZE),

@@ -27,7 +27,7 @@ where
     V: ViewFormats<F>,
 {
     pub format: F,
-    pub usages: U,
+    pub usage: U,
     pub view_formats: V,
     pub size: u32,
 }
@@ -37,20 +37,23 @@ pub struct Texture1D<F, Usage> {
     format: FormatKind<F>,
     size: u32,
     view_formats: StaticVec<TextureFormatId, 8>,
-    _usage: marker::PhantomData<Usage>,
+    usage: Usage,
 }
 
 impl<F, U> Texture1D<F, U>
-    where
-        F: Texture1DFormat,
-        U: UsageFlags,
+where
+    F: Texture1DFormat,
+    U: UsageFlags,
 {
     pub(crate) fn new<V: ViewFormats<F>>(
         device: &Device,
         descriptor: &Texture1DDescriptor<F, U, V>,
     ) -> Self {
         let Texture1DDescriptor {
-            view_formats, size, ..
+            view_formats,
+            size,
+            usage,
+            ..
         } = descriptor;
 
         assert!(*size > 0, "size must be greater than `0`");
@@ -69,8 +72,17 @@ impl<F, U> Texture1D<F, U>
             format: FormatKind::Typed(Default::default()),
             size: *size,
             view_formats,
-            _usage: Default::default(),
+            usage: *usage,
         }
+    }
+}
+
+impl<F, U> Texture1D<F, U>
+where
+    U: UsageFlags,
+{
+    pub fn usage(&self) -> U {
+        self.usage
     }
 }
 
@@ -93,9 +105,9 @@ impl<F, U> Texture1D<F, U> {
     }
 
     pub fn sampled_float(&self) -> Sampled1DFloat
-        where
-            F: FloatSamplable,
-            U: TextureBinding,
+    where
+        F: FloatSamplable,
+        U: TextureBinding,
     {
         Sampled1DFloat {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys()),
@@ -106,9 +118,9 @@ impl<F, U> Texture1D<F, U> {
     pub fn try_as_sampled_float<ViewedFormat>(
         &self,
     ) -> Result<Sampled1DFloat, UnsupportedViewFormat>
-        where
-            ViewedFormat: ViewFormat<F> + FloatSamplable,
-            U: TextureBinding,
+    where
+        ViewedFormat: ViewFormat<F> + FloatSamplable,
+        U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled1DFloat {
@@ -124,9 +136,9 @@ impl<F, U> Texture1D<F, U> {
     }
 
     pub fn sampled_unfiltered_float(&self) -> Sampled1DUnfilteredFloat
-        where
-            F: UnfilteredFloatSamplable,
-            U: TextureBinding,
+    where
+        F: UnfilteredFloatSamplable,
+        U: TextureBinding,
     {
         Sampled1DUnfilteredFloat {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys()),
@@ -137,9 +149,9 @@ impl<F, U> Texture1D<F, U> {
     pub fn try_as_sampled_unfiltered_float<ViewedFormat>(
         &self,
     ) -> Result<Sampled1DUnfilteredFloat, UnsupportedViewFormat>
-        where
-            ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
-            U: TextureBinding,
+    where
+        ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
+        U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled1DUnfilteredFloat {
@@ -155,9 +167,9 @@ impl<F, U> Texture1D<F, U> {
     }
 
     pub fn sampled_signed_integer(&self) -> Sampled1DSignedInteger
-        where
-            F: SignedIntegerSamplable,
-            U: TextureBinding,
+    where
+        F: SignedIntegerSamplable,
+        U: TextureBinding,
     {
         Sampled1DSignedInteger {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys()),
@@ -168,9 +180,9 @@ impl<F, U> Texture1D<F, U> {
     pub fn try_as_sampled_signed_integer<ViewedFormat>(
         &self,
     ) -> Result<Sampled1DSignedInteger, UnsupportedViewFormat>
-        where
-            ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
-            U: TextureBinding,
+    where
+        ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
+        U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled1DSignedInteger {
@@ -186,9 +198,9 @@ impl<F, U> Texture1D<F, U> {
     }
 
     pub fn sampled_unsigned_integer(&self) -> Sampled1DUnsignedInteger
-        where
-            F: UnsignedIntegerSamplable,
-            U: TextureBinding,
+    where
+        F: UnsignedIntegerSamplable,
+        U: TextureBinding,
     {
         Sampled1DUnsignedInteger {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys()),
@@ -199,9 +211,9 @@ impl<F, U> Texture1D<F, U> {
     pub fn try_as_sampled_unsigned_integer<ViewedFormat>(
         &self,
     ) -> Result<Sampled1DUnsignedInteger, UnsupportedViewFormat>
-        where
-            ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
-            U: TextureBinding,
+    where
+        ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
+        U: TextureBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled1DUnsignedInteger {
@@ -217,9 +229,9 @@ impl<F, U> Texture1D<F, U> {
     }
 
     pub fn storage(&self) -> Storage1D<F>
-        where
-            F: Storable,
-            U: StorageBinding,
+    where
+        F: Storable,
+        U: StorageBinding,
     {
         Storage1D {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys()),
@@ -231,9 +243,9 @@ impl<F, U> Texture1D<F, U> {
     pub fn try_as_storage<ViewedFormat>(
         &self,
     ) -> Result<Storage1D<ViewedFormat>, UnsupportedViewFormat>
-        where
-            ViewedFormat: ViewFormat<F> + Storable,
-            U: StorageBinding,
+    where
+        ViewedFormat: ViewFormat<F> + Storable,
+        U: StorageBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Storage1D {
@@ -274,9 +286,9 @@ impl<F, U> Texture1D<F, U> {
     }
 
     pub fn image_copy_to_buffer_src(&self) -> ImageCopySrc<F>
-        where
-            F: ImageCopyToBufferFormat,
-            U: CopySrc,
+    where
+        F: ImageCopyToBufferFormat,
+        U: CopySrc,
     {
         ImageCopySrc {
             inner: self.image_copy_internal(0, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
@@ -284,9 +296,9 @@ impl<F, U> Texture1D<F, U> {
     }
 
     pub fn image_copy_from_buffer_dst(&self) -> ImageCopyDst<F>
-        where
-            F: ImageCopyFromBufferFormat,
-            U: CopyDst,
+    where
+        F: ImageCopyFromBufferFormat,
+        U: CopyDst,
     {
         ImageCopyDst {
             inner: self.image_copy_internal(0, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
@@ -294,9 +306,9 @@ impl<F, U> Texture1D<F, U> {
     }
 
     pub fn image_copy_to_texture_src(&self) -> ImageCopyToTextureSrc<F>
-        where
-            F: ImageCopyTextureFormat,
-            U: CopySrc,
+    where
+        F: ImageCopyTextureFormat,
+        U: CopySrc,
     {
         ImageCopyToTextureSrc {
             inner: self.image_copy_internal(0, 0, F::BLOCK_SIZE),
@@ -304,9 +316,9 @@ impl<F, U> Texture1D<F, U> {
     }
 
     pub fn image_copy_from_texture_dst(&self) -> ImageCopyFromTextureDst<F>
-        where
-            F: ImageCopyTextureFormat,
-            U: CopyDst,
+    where
+        F: ImageCopyTextureFormat,
+        U: CopyDst,
     {
         ImageCopyFromTextureDst {
             inner: self.image_copy_internal(0, 0, F::BLOCK_SIZE),
@@ -314,9 +326,9 @@ impl<F, U> Texture1D<F, U> {
     }
 
     pub fn sub_image_copy_to_buffer_src(&self, origin: u32) -> SubImageCopySrc<F>
-        where
-            F: ImageCopyToBufferFormat + SubImageCopyFormat,
-            U: CopySrc,
+    where
+        F: ImageCopyToBufferFormat + SubImageCopyFormat,
+        U: CopySrc,
     {
         SubImageCopySrc {
             inner: self.image_copy_internal(origin, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
@@ -324,9 +336,9 @@ impl<F, U> Texture1D<F, U> {
     }
 
     pub fn sub_image_copy_from_buffer_dst(&self, origin: u32) -> SubImageCopyDst<F>
-        where
-            F: ImageCopyFromBufferFormat + SubImageCopyFormat,
-            U: CopyDst,
+    where
+        F: ImageCopyFromBufferFormat + SubImageCopyFormat,
+        U: CopyDst,
     {
         SubImageCopyDst {
             inner: self.image_copy_internal(origin, F::BYTES_PER_BLOCK, F::BLOCK_SIZE),
@@ -334,9 +346,9 @@ impl<F, U> Texture1D<F, U> {
     }
 
     pub fn sub_image_copy_to_texture_src(&self, origin: u32) -> SubImageCopyToTextureSrc<F>
-        where
-            F: ImageCopyTextureFormat + SubImageCopyFormat,
-            U: CopySrc,
+    where
+        F: ImageCopyTextureFormat + SubImageCopyFormat,
+        U: CopySrc,
     {
         SubImageCopyToTextureSrc {
             inner: self.image_copy_internal(origin, 0, F::BLOCK_SIZE),
@@ -344,9 +356,9 @@ impl<F, U> Texture1D<F, U> {
     }
 
     pub fn sub_image_copy_from_texture_dst(&self, origin: u32) -> SubImageCopyFromTextureDst<F>
-        where
-            F: ImageCopyTextureFormat + SubImageCopyFormat,
-            U: CopyDst,
+    where
+        F: ImageCopyTextureFormat + SubImageCopyFormat,
+        U: CopyDst,
     {
         SubImageCopyFromTextureDst {
             inner: self.image_copy_internal(origin, 0, F::BLOCK_SIZE),

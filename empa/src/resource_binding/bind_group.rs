@@ -142,7 +142,10 @@ pub unsafe trait Resource {
     fn to_entry(&self) -> BindGroupEntry;
 }
 
-unsafe impl<T> Resource for &'_ T where T: Resource {
+unsafe impl<T> Resource for &'_ T
+where
+    T: Resource,
+{
     type Binding = T::Binding;
 
     fn to_entry(&self) -> BindGroupEntry {

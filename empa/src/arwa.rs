@@ -216,6 +216,7 @@ impl CanvasContext {
             view_formats,
             color_space,
             compositing_alpha_mode,
+            usage,
             ..
         } = configuration;
 
@@ -241,6 +242,7 @@ impl CanvasContext {
             inner: self.inner,
             canvas: self.canvas,
             view_formats: view_formats.formats().collect(),
+            usage: *usage,
             _marker: Default::default(),
         }
     }
@@ -250,7 +252,8 @@ pub struct ConfiguredCanvasContext<F, U> {
     inner: GpuCanvasContext,
     canvas: HtmlCanvasElement,
     view_formats: StaticVec<TextureFormatId, 8>,
-    _marker: marker::PhantomData<(F, U)>,
+    usage: U,
+    _marker: marker::PhantomData<F>,
 }
 
 impl<F, U> ConfiguredCanvasContext<F, U>
@@ -268,6 +271,7 @@ where
             self.canvas.width(),
             self.canvas.height(),
             &self.view_formats,
+            self.usage,
         )
     }
 

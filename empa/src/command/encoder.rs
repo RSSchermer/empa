@@ -35,7 +35,7 @@ enum ResourceDestroyer {
     Texture(Arc<TextureDestroyer>),
     BindGroup(Arc<Vec<EntryDestroyer>>),
     RenderTarget(Arc<StaticVec<Arc<TextureDestroyer>, 9>>),
-    RenderBundle(Arc<Vec<ResourceDestroyer>>)
+    RenderBundle(Arc<Vec<ResourceDestroyer>>),
 }
 
 impl From<Arc<BufferDestroyer>> for ResourceDestroyer {
@@ -1187,7 +1187,9 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
 
         inner.execute_bundles(array.as_ref());
 
-        command_encoder._resource_destroyers.push(render_bundle._resource_destroyers.clone().into());
+        command_encoder
+            ._resource_destroyers
+            .push(render_bundle._resource_destroyers.clone().into());
 
         RenderPassEncoder {
             inner,
@@ -1222,7 +1224,9 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
 
             array.push(bundle.inner.as_ref());
 
-            command_encoder._resource_destroyers.push(bundle._resource_destroyers.clone().into());
+            command_encoder
+                ._resource_destroyers
+                .push(bundle._resource_destroyers.clone().into());
         }
 
         inner.execute_bundles(array.as_ref());

@@ -17,7 +17,8 @@ use web_sys::{GpuBuffer, GpuBufferDescriptor, GpuImageCopyBuffer};
 
 use crate::abi;
 use crate::buffer::{
-    CopyDst, CopySrc, MapRead, MapWrite, StorageBinding, UniformBinding, ValidUsageFlags,
+    CopyDst, CopySrc, MapRead, MapWrite, StorageBinding, UniformBinding, UsageFlags,
+    ValidUsageFlags,
 };
 use crate::device::{Device, ID_GEN};
 use crate::texture::{ImageCopySize3D, ImageDataByteLayout, ImageDataLayout};
@@ -57,7 +58,7 @@ where
         &self,
         device: &Device,
         mapped_at_creation: bool,
-        _usage: Usage,
+        usage: Usage,
     ) -> Buffer<T, Usage>
     where
         Usage: ValidUsageFlags,
@@ -93,8 +94,8 @@ where
             id,
             len: 1,
             map_context: Mutex::new(map_context),
+            usage,
             _marker: Default::default(),
-            _usages: Default::default(),
         }
     }
 }
@@ -108,7 +109,7 @@ where
         &self,
         device: &Device,
         mapped_at_creation: bool,
-        _usage: Usage,
+        usage: Usage,
     ) -> Buffer<[T], Usage>
     where
         Usage: ValidUsageFlags,
@@ -147,8 +148,8 @@ where
             id,
             len: slice_len,
             map_context: Mutex::new(map_context),
+            usage,
             _marker: Default::default(),
-            _usages: Default::default(),
         }
     }
 }
@@ -177,8 +178,8 @@ where
     id: usize,
     len: usize,
     map_context: Mutex<MapContext>,
+    usage: U,
     _marker: marker::PhantomData<T>,
-    _usages: marker::PhantomData<U>,
 }
 
 impl<T, U> Buffer<T, U>
@@ -225,11 +226,21 @@ where
     }
 }
 
+impl<T, U> Buffer<T, U>
+where
+    T: ?Sized,
+    U: UsageFlags,
+{
+    pub fn usage(&self) -> U {
+        self.usage
+    }
+}
+
 impl<T, U> Buffer<MaybeUninit<T>, U>
 where
     U: ValidUsageFlags,
 {
-    pub(crate) fn create_uninit(device: &Device, mapped_at_creation: bool, _usage: U) -> Self {
+    pub(crate) fn create_uninit(device: &Device, mapped_at_creation: bool, usage: U) -> Self {
         let id = ID_GEN.get();
         let size_in_bytes = mem::size_of::<T>();
         let mut desc = GpuBufferDescriptor::new(size_in_bytes as f64, U::BITS);
@@ -249,8 +260,8 @@ where
             id,
             len: 1,
             map_context: Mutex::new(map_context),
+            usage,
             _marker: Default::default(),
-            _usages: Default::default(),
         }
     }
 }
@@ -268,8 +279,8 @@ impl<T, U> Buffer<MaybeUninit<T>, U> {
             id: self.id,
             len: 1,
             map_context: self.map_context,
+            usage: self.usage,
             _marker: Default::default(),
-            _usages: Default::default(),
         }
     }
 }
@@ -282,7 +293,7 @@ where
         device: &Device,
         len: usize,
         mapped_at_creation: bool,
-        _usage: U,
+        usage: U,
     ) -> Self {
         let id = ID_GEN.get();
         let size_in_bytes = mem::size_of::<T>() * len;
@@ -303,8 +314,8 @@ where
             id,
             len,
             map_context: Mutex::new(map_context),
+            usage,
             _marker: Default::default(),
-            _usages: Default::default(),
         }
     }
 }
@@ -322,8 +333,8 @@ impl<T, U> Buffer<[MaybeUninit<T>], U> {
             id: self.id,
             len: self.len,
             map_context: self.map_context,
+            usage: self.usage,
             _marker: Default::default(),
-            _usages: Default::default(),
         }
     }
 }
@@ -658,6 +669,16 @@ where
 
     pub(crate) fn as_web_sys(self) -> &'a GpuBuffer {
         self.buffer.as_web_sys()
+    }
+}
+
+impl<'a, T, U> View<'a, T, U>
+where
+    T: ?Sized,
+    U: UsageFlags,
+{
+    pub fn usage(&self) -> U {
+        self.buffer.usage
     }
 }
 

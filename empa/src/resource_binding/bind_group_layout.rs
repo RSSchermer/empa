@@ -9,10 +9,10 @@ use crate::Untyped;
 
 use crate::texture::format::TextureFormatId;
 use web_sys::{
-    GpuBindGroupLayout, GpuBindGroupLayoutDescriptor, GpuBindGroupLayoutEntry, GpuStorageTextureAccess,
+    GpuBindGroupLayout, GpuBindGroupLayoutDescriptor, GpuBindGroupLayoutEntry,
     GpuBufferBindingLayout, GpuBufferBindingType, GpuSamplerBindingLayout, GpuSamplerBindingType,
-    GpuStorageTextureBindingLayout, GpuTextureBindingLayout, GpuTextureSampleType,
-    GpuTextureViewDimension,
+    GpuStorageTextureAccess, GpuStorageTextureBindingLayout, GpuTextureBindingLayout,
+    GpuTextureSampleType, GpuTextureViewDimension,
 };
 
 pub struct BindGroupLayoutEncoding {
