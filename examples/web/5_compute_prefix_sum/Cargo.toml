@@ -1,0 +1,13 @@
+[package]
+name = "compute-prefix-sum-example"
+version = "0.1.0"
+authors = ["Roland Schermer <roland0507@gmail.com>"]
+edition = "2021"
+license = "MIT"
+publish = false
+
+[dependencies]
+arwa = { version = "0.1.0", path = "../../../../rudo/arwa" }
+empa = { version = "0.1.0", path = "../../../empa", features = ["arwa"] }
+futures = "0.3.21"
+wasm-bindgen = "0.2.81"
