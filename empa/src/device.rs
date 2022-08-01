@@ -32,6 +32,7 @@ use crate::texture::{
 };
 use crate::{buffer, texture};
 use std::{mem, slice};
+use zeroable::Zeroable;
 
 lazy_static! {
     pub(crate) static ref ID_GEN: RelaxedCounter = RelaxedCounter::new(1);
@@ -105,6 +106,22 @@ impl Device {
         U: buffer::ValidUsageFlags,
     {
         Buffer::create_slice_uninit(self, len, true, usage)
+    }
+
+    pub fn create_slice_buffer_zeroed<T, U>(&self, len: usize, usage: U) -> Buffer<[T], U>
+    where
+        T: Zeroable,
+        U: buffer::ValidUsageFlags,
+    {
+        unsafe { Buffer::create_slice_uninit(self, len, false, usage).assume_init() }
+    }
+
+    pub fn create_slice_buffer_zeroed_mapped<T, U>(&self, len: usize, usage: U) -> Buffer<[T], U>
+    where
+        T: Zeroable,
+        U: buffer::ValidUsageFlags,
+    {
+        unsafe { Buffer::create_slice_uninit(self, len, true, usage).assume_init() }
     }
 
     pub fn create_bind_group_layout<T>(&self) -> BindGroupLayout<T>

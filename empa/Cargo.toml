@@ -17,9 +17,10 @@ empa-reflect = { version = "0.1.0", path = "../empa_reflect" }
 futures = "0.3.21"
 lazy_static = "1.4.0"
 js-sys = "0.3.58"
-staticvec = "0.11.5"
+staticvec = { version = "0.11.6", path = "../../staticvec" }
 wasm-bindgen = "0.2.81"
 wasm-bindgen-futures = "0.4.31"
+zeroable = "0.2.0"
 
 [dependencies.memoffset]
 version = "0.6"

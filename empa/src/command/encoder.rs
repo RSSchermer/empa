@@ -93,7 +93,7 @@ impl CommandEncoder {
     }
 
     pub fn copy_buffer_to_buffer<T, U0, U1>(
-        self,
+        mut self,
         src: buffer::View<T, U0>,
         dst: buffer::View<T, U1>,
     ) -> CommandEncoder
@@ -129,11 +129,16 @@ impl CommandEncoder {
             size as u32,
         );
 
+        self._resource_destroyers
+            .push(src.buffer.inner.clone().into());
+        self._resource_destroyers
+            .push(dst.buffer.inner.clone().into());
+
         self
     }
 
     pub fn copy_buffer_to_buffer_slice<T, U0, U1>(
-        self,
+        mut self,
         src: buffer::View<[T], U0>,
         dst: buffer::View<[T], U1>,
     ) -> CommandEncoder
@@ -174,6 +179,11 @@ impl CommandEncoder {
             dst_offset,
             size as u32,
         );
+
+        self._resource_destroyers
+            .push(src.buffer.inner.clone().into());
+        self._resource_destroyers
+            .push(dst.buffer.inner.clone().into());
 
         self
     }
