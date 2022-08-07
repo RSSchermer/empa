@@ -11,6 +11,8 @@ use web_sys::{
     GpuRenderPassDescriptor, GpuRenderPassEncoder,
 };
 
+use crate::abi;
+use crate::abi::{MemoryUnit, MemoryUnitLayout};
 use crate::buffer::BufferDestroyer;
 use crate::command::{
     BindGroupEncoding, BindGroups, IndexBuffer, IndexBufferEncoding, VertexBufferEncoding,
@@ -588,6 +590,23 @@ pub struct DispatchWorkgroups {
     pub count_z: u32,
 }
 
+unsafe impl abi::Sized for DispatchWorkgroups {
+    const LAYOUT: &'static [MemoryUnit] = &[
+        MemoryUnit {
+            offset: 0,
+            layout: MemoryUnitLayout::UnsignedInteger,
+        },
+        MemoryUnit {
+            offset: 4,
+            layout: MemoryUnitLayout::UnsignedInteger,
+        },
+        MemoryUnit {
+            offset: 8,
+            layout: MemoryUnitLayout::UnsignedInteger,
+        },
+    ];
+}
+
 pub struct ComputePassEncoder<Pipeline, Resources> {
     inner: GpuComputePassEncoder,
     command_encoder: CommandEncoder,
@@ -695,8 +714,10 @@ where
     where
         U: buffer::Indirect,
     {
-        self.inner
-            .dispatch_workgroups_indirect_with_u32(view.as_web_sys(), view.size_in_bytes() as u32);
+        self.inner.dispatch_workgroups_indirect_with_u32(
+            view.as_web_sys(),
+            view.offset_in_bytes() as u32,
+        );
 
         self
     }
@@ -711,6 +732,27 @@ pub struct Draw {
     pub first_instance: u32,
 }
 
+unsafe impl abi::Sized for Draw {
+    const LAYOUT: &'static [MemoryUnit] = &[
+        MemoryUnit {
+            offset: 0,
+            layout: MemoryUnitLayout::UnsignedInteger,
+        },
+        MemoryUnit {
+            offset: 4,
+            layout: MemoryUnitLayout::UnsignedInteger,
+        },
+        MemoryUnit {
+            offset: 8,
+            layout: MemoryUnitLayout::UnsignedInteger,
+        },
+        MemoryUnit {
+            offset: 12,
+            layout: MemoryUnitLayout::UnsignedInteger,
+        },
+    ];
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C)]
 pub struct DrawIndexed {
@@ -719,6 +761,31 @@ pub struct DrawIndexed {
     pub first_index: u32,
     pub base_vertex: u32,
     pub first_instance: u32,
+}
+
+unsafe impl abi::Sized for DrawIndexed {
+    const LAYOUT: &'static [MemoryUnit] = &[
+        MemoryUnit {
+            offset: 0,
+            layout: MemoryUnitLayout::UnsignedInteger,
+        },
+        MemoryUnit {
+            offset: 4,
+            layout: MemoryUnitLayout::UnsignedInteger,
+        },
+        MemoryUnit {
+            offset: 8,
+            layout: MemoryUnitLayout::UnsignedInteger,
+        },
+        MemoryUnit {
+            offset: 12,
+            layout: MemoryUnitLayout::UnsignedInteger,
+        },
+        MemoryUnit {
+            offset: 16,
+            layout: MemoryUnitLayout::UnsignedInteger,
+        },
+    ];
 }
 
 mod render_state_encoder_seal {
@@ -1284,7 +1351,7 @@ where
         U: buffer::Indirect,
     {
         self.inner
-            .draw_indirect_with_u32(view.as_web_sys(), view.size_in_bytes() as u32);
+            .draw_indirect_with_u32(view.as_web_sys(), view.offset_in_bytes() as u32);
 
         self
     }
@@ -1332,7 +1399,7 @@ where
         U: buffer::Indirect,
     {
         self.inner
-            .draw_indexed_indirect_with_u32(view.as_web_sys(), view.size_in_bytes() as u32);
+            .draw_indexed_indirect_with_u32(view.as_web_sys(), view.offset_in_bytes() as u32);
 
         self
     }
