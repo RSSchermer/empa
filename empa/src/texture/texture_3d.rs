@@ -147,6 +147,10 @@ impl<F, U> Texture3D<F, U> {
         self.depth
     }
 
+    pub fn levels(&self) -> u8 {
+        self.mip_level_count
+    }
+
     fn view_internal(
         &self,
         format: GpuTextureFormat,

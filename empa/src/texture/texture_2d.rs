@@ -274,6 +274,10 @@ impl<F, U> Texture2D<F, U> {
         self.layers
     }
 
+    pub fn levels(&self) -> u8 {
+        self.mip_level_count
+    }
+
     fn view_2d_internal(
         &self,
         format: GpuTextureFormat,
