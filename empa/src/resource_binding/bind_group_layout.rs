@@ -402,7 +402,7 @@ pub enum BindingType {
     ReadOnlyStorage(UnsizedBufferLayout),
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum TexelType {
     Float,
     UnfilterableFloat,
@@ -417,6 +417,22 @@ impl TexelType {
             TexelType::UnfilterableFloat => GpuTextureSampleType::UnfilterableFloat,
             TexelType::Integer => GpuTextureSampleType::Sint,
             TexelType::UnsignedInteger => GpuTextureSampleType::Uint,
+        }
+    }
+}
+
+impl PartialEq for TexelType {
+    fn eq(&self, other: &Self) -> bool {
+        // TODO: this is a temporary stop-gap solution around Naga's lack of distinction between
+        // filtered and unfiltered float types.
+        match (*self, *other) {
+            (TexelType::Float, TexelType::Float) => true,
+            (TexelType::UnfilterableFloat, TexelType::UnfilterableFloat) => true,
+            (TexelType::Integer, TexelType::Integer) => true,
+            (TexelType::UnsignedInteger, TexelType::UnsignedInteger) => true,
+            (TexelType::Float, TexelType::UnfilterableFloat) => true,
+            (TexelType::UnfilterableFloat, TexelType::Float) => true,
+            _ => false
         }
     }
 }
