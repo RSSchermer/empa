@@ -322,13 +322,38 @@ impl<F, U> Texture3D<F, U> {
         }
     }
 
-    pub fn storage(&self, descriptor: &View3DDescriptor) -> Storage3D<F>
+    fn storage_internal(
+        &self,
+        format: GpuTextureFormat,
+        mipmap_level: u8,
+    ) -> GpuTextureView {
+        let View3DDescriptor {
+            base_mipmap_level,
+            mipmap_level_count,
+        } = *descriptor;
+
+        assert!(
+            mipmap_level < self.mip_level_count,
+            "`mipmap_level` must not exceed the texture's mipmap level count"
+        );
+
+        let mut desc = GpuTextureViewDescriptor::new();
+
+        desc.dimension(GpuTextureViewDimension::N3d);
+        desc.format(format);
+        desc.base_mip_level(base_mipmap_level as u32);
+        desc.mip_level_count(1);
+
+        self.as_web_sys().create_view_with_descriptor(&desc)
+    }
+
+    pub fn storage(&self, mipmap_level: u8) -> Storage3D<F>
     where
         F: Storable,
         U: StorageBinding,
     {
         Storage3D {
-            inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
+            inner: self.storage_internal(F::FORMAT_ID.to_web_sys(), mipmap_level),
             texture_destroyer: self.inner.clone(),
             _marker: Default::default(),
         }
@@ -336,7 +361,7 @@ impl<F, U> Texture3D<F, U> {
 
     pub fn try_as_storage<ViewedFormat>(
         &self,
-        descriptor: &View3DDescriptor,
+        mipmap_level: u8,
     ) -> Result<Storage3D<ViewedFormat>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + Storable,
@@ -344,7 +369,7 @@ impl<F, U> Texture3D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Storage3D {
-                inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
+                inner: self.storage_internal(ViewedFormat::FORMAT_ID.to_web_sys(), mipmap_level),
                 texture_destroyer: self.inner.clone(),
                 _marker: Default::default(),
             })

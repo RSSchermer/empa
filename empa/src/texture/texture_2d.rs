@@ -1300,6 +1300,7 @@ impl<F, U> Texture2D<F, U> {
         desc.dimension(GpuTextureViewDimension::N2d);
         desc.format(ViewedFormat::FORMAT_ID.to_web_sys());
         desc.base_mip_level(mipmap_level as u32);
+        desc.mip_level_count(1);
 
         let inner = self.as_web_sys().create_view_with_descriptor(&desc);
 
