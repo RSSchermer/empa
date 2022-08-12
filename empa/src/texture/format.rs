@@ -534,6 +534,9 @@ impl UnfilteredFloatSamplable for bgra8unorm_srgb {}
 impl UnfilteredFloatSamplable for r16float {}
 impl UnfilteredFloatSamplable for rg16float {}
 impl UnfilteredFloatSamplable for rgba16float {}
+impl UnfilteredFloatSamplable for r32float {}
+impl UnfilteredFloatSamplable for rg32float {}
+impl UnfilteredFloatSamplable for rgba32float {}
 impl UnfilteredFloatSamplable for rgb10a2unorm {}
 impl UnfilteredFloatSamplable for rg11b10ufloat {}
 impl UnfilteredFloatSamplable for rgb9e5ufloat {}
@@ -589,9 +592,6 @@ impl UnfilteredFloatSamplable for astc_12x10_unorm {}
 impl UnfilteredFloatSamplable for astc_12x10_unorm_srgb {}
 impl UnfilteredFloatSamplable for astc_12x12_unorm {}
 impl UnfilteredFloatSamplable for astc_12x12_unorm_srgb {}
-impl UnfilteredFloatSamplable for r32float {}
-impl UnfilteredFloatSamplable for rg32float {}
-impl UnfilteredFloatSamplable for rgba32float {}
 
 pub trait SignedIntegerSamplable: TextureFormat {}
 
