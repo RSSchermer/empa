@@ -327,11 +327,6 @@ impl<F, U> Texture3D<F, U> {
         format: GpuTextureFormat,
         mipmap_level: u8,
     ) -> GpuTextureView {
-        let View3DDescriptor {
-            base_mipmap_level,
-            mipmap_level_count,
-        } = *descriptor;
-
         assert!(
             mipmap_level < self.mip_level_count,
             "`mipmap_level` must not exceed the texture's mipmap level count"
@@ -341,7 +336,7 @@ impl<F, U> Texture3D<F, U> {
 
         desc.dimension(GpuTextureViewDimension::N3d);
         desc.format(format);
-        desc.base_mip_level(base_mipmap_level as u32);
+        desc.base_mip_level(mipmap_level as u32);
         desc.mip_level_count(1);
 
         self.as_web_sys().create_view_with_descriptor(&desc)
