@@ -168,7 +168,7 @@ impl<F, U> Texture3D<F, U> {
 
         let mipmap_level_count = if let Some(mipmap_level_count) = mipmap_level_count {
             assert!(
-                base_mipmap_level + mipmap_level_count < self.mip_level_count,
+                base_mipmap_level + mipmap_level_count <= self.mip_level_count,
                 "`base_mipmap_level + mip_level_count` must not exceed the texture's mipmap \
                     level count"
             );
