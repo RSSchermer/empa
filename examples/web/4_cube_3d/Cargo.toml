@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 arwa = { version = "0.1.0", path = "../../../../rudo/arwa" }
 empa = { version = "0.1.0", path = "../../../empa", features = ["arwa"] }
-empa-cgmath = { version = "0.1.0", path = "../../../empa_cgmath" }
-cgmath = "0.18.0"
+empa-glam = { version = "0.1.0", path = "../../../empa_glam" }
+glam = "0.21.3"
 futures = "0.3.21"
 wasm-bindgen = "0.2.81"

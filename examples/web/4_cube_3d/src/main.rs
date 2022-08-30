@@ -6,7 +6,6 @@ use std::f32::consts::PI;
 use arwa::dom::{selector, ParentNode};
 use arwa::html::HtmlCanvasElement;
 use arwa::window::window;
-use cgmath::{Matrix4, PerspectiveFov, Rad, SquareMatrix, Vector3};
 use empa::abi;
 use empa::arwa::{
     CanvasConfiguration, CompositingAlphaMode, HtmlCanvasElementExt, NavigatorExt,
@@ -30,8 +29,9 @@ use empa::shader_module::{shader_source, ShaderSource};
 use empa::texture::format::{depth24plus, rgba8unorm};
 use empa::texture::{AttachableImageDescriptor, MipmapLevels, Texture2DDescriptor};
 use empa::{buffer, texture, CompareFunction};
-use empa_cgmath::ToAbi;
+use empa_glam::ToAbi;
 use futures::FutureExt;
+use glam::Mat4;
 
 #[derive(empa::render_pipeline::Vertex, Clone, Copy)]
 struct MyVertex {
@@ -169,19 +169,18 @@ async fn render() -> Result<(), Box<dyn Error>> {
 
     let index_buffer: Buffer<[u16], _> = device.create_buffer(index_data, buffer::Usages::index());
 
-    let view = Matrix4::from_translation(Vector3::new(0.0, 0.0, 30.0))
-        .invert()
-        .unwrap()
+    let view = glam::f32::Mat4::from_translation(glam::f32::Vec3::new(0.0, 0.0, 30.0))
+        .inverse()
         .to_abi();
-    let projection = Matrix4::from(PerspectiveFov {
-        fovy: Rad(0.3 * PI),
-        aspect: 1.0,
-        near: 1.0,
-        far: 100.0,
-    })
+    let projection = glam::f32::Mat4::perspective_rh(
+        0.3 * PI,
+        1.0,
+         1.0,
+        100.0,
+    )
     .to_abi();
     let uniforms = Uniforms {
-        model: Matrix4::identity().to_abi(),
+        model: glam::f32::Mat4::IDENTITY.to_abi(),
         view,
         projection,
     };
@@ -230,8 +229,8 @@ async fn render() -> Result<(), Box<dyn Error>> {
         let time = window.request_animation_frame().await;
         let time = time as f32;
 
-        let rotate_x = Matrix4::from_angle_x(Rad(time / 1000.0));
-        let rotate_y = Matrix4::from_angle_y(Rad(time / 1000.0));
+        let rotate_x = glam::f32::Mat4::from_rotation_x(time / 1000.0);
+        let rotate_y = glam::f32::Mat4::from_rotation_y(time / 1000.0);
         let model = rotate_y * rotate_x;
         let uniforms = Uniforms {
             model: model.to_abi(),

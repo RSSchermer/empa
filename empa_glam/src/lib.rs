@@ -1,4 +1,3 @@
-use cgmath::{Matrix2, Matrix3, Matrix4, Vector1, Vector2, Vector3, Vector4};
 use empa::abi;
 
 pub trait ToAbi {
@@ -7,15 +6,7 @@ pub trait ToAbi {
     fn to_abi(&self) -> Self::Abi;
 }
 
-impl ToAbi for Vector1<f32> {
-    type Abi = f32;
-
-    fn to_abi(&self) -> Self::Abi {
-        self.x
-    }
-}
-
-impl ToAbi for Vector2<f32> {
+impl ToAbi for glam::f32::Vec2 {
     type Abi = abi::Vec2<f32>;
 
     fn to_abi(&self) -> Self::Abi {
@@ -23,7 +14,7 @@ impl ToAbi for Vector2<f32> {
     }
 }
 
-impl ToAbi for Vector3<f32> {
+impl ToAbi for glam::f32::Vec3 {
     type Abi = abi::Vec3<f32>;
 
     fn to_abi(&self) -> Self::Abi {
@@ -31,7 +22,7 @@ impl ToAbi for Vector3<f32> {
     }
 }
 
-impl ToAbi for Vector4<f32> {
+impl ToAbi for glam::f32::Vec4 {
     type Abi = abi::Vec4<f32>;
 
     fn to_abi(&self) -> Self::Abi {
@@ -39,15 +30,7 @@ impl ToAbi for Vector4<f32> {
     }
 }
 
-impl ToAbi for Vector1<i32> {
-    type Abi = i32;
-
-    fn to_abi(&self) -> Self::Abi {
-        self.x
-    }
-}
-
-impl ToAbi for Vector2<i32> {
+impl ToAbi for glam::i32::IVec2 {
     type Abi = abi::Vec2<i32>;
 
     fn to_abi(&self) -> Self::Abi {
@@ -55,7 +38,7 @@ impl ToAbi for Vector2<i32> {
     }
 }
 
-impl ToAbi for Vector3<i32> {
+impl ToAbi for glam::i32::IVec3 {
     type Abi = abi::Vec3<i32>;
 
     fn to_abi(&self) -> Self::Abi {
@@ -63,7 +46,7 @@ impl ToAbi for Vector3<i32> {
     }
 }
 
-impl ToAbi for Vector4<i32> {
+impl ToAbi for glam::i32::IVec4 {
     type Abi = abi::Vec4<i32>;
 
     fn to_abi(&self) -> Self::Abi {
@@ -71,15 +54,7 @@ impl ToAbi for Vector4<i32> {
     }
 }
 
-impl ToAbi for Vector1<u32> {
-    type Abi = u32;
-
-    fn to_abi(&self) -> Self::Abi {
-        self.x
-    }
-}
-
-impl ToAbi for Vector2<u32> {
+impl ToAbi for glam::u32::UVec2 {
     type Abi = abi::Vec2<u32>;
 
     fn to_abi(&self) -> Self::Abi {
@@ -87,7 +62,7 @@ impl ToAbi for Vector2<u32> {
     }
 }
 
-impl ToAbi for Vector3<u32> {
+impl ToAbi for glam::u32::UVec3 {
     type Abi = abi::Vec3<u32>;
 
     fn to_abi(&self) -> Self::Abi {
@@ -95,7 +70,7 @@ impl ToAbi for Vector3<u32> {
     }
 }
 
-impl ToAbi for Vector4<u32> {
+impl ToAbi for glam::u32::UVec4 {
     type Abi = abi::Vec4<u32>;
 
     fn to_abi(&self) -> Self::Abi {
@@ -103,31 +78,31 @@ impl ToAbi for Vector4<u32> {
     }
 }
 
-impl ToAbi for Matrix2<f32> {
+impl ToAbi for glam::f32::Mat2 {
     type Abi = abi::Mat2x2;
 
     fn to_abi(&self) -> Self::Abi {
-        abi::Mat2x2(self.x.to_abi(), self.y.to_abi())
+        abi::Mat2x2(self.col(0).to_abi(), self.col(1).to_abi())
     }
 }
 
-impl ToAbi for Matrix3<f32> {
+impl ToAbi for glam::f32::Mat3 {
     type Abi = abi::Mat3x3;
 
     fn to_abi(&self) -> Self::Abi {
-        abi::Mat3x3(self.x.to_abi(), self.y.to_abi(), self.z.to_abi())
+        abi::Mat3x3(self.col(0).to_abi(), self.col(1).to_abi(), self.col(2).to_abi())
     }
 }
 
-impl ToAbi for Matrix4<f32> {
+impl ToAbi for glam::f32::Mat4 {
     type Abi = abi::Mat4x4;
 
     fn to_abi(&self) -> Self::Abi {
         abi::Mat4x4(
-            self.x.to_abi(),
-            self.y.to_abi(),
-            self.z.to_abi(),
-            self.w.to_abi(),
+            self.col(0).to_abi(),
+            self.col(1).to_abi(),
+            self.col(2).to_abi(),
+            self.col(3).to_abi(),
         )
     }
 }
