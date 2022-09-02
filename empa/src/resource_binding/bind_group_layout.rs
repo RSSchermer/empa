@@ -432,7 +432,7 @@ impl PartialEq for TexelType {
             (TexelType::UnsignedInteger, TexelType::UnsignedInteger) => true,
             (TexelType::Float, TexelType::UnfilterableFloat) => true,
             (TexelType::UnfilterableFloat, TexelType::Float) => true,
-            _ => false
+            _ => false,
         }
     }
 }

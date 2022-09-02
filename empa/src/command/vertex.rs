@@ -36,7 +36,7 @@ where
 
     fn to_encoding(&self) -> VertexBufferEncoding {
         VertexBufferEncoding {
-            buffer: self.inner.clone(),
+            buffer: self.internal.inner.clone(),
             id: self.id(),
             offset: 0,
             size: self.size_in_bytes() as u32,

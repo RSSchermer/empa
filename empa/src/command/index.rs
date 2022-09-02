@@ -39,7 +39,7 @@ where
 
     fn to_encoding(&self) -> IndexBufferEncoding {
         IndexBufferEncoding {
-            buffer: self.inner.clone(),
+            buffer: self.internal.inner.clone(),
             id: self.id(),
             format: I::FORMAT_ID.inner,
             offset: 0,
