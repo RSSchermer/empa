@@ -90,7 +90,11 @@ impl ToAbi for glam::f32::Mat3 {
     type Abi = abi::Mat3x3;
 
     fn to_abi(&self) -> Self::Abi {
-        abi::Mat3x3(self.col(0).to_abi(), self.col(1).to_abi(), self.col(2).to_abi())
+        abi::Mat3x3(
+            self.col(0).to_abi(),
+            self.col(1).to_abi(),
+            self.col(2).to_abi(),
+        )
     }
 }
 

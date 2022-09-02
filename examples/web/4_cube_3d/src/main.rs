@@ -172,13 +172,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
     let view = glam::f32::Mat4::from_translation(glam::f32::Vec3::new(0.0, 0.0, 30.0))
         .inverse()
         .to_abi();
-    let projection = glam::f32::Mat4::perspective_rh(
-        0.3 * PI,
-        1.0,
-         1.0,
-        100.0,
-    )
-    .to_abi();
+    let projection = glam::f32::Mat4::perspective_rh(0.3 * PI, 1.0, 1.0, 100.0).to_abi();
     let uniforms = Uniforms {
         model: glam::f32::Mat4::IDENTITY.to_abi(),
         view,

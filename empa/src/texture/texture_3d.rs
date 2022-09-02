@@ -322,11 +322,7 @@ impl<F, U> Texture3D<F, U> {
         }
     }
 
-    fn storage_internal(
-        &self,
-        format: GpuTextureFormat,
-        mipmap_level: u8,
-    ) -> GpuTextureView {
+    fn storage_internal(&self, format: GpuTextureFormat, mipmap_level: u8) -> GpuTextureView {
         assert!(
             mipmap_level < self.mip_level_count,
             "`mipmap_level` must not exceed the texture's mipmap level count"
