@@ -24,8 +24,6 @@ use crate::buffer::{
 use crate::device::{Device, ID_GEN};
 use crate::texture::{ImageCopySize3D, ImageDataByteLayout, ImageDataLayout};
 
-pub use field_offset::offset_of;
-
 /// Signals that an error occurred when trying to map a buffer.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MapError;
