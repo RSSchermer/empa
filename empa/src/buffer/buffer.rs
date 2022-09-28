@@ -9,7 +9,6 @@ use std::sync::{Arc, Mutex};
 use std::{error, marker, mem, slice};
 
 use atomic_counter::AtomicCounter;
-use field_offset::FieldOffset;
 use futures::TryFutureExt;
 use js_sys::Uint8Array;
 use wasm_bindgen::prelude::*;
@@ -23,6 +22,39 @@ use crate::buffer::{
 };
 use crate::device::{Device, ID_GEN};
 use crate::texture::{ImageCopySize3D, ImageDataByteLayout, ImageDataLayout};
+
+#[doc(hidden)]
+pub use field_offset::offset_of;
+
+pub struct Projection<T, P> {
+    offset_in_bytes: usize,
+    _marker: marker::PhantomData<(T, P)>,
+}
+
+impl<T, P> Projection<T, P> {
+    pub unsafe fn from_offset_in_bytes(offset_in_bytes: usize) -> Self {
+        Projection {
+            offset_in_bytes,
+            _marker: Default::default(),
+        }
+    }
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! projection {
+    ($parent:ident => $projection:ident) => {
+        {
+            let offset_in_bytes = crate::buffer::offset_of!($parent => $projection).get_byte_offset();
+
+            unsafe {
+                crate::buffer::Projection::from_offset_in_bytes(offset_in_bytes)
+            }
+        }
+    };
+}
+
+pub use crate::projection;
 
 /// Signals that an error occurred when trying to map a buffer.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -388,10 +420,10 @@ impl<T, U> Buffer<T, U> {
         self.into()
     }
 
-    pub fn project_to<O>(&self, field_offset: FieldOffset<T, O>) -> View<O, U> {
+    pub fn project_to<P>(&self, projection: Projection<T, P>) -> View<P, U> {
         View {
             buffer: &self.internal,
-            offset_in_bytes: field_offset.get_byte_offset(),
+            offset_in_bytes: projection.offset_in_bytes,
             len: 1,
             _marker: Default::default(),
         }
@@ -738,7 +770,7 @@ impl<'a, T, U> View<'a, T, U> {
         let end = start + size_in_bytes;
 
         self.buffer.map_context.lock().unwrap().add(start..end);
-
+        arwa::console::log!(start, size_in_bytes);
         let mapped_bytes = Uint8Array::new(
             &self
                 .as_web_sys()
@@ -800,10 +832,10 @@ impl<'a, T, U> View<'a, T, U> {
         }
     }
 
-    pub fn project_to<O>(&self, field_offset: FieldOffset<T, O>) -> View<O, U> {
+    pub fn project_to<P>(&self, projection: Projection<T, P>) -> View<P, U> {
         View {
             buffer: self.buffer,
-            offset_in_bytes: self.offset_in_bytes + field_offset.get_byte_offset(),
+            offset_in_bytes: self.offset_in_bytes + projection.offset_in_bytes,
             len: 1,
             _marker: Default::default(),
         }

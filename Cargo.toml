@@ -10,5 +10,6 @@ members = [
     "examples/web/3_compute",
     "examples/web/4_cube_3d",
     "examples/web/5_compute_prefix_sum",
-    "examples/web/6_compute_atomic_array"
+    "examples/web/6_compute_atomic_array",
+    "examples/web/7_buffer_projection"
 ]
