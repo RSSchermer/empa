@@ -1,21 +1,165 @@
+use std::collections::hash_map::DefaultHasher;
 use std::env;
-use std::path::Path;
+use std::hash::{Hash, Hasher};
+use std::ops::Range;
+use std::path::{Path, PathBuf};
 
+use codespan_reporting::diagnostic::{Diagnostic, Label};
+use codespan_reporting::files::{Error, Files, SimpleFile};
+use codespan_reporting::term;
+use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use empa_reflect::{
     BindingType, ConstantIdentifier, ConstantType, EntryPointBinding, EntryPointBindingType,
     Interpolation, MemoryUnit, MemoryUnitLayout, Sampling, ShaderSource, ShaderStage,
     SizedBufferLayout, StorageTextureFormat, TexelType, UnsizedBufferLayout,
 };
-use include_preprocessor::{preprocess, PathTracker, SearchPaths};
+use include_preprocessor::{preprocess, OutputSink, SearchPaths, SourceMappedChunk, SourceTracker};
 use proc_macro::{tracked_path, Span, TokenStream};
 use quote::quote;
+use std::collections::HashMap;
 use syn::{parse_macro_input, LitStr};
 
-struct ProcMacroPathTracker;
+fn gen_file_id(path: &Path) -> u64 {
+    let mut hasher = DefaultHasher::new();
 
-impl PathTracker for ProcMacroPathTracker {
-    fn track(&mut self, path: &Path) {
-        tracked_path::path(path.to_str().expect("cannot track non-unicode path"));
+    path.hash(&mut hasher);
+
+    hasher.finish()
+}
+
+struct SourceFiles {
+    map: HashMap<u64, SimpleFile<String, String>>,
+}
+
+impl SourceFiles {
+    fn new() -> Self {
+        SourceFiles {
+            map: Default::default(),
+        }
+    }
+}
+
+impl SourceTracker for SourceFiles {
+    fn track(&mut self, path: &Path, source: &str) {
+        let id = gen_file_id(path);
+        let path = path
+            .to_str()
+            .expect("cannot track non-unicode path")
+            .to_string();
+        let source = source.to_string();
+
+        tracked_path::path(&path);
+        self.map.insert(id, SimpleFile::new(path, source));
+    }
+}
+
+impl<'a> Files<'a> for SourceFiles {
+    type FileId = u64;
+    type Name = &'a str;
+    type Source = &'a str;
+
+    fn name(&'a self, id: Self::FileId) -> Result<Self::Name, Error> {
+        self.map
+            .get(&id)
+            .ok_or(Error::FileMissing)
+            .map(|file| file.name().as_str())
+    }
+
+    fn source(&'a self, id: Self::FileId) -> Result<Self::Source, Error> {
+        self.map
+            .get(&id)
+            .ok_or(Error::FileMissing)
+            .map(|file| file.source().as_str())
+    }
+
+    fn line_index(&'a self, id: Self::FileId, byte_index: usize) -> Result<usize, Error> {
+        self.map
+            .get(&id)
+            .ok_or(Error::FileMissing)
+            .and_then(|file| file.line_index((), byte_index))
+    }
+
+    fn line_range(&'a self, id: Self::FileId, line_index: usize) -> Result<Range<usize>, Error> {
+        self.map
+            .get(&id)
+            .ok_or(Error::FileMissing)
+            .and_then(|file| file.line_range((), line_index))
+    }
+}
+
+struct SourceSpan {
+    source_range: Range<usize>,
+    file_id: u64,
+    mapped_range: Range<usize>,
+}
+
+struct SourceMappedSpan {
+    file_id: u64,
+    range: Range<usize>,
+}
+
+struct SourceMap {
+    spans: Vec<SourceSpan>,
+}
+
+impl SourceMap {
+    fn new() -> Self {
+        SourceMap { spans: Vec::new() }
+    }
+
+    fn mapped_span(&self, source_range: Range<usize>) -> Option<SourceMappedSpan> {
+        let start = source_range.start;
+
+        for span in &self.spans {
+            if span.source_range.contains(&start) {
+                let span_size = usize::min(source_range.len(), span.source_range.end - start);
+                let offset = source_range.start - span.source_range.start;
+                let start = span.mapped_range.start + offset;
+                let end = start + span_size;
+
+                return Some(SourceMappedSpan {
+                    file_id: span.file_id,
+                    range: start..end,
+                });
+            }
+        }
+
+        None
+    }
+}
+
+struct OutputWriter {
+    buffer: String,
+    source_map: SourceMap,
+    current_byte_offset: usize,
+}
+
+impl OutputWriter {
+    fn new() -> Self {
+        OutputWriter {
+            buffer: String::new(),
+            source_map: SourceMap::new(),
+            current_byte_offset: 0,
+        }
+    }
+}
+
+impl OutputSink for OutputWriter {
+    fn sink(&mut self, chunk: &str) {
+        self.current_byte_offset += chunk.len();
+        self.buffer.push_str(chunk);
+    }
+
+    fn sink_source_mapped(&mut self, source_mapped_chunk: SourceMappedChunk) {
+        let start = self.current_byte_offset;
+
+        self.current_byte_offset += source_mapped_chunk.text().len();
+        self.buffer.push_str(source_mapped_chunk.text());
+        self.source_map.spans.push(SourceSpan {
+            source_range: start..self.current_byte_offset,
+            file_id: gen_file_id(source_mapped_chunk.source_path()),
+            mapped_range: source_mapped_chunk.source_range(),
+        });
     }
 }
 
@@ -32,21 +176,42 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
     search_paths.push_base_path(cargo_manifest_dir);
 
     let source_join = source_dir.join(path.value());
+    let mut source_files = SourceFiles::new();
 
     let output = if source_join.is_file() {
-        let buffer = String::new();
+        let writer = OutputWriter::new();
 
-        preprocess(source_join, search_paths, buffer, &mut ProcMacroPathTracker).unwrap()
+        preprocess(source_join, search_paths, writer, &mut source_files).unwrap()
     } else {
         panic!("Entry (`{:?}`) point is not a file!", source_join);
     };
 
-    let source_token = LitStr::new(&output, Span::call_site().into());
+    let source_token = LitStr::new(&output.buffer, Span::call_site().into());
 
-    let shader_source = match ShaderSource::parse(output.clone()) {
+    let shader_source = match ShaderSource::parse(output.buffer.clone()) {
         Ok(shader_source) => shader_source,
         Err(err) => {
-            panic!("{}", err.emit_to_string(&output));
+            let diagnostic = Diagnostic::error()
+                .with_message(err.message().to_string())
+                .with_labels(
+                    err.labels()
+                        .map(|label| {
+                            let source_range = label.0.clone();
+                            let mapped_span = output.source_map.mapped_span(source_range).unwrap();
+
+                            Label::primary(mapped_span.file_id, mapped_span.range.clone())
+                                .with_message(label.1.to_string())
+                        })
+                        .collect(),
+                );
+
+            let config = codespan_reporting::term::Config::default();
+            let writer = StandardStream::stderr(ColorChoice::Auto);
+
+            term::emit(&mut writer.lock(), &config, &source_files, &diagnostic)
+                .expect("cannot write error");
+
+            panic!("failed to compile shader source");
         }
     };
 

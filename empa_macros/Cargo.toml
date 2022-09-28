@@ -12,6 +12,7 @@ license = "MIT"
 proc-macro = true
 
 [dependencies]
+codespan-reporting = "0.11.1"
 empa-reflect = { version = "0.1.0", path = "../empa_reflect" }
 include-preprocessor = { version = "0.1.0", path = "../../include_preprocessor/include_preprocessor/" }
 proc-macro2 = "1.0.5"
