@@ -45,10 +45,10 @@ impl<T, P> Projection<T, P> {
 macro_rules! projection {
     ($parent:ident => $projection:ident) => {
         {
-            let offset_in_bytes = crate::buffer::offset_of!($parent => $projection).get_byte_offset();
+            let offset_in_bytes = $crate::buffer::offset_of!($parent => $projection).get_byte_offset();
 
             unsafe {
-                crate::buffer::Projection::from_offset_in_bytes(offset_in_bytes)
+                $crate::buffer::Projection::from_offset_in_bytes(offset_in_bytes)
             }
         }
     };
