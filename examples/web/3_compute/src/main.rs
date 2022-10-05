@@ -1,5 +1,3 @@
-#![feature(const_ptr_offset_from)]
-
 use std::error::Error;
 
 use arwa::console;

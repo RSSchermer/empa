@@ -1,5 +1,3 @@
-#![feature(const_ptr_offset_from)]
-
 use std::error::Error;
 use std::f32::consts::PI;
 
@@ -31,7 +29,6 @@ use empa::texture::{AttachableImageDescriptor, MipmapLevels, Texture2DDescriptor
 use empa::{buffer, texture, CompareFunction};
 use empa_glam::ToAbi;
 use futures::FutureExt;
-use glam::Mat4;
 
 #[derive(empa::render_pipeline::Vertex, Clone, Copy)]
 struct MyVertex {

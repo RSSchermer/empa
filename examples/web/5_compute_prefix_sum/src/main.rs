@@ -1,4 +1,4 @@
-#![feature(const_ptr_offset_from, int_roundings)]
+#![feature(int_roundings)]
 
 use std::collections::VecDeque;
 use std::error::Error;

@@ -1,19 +1,12 @@
-#![feature(const_ptr_offset_from)]
-
 use std::error::Error;
 
 use arwa::console;
 use arwa::window::window;
 use empa::arwa::{NavigatorExt, RequestAdapterOptions};
 use empa::buffer;
-use empa::buffer::{projection, Buffer, Storage};
-use empa::command::{DispatchWorkgroups, ResourceBindingCommandEncoder};
-use empa::compute_pipeline::{ComputePipelineDescriptorBuilder, ComputeStageBuilder};
+use empa::buffer::projection;
 use empa::device::DeviceDescriptor;
-use empa::resource_binding::Resources;
-use empa::shader_module::{shader_source, ShaderSource};
 use futures::FutureExt;
-use std::ops::Deref;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 struct Foo {
@@ -42,8 +35,6 @@ async fn render() -> Result<(), Box<dyn Error>> {
         .await
         .ok_or("adapter not found")?;
     let device = adapter.request_device(&DeviceDescriptor::default()).await?;
-
-    let data: Vec<u32> = vec![0; 32];
 
     let buffer = device.create_buffer(
         Foo {
