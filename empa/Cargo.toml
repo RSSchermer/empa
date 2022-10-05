@@ -18,7 +18,7 @@ field-offset = "0.3.4"
 futures = "0.3.21"
 lazy_static = "1.4.0"
 js-sys = "0.3.58"
-staticvec = { version = "0.11.6", path = "../../staticvec" }
+staticvec = "0.11.9"
 wasm-bindgen = "0.2.81"
 wasm-bindgen-futures = "0.4.31"
 zeroable = "0.2.0"
