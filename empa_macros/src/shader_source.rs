@@ -1,8 +1,9 @@
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
 use std::env;
 use std::hash::{Hash, Hasher};
 use std::ops::Range;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use codespan_reporting::diagnostic::{Diagnostic, Label};
 use codespan_reporting::files::{Error, Files, SimpleFile};
@@ -13,10 +14,11 @@ use empa_reflect::{
     Interpolation, MemoryUnit, MemoryUnitLayout, Sampling, ShaderSource, ShaderStage,
     SizedBufferLayout, StorageTextureFormat, TexelType, UnsizedBufferLayout,
 };
-use include_preprocessor::{preprocess, OutputSink, SearchPaths, SourceMappedChunk, SourceTracker};
+use include_preprocessor::{
+    preprocess, Error as IppError, OutputSink, SearchPaths, SourceMappedChunk, SourceTracker,
+};
 use proc_macro::{tracked_path, Span, TokenStream};
 use quote::quote;
-use std::collections::HashMap;
 use syn::{parse_macro_input, LitStr};
 
 fn gen_file_id(path: &Path) -> u64 {
@@ -181,7 +183,63 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
     let output = if source_join.is_file() {
         let writer = OutputWriter::new();
 
-        preprocess(source_join, search_paths, writer, &mut source_files).unwrap()
+        match preprocess(source_join, search_paths, writer, &mut source_files) {
+            Ok(output) => output,
+            Err(error) => {
+                let (file, diagnostic) = match error {
+                    IppError::FileNotFound(error) => {
+                        let file = SimpleFile::new(
+                            error.source_file().to_string_lossy().to_string(),
+                            error.source().to_string(),
+                        );
+                        let range = file.line_range((), error.line_number()).unwrap();
+
+                        // I don't quite understand if this is a bug in `codespan_reporting` or
+                        // if I'm doing something wrong that necessitates this correction
+                        let range = range.start..range.end.saturating_sub(1);
+
+                        let label = Label::primary((), range);
+                        let diagnostic = Diagnostic::error()
+                            .with_message(format!(
+                                "Could not find file: {}",
+                                error.included_path().to_string_lossy()
+                            ))
+                            .with_labels(vec![label]);
+
+                        (file, diagnostic)
+                    }
+                    IppError::IO(error) => {
+                        panic!("adsf asdf {}", error);
+                    }
+                    IppError::Parse(error) => {
+                        let file = SimpleFile::new(
+                            error.source_file().to_string_lossy().to_string(),
+                            error.source().to_string(),
+                        );
+                        let range = file.line_range((), error.line_number()).unwrap();
+
+                        // I don't quite understand if this is a bug in `codespan_reporting` or
+                        // if I'm doing something wrong that necessitates this correction
+                        let range = range.start..range.end.saturating_sub(1);
+
+                        let label = Label::primary((), range);
+                        let diagnostic = Diagnostic::error()
+                            .with_message(error.message().to_string())
+                            .with_labels(vec![label]);
+
+                        (file, diagnostic)
+                    }
+                };
+
+                let config = codespan_reporting::term::Config::default();
+                let writer = StandardStream::stderr(ColorChoice::Auto);
+
+                term::emit(&mut writer.lock(), &config, &file, &diagnostic)
+                    .expect("cannot write error");
+
+                panic!("failed to compile shader source");
+            }
+        }
     } else {
         panic!("Entry (`{:?}`) point is not a file!", source_join);
     };
