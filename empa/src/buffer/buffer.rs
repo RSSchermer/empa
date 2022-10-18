@@ -770,7 +770,7 @@ impl<'a, T, U> View<'a, T, U> {
         let end = start + size_in_bytes;
 
         self.buffer.map_context.lock().unwrap().add(start..end);
-        arwa::console::log!(start, size_in_bytes);
+
         let mapped_bytes = Uint8Array::new(
             &self
                 .as_web_sys()
