@@ -551,63 +551,63 @@ impl<
 }
 
 impl Usages<O, O, O, O, O, O, O, O, O, O> {
-    pub fn query_resolve() -> Usages<X, O, O, O, O, O, O, O, O, O> {
+    pub const fn query_resolve() -> Usages<X, O, O, O, O, O, O, O, O, O> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 
-    pub fn indirect() -> Usages<O, X, O, O, O, O, O, O, O, O> {
+    pub const fn indirect() -> Usages<O, X, O, O, O, O, O, O, O, O> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 
-    pub fn storage_binding() -> Usages<O, O, X, O, O, O, O, O, O, O> {
+    pub const fn storage_binding() -> Usages<O, O, X, O, O, O, O, O, O, O> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 
-    pub fn uniform_binding() -> Usages<O, O, O, X, O, O, O, O, O, O> {
+    pub const fn uniform_binding() -> Usages<O, O, O, X, O, O, O, O, O, O> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 
-    pub fn vertex() -> Usages<O, O, O, O, X, O, O, O, O, O> {
+    pub const fn vertex() -> Usages<O, O, O, O, X, O, O, O, O, O> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 
-    pub fn index() -> Usages<O, O, O, O, O, X, O, O, O, O> {
+    pub const fn index() -> Usages<O, O, O, O, O, X, O, O, O, O> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 
-    pub fn copy_dst() -> Usages<O, O, O, O, O, O, X, O, O, O> {
+    pub const fn copy_dst() -> Usages<O, O, O, O, O, O, X, O, O, O> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 
-    pub fn copy_src() -> Usages<O, O, O, O, O, O, O, X, O, O> {
+    pub const fn copy_src() -> Usages<O, O, O, O, O, O, O, X, O, O> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 
-    pub fn map_write() -> Usages<O, O, O, O, O, O, O, O, X, O> {
+    pub const fn map_write() -> Usages<O, O, O, O, O, O, O, O, X, O> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 
-    pub fn map_read() -> Usages<O, O, O, O, O, O, O, O, O, X> {
+    pub const fn map_read() -> Usages<O, O, O, O, O, O, O, O, O, X> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 }
@@ -625,9 +625,9 @@ impl<
         U9: TypeFlag,
     > Usages<U0, U1, U2, U3, U4, U5, U6, U7, U8, U9>
 {
-    pub fn and_render_attachment(self) -> Usages<U0, U1, U2, U3, U4, U5, U6, U7, U8, U9> {
+    pub const fn and_render_attachment(self) -> Usages<U0, U1, U2, U3, U4, U5, U6, U7, U8, U9> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 }
@@ -644,9 +644,9 @@ impl<
         U9: TypeFlag,
     > Usages<O, U1, U2, U3, U4, U5, U6, U7, U8, U9>
 {
-    pub fn and_query_resolve(self) -> Usages<X, U1, U2, U3, U4, U5, U6, U7, U8, U9> {
+    pub const fn and_query_resolve(self) -> Usages<X, U1, U2, U3, U4, U5, U6, U7, U8, U9> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 }
@@ -663,9 +663,9 @@ impl<
         U9: TypeFlag,
     > Usages<U0, O, U2, U3, U4, U5, U6, U7, U8, U9>
 {
-    pub fn and_indirect(self) -> Usages<U0, X, U2, U3, U4, U5, U6, U7, U8, U9> {
+    pub const fn and_indirect(self) -> Usages<U0, X, U2, U3, U4, U5, U6, U7, U8, U9> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 }
@@ -682,9 +682,9 @@ impl<
         U9: TypeFlag,
     > Usages<U0, U1, O, U3, U4, U5, U6, U7, U8, U9>
 {
-    pub fn and_storage_binding(self) -> Usages<U0, U1, X, U3, U4, U5, U6, U7, U8, U9> {
+    pub const fn and_storage_binding(self) -> Usages<U0, U1, X, U3, U4, U5, U6, U7, U8, U9> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 }
@@ -701,9 +701,9 @@ impl<
         U9: TypeFlag,
     > Usages<U0, U1, U2, O, U4, U5, U6, U7, U8, U9>
 {
-    pub fn and_uniform_binding(self) -> Usages<U0, U1, U2, X, U4, U5, U6, U7, U8, U9> {
+    pub const fn and_uniform_binding(self) -> Usages<U0, U1, U2, X, U4, U5, U6, U7, U8, U9> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 }
@@ -720,9 +720,9 @@ impl<
         U9: TypeFlag,
     > Usages<U0, U1, U2, U3, O, U5, U6, U7, U8, U9>
 {
-    pub fn and_vertex(self) -> Usages<U0, U1, U2, U3, X, U5, U6, U7, U8, U9> {
+    pub const fn and_vertex(self) -> Usages<U0, U1, U2, U3, X, U5, U6, U7, U8, U9> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 }
@@ -739,9 +739,9 @@ impl<
         U9: TypeFlag,
     > Usages<U0, U1, U2, U3, U4, O, U6, U7, U8, U9>
 {
-    pub fn and_index(self) -> Usages<U0, U1, U2, U3, U4, X, U6, U7, U8, U9> {
+    pub const fn and_index(self) -> Usages<U0, U1, U2, U3, U4, X, U6, U7, U8, U9> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 }
@@ -758,9 +758,9 @@ impl<
         U9: TypeFlag,
     > Usages<U0, U1, U2, U3, U4, U5, O, U7, U8, U9>
 {
-    pub fn and_copy_dst(self) -> Usages<U0, U1, U2, U3, U4, U5, X, U7, U8, U9> {
+    pub const fn and_copy_dst(self) -> Usages<U0, U1, U2, U3, U4, U5, X, U7, U8, U9> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 }
@@ -777,9 +777,9 @@ impl<
         U9: TypeFlag,
     > Usages<U0, U1, U2, U3, U4, U5, U6, O, U8, U9>
 {
-    pub fn and_copy_src(self) -> Usages<U0, U1, U2, U3, U4, U5, U6, X, U8, U9> {
+    pub const fn and_copy_src(self) -> Usages<U0, U1, U2, U3, U4, U5, U6, X, U8, U9> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 }
@@ -796,9 +796,9 @@ impl<
         U9: TypeFlag,
     > Usages<U0, U1, U2, U3, U4, U5, U6, U7, O, U9>
 {
-    pub fn and_map_write(self) -> Usages<U0, U1, U2, U3, U4, U5, U6, U7, X, U9> {
+    pub const fn and_map_write(self) -> Usages<U0, U1, U2, U3, U4, U5, U6, U7, X, U9> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 }
@@ -815,9 +815,9 @@ impl<
         U8: TypeFlag,
     > Usages<U0, U1, U2, U3, U4, U5, U6, U7, U8, O>
 {
-    pub fn and_map_read(self) -> Usages<U0, U1, U2, U3, U4, U5, U6, U7, U8, X> {
+    pub const fn and_map_read(self) -> Usages<U0, U1, U2, U3, U4, U5, U6, U7, U8, X> {
         Usages {
-            _marker: Default::default(),
+            _marker: std::marker::PhantomData,
         }
     }
 }
