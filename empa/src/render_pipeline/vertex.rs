@@ -53,6 +53,12 @@ pub trait TypedVertexLayout: typed_vertex_layout_seal::Seal {
     const LAYOUT: &'static [VertexDescriptor<'static>];
 }
 
+impl typed_vertex_layout_seal::Seal for () {}
+
+impl TypedVertexLayout for () {
+    const LAYOUT: &'static [VertexDescriptor<'static>] = &[];
+}
+
 macro_rules! impl_typed_vertex_layout {
     ($($vertex:ident),*) => {
         #[allow(unused_parens)]

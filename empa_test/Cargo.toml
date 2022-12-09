@@ -1,0 +1,12 @@
+[package]
+name = "empa-test"
+version = "0.1.0"
+authors = ["Roland Schermer <roland0507@gmail.com>"]
+edition = "2021"
+publish = false
+repository = "https://github.com/RSSchermer/empa"
+license = "MIT"
+
+[dev-dependencies]
+compiletest_rs = "0.9"
+empa = { path = "../empa" }

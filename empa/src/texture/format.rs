@@ -134,7 +134,6 @@ impl TextureFormatId {
             GpuTextureFormat::Bc6hRgbFloat => "bc6h-rgb-float",
             GpuTextureFormat::Bc7RgbaUnorm => "bc7-rgba-unorm",
             GpuTextureFormat::Bc7RgbaUnormSrgb => "bc7-rgba-unorm-srgb",
-            GpuTextureFormat::Depth24unormStencil8 => "depth24unorm-stencil8",
             GpuTextureFormat::Depth32floatStencil8 => "depth32float-stencil8",
             _ => "unknown",
         }
@@ -216,7 +215,6 @@ typed_texture_format!(depth16unorm, Depth16unorm);
 typed_texture_format!(depth24plus, Depth24plus);
 typed_texture_format!(depth24plus_stencil8, Depth24plusStencil8);
 typed_texture_format!(depth32float, Depth32float);
-typed_texture_format!(depth24unorm_stencil8, Depth24unormStencil8);
 typed_texture_format!(depth32float_stencil8, Depth32floatStencil8);
 typed_texture_format!(bc1_rgba_unorm, Bc1RgbaUnorm, 4, 4);
 typed_texture_format!(bc1_rgba_unorm_srgb, Bc1RgbaUnormSrgb, 4, 4);
@@ -356,7 +354,6 @@ impl Texture2DFormat for depth16unorm {}
 impl Texture2DFormat for depth24plus {}
 impl Texture2DFormat for depth24plus_stencil8 {}
 impl Texture2DFormat for depth32float {}
-impl Texture2DFormat for depth24unorm_stencil8 {}
 impl Texture2DFormat for depth32float_stencil8 {}
 impl Texture2DFormat for bc1_rgba_unorm {}
 impl Texture2DFormat for bc1_rgba_unorm_srgb {}
@@ -632,11 +629,6 @@ impl DepthStencilFormat for depth24plus_stencil8 {
     type StencilAspect = stencil8;
 }
 
-impl DepthStencilFormat for depth24unorm_stencil8 {
-    type DepthAspect = depth24plus;
-    type StencilAspect = stencil8;
-}
-
 impl DepthStencilFormat for depth32float_stencil8 {
     type DepthAspect = depth32float;
     type StencilAspect = stencil8;
@@ -648,7 +640,6 @@ impl DepthStencilTestFormat for depth16unorm {}
 impl DepthStencilTestFormat for depth24plus {}
 impl DepthStencilTestFormat for depth32float {}
 impl DepthStencilTestFormat for depth24plus_stencil8 {}
-impl DepthStencilTestFormat for depth24unorm_stencil8 {}
 impl DepthStencilTestFormat for depth32float_stencil8 {}
 impl DepthStencilTestFormat for stencil8 {}
 
@@ -708,7 +699,6 @@ impl Renderable for depth16unorm {}
 impl Renderable for depth24plus {}
 impl Renderable for depth24plus_stencil8 {}
 impl Renderable for depth32float {}
-impl Renderable for depth24unorm_stencil8 {}
 impl Renderable for depth32float_stencil8 {}
 
 pub trait ColorRenderable: Renderable {}
@@ -790,13 +780,11 @@ impl DepthStencilRenderable for depth16unorm {}
 impl DepthStencilRenderable for depth24plus {}
 impl DepthStencilRenderable for depth24plus_stencil8 {}
 impl DepthStencilRenderable for depth32float {}
-impl DepthStencilRenderable for depth24unorm_stencil8 {}
 impl DepthStencilRenderable for depth32float_stencil8 {}
 
 pub trait CombinedDepthStencilRenderable: DepthStencilRenderable {}
 
 impl CombinedDepthStencilRenderable for depth24plus_stencil8 {}
-impl CombinedDepthStencilRenderable for depth24unorm_stencil8 {}
 impl CombinedDepthStencilRenderable for depth32float_stencil8 {}
 
 pub trait DepthRenderable: DepthStencilRenderable {}
@@ -843,7 +831,6 @@ impl MultisampleFormat for depth16unorm {}
 impl MultisampleFormat for depth24plus {}
 impl MultisampleFormat for depth24plus_stencil8 {}
 impl MultisampleFormat for depth32float {}
-impl MultisampleFormat for depth24unorm_stencil8 {}
 impl MultisampleFormat for depth32float_stencil8 {}
 
 pub trait MultisampleColorRenderable: MultisampleFormat {}

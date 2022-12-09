@@ -4,6 +4,7 @@ members = [
     "empa_glam",
     "empa_macros",
     "empa_reflect",
+    "empa_test",
     "examples/web/0_triangle",
     "examples/web/1_animated_triangle",
     "examples/web/2_textured_triangle",
@@ -11,5 +12,6 @@ members = [
     "examples/web/4_cube_3d",
     "examples/web/5_compute_prefix_sum",
     "examples/web/6_compute_atomic_array",
-    "examples/web/7_buffer_projection"
+    "examples/web/7_buffer_projection",
+    "examples/web/8_persistent_threads"
 ]

@@ -12,9 +12,9 @@ use staticvec::StaticVec;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    Gpu, GpuCanvasCompositingAlphaMode, GpuCanvasConfiguration, GpuCanvasContext,
-    GpuImageCopyExternalImage, GpuImageCopyTextureTagged, GpuOrigin2dDict, GpuOrigin3dDict,
-    GpuPowerPreference, GpuPredefinedColorSpace, GpuRequestAdapterOptions,
+    Gpu, GpuCanvasAlphaMode, GpuCanvasConfiguration, GpuCanvasContext, GpuImageCopyExternalImage,
+    GpuImageCopyTextureTagged, GpuOrigin2dDict, GpuOrigin3dDict, GpuPowerPreference,
+    GpuRequestAdapterOptions,
 };
 
 use crate::adapter::Adapter;
@@ -144,36 +144,39 @@ impl CanvasContextFormat for bgra8unorm {}
 impl CanvasContextFormat for rgba8unorm {}
 impl CanvasContextFormat for rgba16float {}
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-#[allow(non_camel_case_types)]
-pub enum PredefinedColorSpace {
-    srgb,
-}
+// TODO: ignoring for now, this type is now part of an update to the canvas spec that is not yet in
+// web-sys
+//
+// #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+// #[allow(non_camel_case_types)]
+// pub enum PredefinedColorSpace {
+//     srgb,
+// }
+//
+// impl PredefinedColorSpace {
+//     fn to_web_sys(&self) -> GpuPredefinedColorSpace {
+//         match self {
+//             PredefinedColorSpace::srgb => GpuPredefinedColorSpace::Srgb,
+//         }
+//     }
+// }
+//
+// impl Default for PredefinedColorSpace {
+//     fn default() -> Self {
+//         PredefinedColorSpace::srgb
+//     }
+// }
 
-impl PredefinedColorSpace {
-    fn to_web_sys(&self) -> GpuPredefinedColorSpace {
-        match self {
-            PredefinedColorSpace::srgb => GpuPredefinedColorSpace::Srgb,
-        }
-    }
-}
-
-impl Default for PredefinedColorSpace {
-    fn default() -> Self {
-        PredefinedColorSpace::srgb
-    }
-}
-
-pub enum CompositingAlphaMode {
+pub enum AlphaMode {
     Opaque,
     Premultiplied,
 }
 
-impl CompositingAlphaMode {
-    fn to_web_sys(&self) -> GpuCanvasCompositingAlphaMode {
+impl AlphaMode {
+    fn to_web_sys(&self) -> GpuCanvasAlphaMode {
         match self {
-            CompositingAlphaMode::Opaque => GpuCanvasCompositingAlphaMode::Opaque,
-            CompositingAlphaMode::Premultiplied => GpuCanvasCompositingAlphaMode::Premultiplied,
+            AlphaMode::Opaque => GpuCanvasAlphaMode::Opaque,
+            AlphaMode::Premultiplied => GpuCanvasAlphaMode::Premultiplied,
         }
     }
 }
@@ -188,8 +191,9 @@ where
     pub format: F,
     pub usage: U,
     pub view_formats: V,
-    pub color_space: PredefinedColorSpace,
-    pub compositing_alpha_mode: CompositingAlphaMode,
+    // Ignoring for now, see comment above.
+    // pub color_space: PredefinedColorSpace,
+    pub alpha_mode: AlphaMode,
 }
 
 pub struct CanvasContext {
@@ -214,8 +218,9 @@ impl CanvasContext {
         let CanvasConfiguration {
             device,
             view_formats,
-            color_space,
-            compositing_alpha_mode,
+            // Ignoring for now, see comment above.
+            // color_space,
+            alpha_mode,
             usage,
             ..
         } = configuration;
@@ -233,8 +238,9 @@ impl CanvasContext {
 
         // TODO: view formats not in web-sys
 
-        config.color_space(color_space.to_web_sys());
-        config.compositing_alpha_mode(compositing_alpha_mode.to_web_sys());
+        // Ignoring for now, see comment above.
+        // config.color_space(color_space.to_web_sys());
+        config.alpha_mode(alpha_mode.to_web_sys());
 
         self.inner.configure(&config);
 
@@ -426,7 +432,8 @@ fn validate_size_origin(width: u32, height: u32, origin_x: u32, origin_y: u32) {
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub struct ExternalImageCopyDstDescriptor {
     pub mipmap_level: u8,
-    pub color_space: PredefinedColorSpace,
+    // Ignoring for now, see comment above.
+    // pub color_space: PredefinedColorSpace,
     pub premultiplied_alpha: bool,
 }
 
@@ -436,7 +443,8 @@ pub struct ExternalSubImageCopyDstDescriptor {
     pub origin_x: u32,
     pub origin_y: u32,
     pub origin_layer: u32,
-    pub color_space: PredefinedColorSpace,
+    // Ignoring for now, see comment above.
+    // pub color_space: PredefinedColorSpace,
     pub premultiplied_alpha: bool,
 }
 
@@ -497,7 +505,8 @@ impl<F, U> Texture2DExt<F, U> for Texture2D<F, U> {
     {
         let ExternalImageCopyDstDescriptor {
             mipmap_level,
-            color_space,
+            // Ignoring for now, see comment above
+            // color_space,
             premultiplied_alpha,
         } = descriptor;
 
@@ -509,7 +518,8 @@ impl<F, U> Texture2DExt<F, U> for Texture2D<F, U> {
         let mut inner = GpuImageCopyTextureTagged::new(self.as_web_sys());
 
         inner.mip_level(mipmap_level as u32);
-        inner.color_space(color_space.to_web_sys());
+        // Ignoring for now, see comment above
+        // inner.color_space(color_space.to_web_sys());
         inner.premultiplied_alpha(premultiplied_alpha);
 
         ExternalImageCopyDst {
@@ -533,7 +543,8 @@ impl<F, U> Texture2DExt<F, U> for Texture2D<F, U> {
             origin_x,
             origin_y,
             origin_layer,
-            color_space,
+            // Ignoring for now, see comment above
+            // color_space,
             premultiplied_alpha,
         } = descriptor;
 
@@ -555,7 +566,8 @@ impl<F, U> Texture2DExt<F, U> for Texture2D<F, U> {
 
         inner.origin(origin.as_ref());
         inner.mip_level(mipmap_level as u32);
-        inner.color_space(color_space.to_web_sys());
+        // Ignoring for now, see comment above
+        // inner.color_space(color_space.to_web_sys());
         inner.premultiplied_alpha(premultiplied_alpha);
 
         ExternalImageCopyDst {

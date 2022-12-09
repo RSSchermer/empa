@@ -5,8 +5,8 @@ use arwa::html::{HtmlCanvasElement, HtmlImgElement};
 use arwa::image_bitmap::{create_image_bitmap, ImageBitmapOptions, ImageRegion};
 use arwa::window::window;
 use empa::arwa::{
-    CanvasConfiguration, CompositingAlphaMode, ExternalImageCopySrc, HtmlCanvasElementExt,
-    NavigatorExt, PredefinedColorSpace, QueueExt, RequestAdapterOptions, Texture2DExt,
+    AlphaMode, CanvasConfiguration, ExternalImageCopySrc, HtmlCanvasElementExt, NavigatorExt,
+    QueueExt, RequestAdapterOptions, Texture2DExt,
 };
 use empa::buffer::Buffer;
 use empa::command::{
@@ -71,8 +71,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
         format: rgba8unorm,
         usage: texture::Usages::render_attachment(),
         view_formats: (),
-        color_space: PredefinedColorSpace::srgb,
-        compositing_alpha_mode: CompositingAlphaMode::Opaque,
+        alpha_mode: AlphaMode::Opaque,
     });
 
     let shader = device.create_shader_module(&SHADER);

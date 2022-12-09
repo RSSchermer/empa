@@ -718,13 +718,13 @@ impl From<naga::Sampling> for Sampling {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MemoryUnit {
     pub offset: usize,
     pub layout: MemoryUnitLayout,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum MemoryUnitLayout {
     Float,
     FloatArray(usize),
@@ -768,6 +768,11 @@ pub enum MemoryUnitLayout {
     Matrix4x3Array(usize),
     Matrix4x4,
     Matrix4x4Array(usize),
+    ComplexArray {
+        units: Vec<MemoryUnit>,
+        stride: usize,
+        len: usize,
+    },
 }
 
 fn collect_units(
@@ -967,7 +972,7 @@ fn collect_units(
         naga::TypeInner::Array { base, size, stride } => {
             match size.to_indexable_length(module).map_err(|_| ())? {
                 IndexableLength::Known(size) => {
-                    collect_array_units(offset, module, *base, size, *stride, head, tail)?;
+                    collect_array_units(offset, module, *base, size, *stride, head)?;
                 }
                 IndexableLength::Dynamic => {
                     let mut units = Vec::new();
@@ -1000,7 +1005,6 @@ fn collect_array_units(
     len: u32,
     stride: u32,
     head: &mut Vec<MemoryUnit>,
-    tail: &mut Option<Vec<MemoryUnit>>,
 ) -> Result<(), ()> {
     let len = len as usize;
     let ty = module.types.get_handle(type_handle).unwrap();
@@ -1190,28 +1194,45 @@ fn collect_array_units(
             size,
             stride: stride_inner,
         } => {
-            let len = if let Ok(IndexableLength::Known(len)) = size.to_indexable_length(module) {
-                len
-            } else {
-                return Err(());
-            };
+            let len_inner =
+                if let Ok(IndexableLength::Known(len)) = size.to_indexable_length(module) {
+                    len
+                } else {
+                    return Err(());
+                };
 
-            for i in 0..len {
-                collect_array_units(
-                    offset + (i * stride) as usize,
-                    module,
-                    *base,
+            let mut units = Vec::new();
+
+            collect_array_units(0, module, *base, len_inner, *stride_inner, &mut units)?;
+
+            head.push(MemoryUnit {
+                offset,
+                layout: MemoryUnitLayout::ComplexArray {
+                    units,
+                    stride: stride as usize,
                     len,
-                    *stride_inner,
-                    head,
-                    tail,
-                )?;
-            }
+                },
+            })
         }
         naga::TypeInner::Struct { members, .. } => {
-            for i in 0..len {
-                collect_struct_units(offset + i * stride as usize, module, members, head, tail)?;
+            let mut units = Vec::new();
+            let mut nested_tail = None;
+
+            collect_struct_units(0, module, members, &mut units, &mut nested_tail)?;
+
+            if nested_tail.is_some() {
+                // Cannot have a dynamically sized array inside of an array
+                return Err(());
             }
+
+            head.push(MemoryUnit {
+                offset,
+                layout: MemoryUnitLayout::ComplexArray {
+                    units,
+                    stride: stride as usize,
+                    len,
+                },
+            })
         }
         _ => return Err(()),
     };

@@ -516,9 +516,11 @@ fn storage_format_tokens(storage_format: StorageTextureFormat) -> proc_macro2::T
 fn sized_buffer_layout_tokens(layout: &SizedBufferLayout) -> proc_macro2::TokenStream {
     let recurse = layout.memory_units().iter().map(|u| memory_unit_tokens(u));
 
-    quote! {
+    let tokens = quote! {
         empa::resource_binding::SizedBufferLayout(&[#(#recurse),*])
-    }
+    };
+
+    tokens
 }
 
 fn unsized_buffer_layout_tokens(layout: &UnsizedBufferLayout) -> proc_macro2::TokenStream {
@@ -557,132 +559,288 @@ fn memory_unit_tokens(memory_unit: &MemoryUnit) -> proc_macro2::TokenStream {
 fn memory_unit_layout_tokens(memory_unit_layout: &MemoryUnitLayout) -> proc_macro2::TokenStream {
     let mod_path = quote!(empa::abi);
 
-    match *memory_unit_layout {
+    match memory_unit_layout {
         MemoryUnitLayout::Float => {
             quote!(#mod_path::MemoryUnitLayout::Float)
         }
         MemoryUnitLayout::FloatArray(len) => {
-            quote!(#mod_path::MemoryUnitLayout::FloatArray(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::Float
+                }],
+                stride: 4,
+                len: #len
+            })
         }
         MemoryUnitLayout::FloatVector2 => {
             quote!(#mod_path::MemoryUnitLayout::FloatVector2)
         }
         MemoryUnitLayout::FloatVector2Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::FloatVector2Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::FloatVector2
+                }],
+                stride: 8,
+                len: #len
+            })
         }
         MemoryUnitLayout::FloatVector3 => {
             quote!(#mod_path::MemoryUnitLayout::FloatVector3)
         }
         MemoryUnitLayout::FloatVector3Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::FloatVector3Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::FloatVector3
+                }],
+                stride: 16,
+                len: #len
+            })
         }
         MemoryUnitLayout::FloatVector4 => {
             quote!(#mod_path::MemoryUnitLayout::FloatVector4)
         }
         MemoryUnitLayout::FloatVector4Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::FloatVector4Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::FloatVector4
+                }],
+                stride: 16,
+                len: #len
+            })
         }
         MemoryUnitLayout::Integer => {
             quote!(#mod_path::MemoryUnitLayout::Integer)
         }
         MemoryUnitLayout::IntegerArray(len) => {
-            quote!(#mod_path::MemoryUnitLayout::IntegerArray(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::Integer
+                }],
+                stride: 4,
+                len: #len
+            })
         }
         MemoryUnitLayout::IntegerVector2 => {
             quote!(#mod_path::MemoryUnitLayout::IntegerVector2)
         }
         MemoryUnitLayout::IntegerVector2Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::IntegerVector2Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::IntegerVector2
+                }],
+                stride: 8,
+                len: #len
+            })
         }
         MemoryUnitLayout::IntegerVector3 => {
             quote!(#mod_path::MemoryUnitLayout::IntegerVector3)
         }
         MemoryUnitLayout::IntegerVector3Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::IntegerVector3Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::IntegerVector3
+                }],
+                stride: 16,
+                len: #len
+            })
         }
         MemoryUnitLayout::IntegerVector4 => {
             quote!(#mod_path::MemoryUnitLayout::IntegerVector4)
         }
         MemoryUnitLayout::IntegerVector4Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::IntegerVector4Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::IntegerVector4
+                }],
+                stride: 16,
+                len: #len
+            })
         }
         MemoryUnitLayout::UnsignedInteger => {
             quote!(#mod_path::MemoryUnitLayout::UnsignedInteger)
         }
         MemoryUnitLayout::UnsignedIntegerArray(len) => {
-            quote!(#mod_path::MemoryUnitLayout::UnsignedIntegerArray(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::UnsignedInteger
+                }],
+                stride: 4,
+                len: #len
+            })
         }
         MemoryUnitLayout::UnsignedIntegerVector2 => {
             quote!(#mod_path::MemoryUnitLayout::UnsignedIntegerVector2)
         }
         MemoryUnitLayout::UnsignedIntegerVector2Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::UnsignedIntegerVector2Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::UnsignedIntegerVector2
+                }],
+                stride: 8,
+                len: #len
+            })
         }
         MemoryUnitLayout::UnsignedIntegerVector3 => {
             quote!(#mod_path::MemoryUnitLayout::UnsignedIntegerVector3)
         }
         MemoryUnitLayout::UnsignedIntegerVector3Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::UnsignedIntegerVector3Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::UnsignedIntegerVector3
+                }],
+                stride: 16,
+                len: #len
+            })
         }
         MemoryUnitLayout::UnsignedIntegerVector4 => {
             quote!(#mod_path::MemoryUnitLayout::UnsignedIntegerVector4)
         }
         MemoryUnitLayout::UnsignedIntegerVector4Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::UnsignedIntegerVector4Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::UnsignedIntegerVector4
+                }],
+                stride: 16,
+                len: #len
+            })
         }
         MemoryUnitLayout::Matrix2x2 => {
             quote!(#mod_path::MemoryUnitLayout::Matrix2x2)
         }
         MemoryUnitLayout::Matrix2x2Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix2x2Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::Matrix2x2
+                }],
+                stride: 16,
+                len: #len
+            })
         }
         MemoryUnitLayout::Matrix2x3 => {
             quote!(#mod_path::MemoryUnitLayout::Matrix2x3)
         }
         MemoryUnitLayout::Matrix2x3Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix2x3Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::Matrix2x3
+                }],
+                stride: 32,
+                len: #len
+            })
         }
         MemoryUnitLayout::Matrix2x4 => {
             quote!(#mod_path::MemoryUnitLayout::Matrix2x4)
         }
         MemoryUnitLayout::Matrix2x4Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix2x4Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::Matrix2x4
+                }],
+                stride: 32,
+                len: #len
+            })
         }
         MemoryUnitLayout::Matrix3x2 => {
             quote!(#mod_path::MemoryUnitLayout::Matrix3x2)
         }
         MemoryUnitLayout::Matrix3x2Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix3x2Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::Matrix3x2
+                }],
+                stride: 24,
+                len: #len
+            })
         }
         MemoryUnitLayout::Matrix3x3 => {
             quote!(#mod_path::MemoryUnitLayout::Matrix3x3)
         }
         MemoryUnitLayout::Matrix3x3Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix3x3Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::Matrix3x3
+                }],
+                stride: 48,
+                len: #len
+            })
         }
         MemoryUnitLayout::Matrix3x4 => {
             quote!(#mod_path::MemoryUnitLayout::Matrix3x4)
         }
         MemoryUnitLayout::Matrix3x4Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix3x4Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::Matrix3x4
+                }],
+                stride: 48,
+                len: #len
+            })
         }
         MemoryUnitLayout::Matrix4x2 => {
             quote!(#mod_path::MemoryUnitLayout::Matrix4x2)
         }
         MemoryUnitLayout::Matrix4x2Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix4x2Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::Matrix4x2
+                }],
+                stride: 32,
+                len: #len
+            })
         }
         MemoryUnitLayout::Matrix4x3 => {
             quote!(#mod_path::MemoryUnitLayout::Matrix4x3)
         }
         MemoryUnitLayout::Matrix4x3Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix4x3Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::Matrix4x3
+                }],
+                stride: 64,
+                len: #len
+            })
         }
         MemoryUnitLayout::Matrix4x4 => {
             quote!(#mod_path::MemoryUnitLayout::Matrix4x4)
         }
         MemoryUnitLayout::Matrix4x4Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix4x4Array(#len))
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#mod_path::MemoryUnit {
+                    offset: 0,
+                    layout: #mod_path::MemoryUnitLayout::Matrix4x4
+                }],
+                stride: 64,
+                len: #len
+            })
+        }
+        MemoryUnitLayout::ComplexArray { units, stride, len } => {
+            let recurse = units.iter().map(|unit| memory_unit_tokens(unit));
+
+            quote!(#mod_path::MemoryUnitLayout::Array {
+                units: &[#(#recurse),*],
+                stride: #stride,
+                len: #len,
+            })
         }
     }
 }

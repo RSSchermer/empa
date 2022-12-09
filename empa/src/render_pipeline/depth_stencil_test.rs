@@ -4,8 +4,8 @@ use web_sys::{GpuDepthStencilState, GpuStencilFaceState, GpuStencilOperation};
 
 use crate::render_target::ReadOnly;
 use crate::texture::format::{
-    depth16unorm, depth24plus, depth24plus_stencil8, depth24unorm_stencil8, depth32float,
-    depth32float_stencil8, stencil8, DepthStencilTestFormat,
+    depth16unorm, depth24plus, depth24plus_stencil8, depth32float, depth32float_stencil8, stencil8,
+    DepthStencilTestFormat,
 };
 use crate::CompareFunction;
 
@@ -83,14 +83,12 @@ impl depth_stencil_test_seal::Seal for depth16unorm {}
 impl depth_stencil_test_seal::Seal for depth24plus {}
 impl depth_stencil_test_seal::Seal for depth32float {}
 impl depth_stencil_test_seal::Seal for depth24plus_stencil8 {}
-impl depth_stencil_test_seal::Seal for depth24unorm_stencil8 {}
 impl depth_stencil_test_seal::Seal for depth32float_stencil8 {}
 impl depth_stencil_test_seal::Seal for stencil8 {}
 impl depth_stencil_test_seal::Seal for ReadOnly<depth16unorm> {}
 impl depth_stencil_test_seal::Seal for ReadOnly<depth24plus> {}
 impl depth_stencil_test_seal::Seal for ReadOnly<depth32float> {}
 impl depth_stencil_test_seal::Seal for ReadOnly<depth24plus_stencil8> {}
-impl depth_stencil_test_seal::Seal for ReadOnly<depth24unorm_stencil8> {}
 impl depth_stencil_test_seal::Seal for ReadOnly<depth32float_stencil8> {}
 impl depth_stencil_test_seal::Seal for ReadOnly<stencil8> {}
 
@@ -100,23 +98,19 @@ impl DepthTest for depth16unorm {}
 impl DepthTest for depth24plus {}
 impl DepthTest for depth32float {}
 impl DepthTest for depth24plus_stencil8 {}
-impl DepthTest for depth24unorm_stencil8 {}
 impl DepthTest for depth32float_stencil8 {}
 impl DepthTest for ReadOnly<depth16unorm> {}
 impl DepthTest for ReadOnly<depth24plus> {}
 impl DepthTest for ReadOnly<depth32float> {}
 impl DepthTest for ReadOnly<depth24plus_stencil8> {}
-impl DepthTest for ReadOnly<depth24unorm_stencil8> {}
 impl DepthTest for ReadOnly<depth32float_stencil8> {}
 
 pub trait StencilTest {}
 
 impl StencilTest for depth24plus_stencil8 {}
-impl StencilTest for depth24unorm_stencil8 {}
 impl StencilTest for depth32float_stencil8 {}
 impl StencilTest for stencil8 {}
 impl StencilTest for ReadOnly<depth24plus_stencil8> {}
-impl StencilTest for ReadOnly<depth24unorm_stencil8> {}
 impl StencilTest for ReadOnly<depth32float_stencil8> {}
 impl StencilTest for ReadOnly<stencil8> {}
 

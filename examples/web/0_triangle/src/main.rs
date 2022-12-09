@@ -4,8 +4,7 @@ use arwa::dom::{selector, ParentNode};
 use arwa::html::HtmlCanvasElement;
 use arwa::window::window;
 use empa::arwa::{
-    CanvasConfiguration, CompositingAlphaMode, HtmlCanvasElementExt, NavigatorExt,
-    PredefinedColorSpace, RequestAdapterOptions,
+    AlphaMode, CanvasConfiguration, HtmlCanvasElementExt, NavigatorExt, RequestAdapterOptions,
 };
 use empa::buffer::Buffer;
 use empa::command::{Draw, DrawCommandEncoder, RenderPassDescriptor, RenderStateEncoder};
@@ -55,8 +54,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
         format: rgba8unorm,
         usage: texture::Usages::render_attachment(),
         view_formats: (),
-        color_space: PredefinedColorSpace::srgb,
-        compositing_alpha_mode: CompositingAlphaMode::Opaque,
+        alpha_mode: AlphaMode::Opaque,
     });
 
     let shader = device.create_shader_module(&SHADER);

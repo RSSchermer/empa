@@ -31,6 +31,7 @@ use crate::texture::format::{DepthStencilRenderable, ImageData, TextureFormat};
 use crate::texture::{ImageCopySize3D, TextureDestroyer};
 use crate::type_flag::{TypeFlag, O, X};
 use crate::{buffer, texture};
+use zeroable::Zeroable;
 
 enum ResourceDestroyer {
     Buffer(Arc<BufferDestroyer>),
@@ -92,6 +93,56 @@ impl CommandEncoder {
             inner: device.inner.create_command_encoder(),
             _resource_destroyers: Vec::new(),
         }
+    }
+
+    pub fn clear_buffer<T, U>(mut self, buffer: buffer::View<T, U>) -> CommandEncoder
+    where
+        U: buffer::CopyDst + 'static,
+    {
+        let size = buffer.size_in_bytes() as u32;
+        let offset = buffer.offset_in_bytes() as u32;
+
+        assert!(
+            size.rem(4) == 0,
+            "cleared region's size in bytes must be a multiple of `4`"
+        );
+        assert!(
+            offset.rem(4) == 0,
+            "cleared region's offset in bytes must be a multiple of `8`"
+        );
+
+        self.inner
+            .clear_buffer_with_u32_and_u32(buffer.as_web_sys(), offset, size);
+
+        self._resource_destroyers
+            .push(buffer.buffer.inner.clone().into());
+
+        self
+    }
+
+    pub fn clear_buffer_slice<T, U>(mut self, buffer: buffer::View<[T], U>) -> CommandEncoder
+    where
+        U: buffer::CopyDst + 'static,
+    {
+        let size = buffer.size_in_bytes() as u32;
+        let offset = buffer.offset_in_bytes() as u32;
+
+        assert!(
+            size.rem(4) == 0,
+            "cleared region's size in bytes must be a multiple of `4`"
+        );
+        assert!(
+            offset.rem(4) == 0,
+            "cleared region's offset in bytes must be a multiple of `8`"
+        );
+
+        self.inner
+            .clear_buffer_with_u32_and_u32(buffer.as_web_sys(), offset, size);
+
+        self._resource_destroyers
+            .push(buffer.buffer.inner.clone().into());
+
+        self
     }
 
     pub fn copy_buffer_to_buffer<T, U0, U1>(
