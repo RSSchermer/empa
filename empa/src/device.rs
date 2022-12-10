@@ -86,6 +86,26 @@ impl Device {
         Buffer::create_uninit(self, true, usage)
     }
 
+    pub fn create_buffer_zeroed<T, U>(&self, usage: U) -> Buffer<T, U>
+        where
+            T: Zeroable,
+            U: buffer::ValidUsageFlags,
+    {
+        unsafe {
+            Buffer::create_uninit(self, false, usage).assume_init()
+        }
+    }
+
+    pub fn create_buffer_zeroed_mapped<T, U>(&self, usage: U) -> Buffer<T, U>
+        where
+            T: Zeroable,
+            U: buffer::ValidUsageFlags,
+    {
+        unsafe {
+            Buffer::create_uninit(self, true, usage).assume_init()
+        }
+    }
+
     pub fn create_slice_buffer_uninit<T, U>(
         &self,
         len: usize,
