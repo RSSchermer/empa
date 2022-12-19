@@ -79,6 +79,17 @@ pub trait VertexBuffers: vertex_buffers_seal::Seal {
     fn encodings(&self) -> Self::Encodings;
 }
 
+impl vertex_buffers_seal::Seal for () {}
+impl VertexBuffers for () {
+    type Layout = ();
+
+    type Encodings = std::iter::Empty<VertexBufferEncoding>;
+
+    fn encodings(&self) -> Self::Encodings {
+        std::iter::empty()
+    }
+}
+
 macro_rules! impl_vertex_buffers {
     ($n:literal, $($B:ident),*) => {
         #[allow(unused_parens)]
