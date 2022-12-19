@@ -23,19 +23,16 @@ use crate::buffer::{
 use crate::device::{Device, ID_GEN};
 use crate::texture::{ImageCopySize3D, ImageDataByteLayout, ImageDataLayout};
 
-#[doc(hidden)]
-pub use field_offset::offset_of;
-
 pub struct Projection<T, P> {
     offset_in_bytes: usize,
     _marker: marker::PhantomData<(T, P)>,
 }
 
 impl<T, P> Projection<T, P> {
-    pub unsafe fn from_offset_in_bytes(offset_in_bytes: usize) -> Self {
+    pub const unsafe fn from_offset_in_bytes(offset_in_bytes: usize) -> Self {
         Projection {
             offset_in_bytes,
-            _marker: Default::default(),
+            _marker: marker::PhantomData,
         }
     }
 }
@@ -45,7 +42,7 @@ impl<T, P> Projection<T, P> {
 macro_rules! projection {
     ($parent:ident => $projection:ident) => {
         {
-            let offset_in_bytes = $crate::buffer::offset_of!($parent => $projection).get_byte_offset();
+            let offset_in_bytes = $crate::offset_of!($parent, $projection);
 
             unsafe {
                 $crate::buffer::Projection::from_offset_in_bytes(offset_in_bytes)
