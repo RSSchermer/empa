@@ -57,6 +57,10 @@ where
 
         for (binding, entry) in resources.to_entries().enumerate() {
             if let Some(entry) = entry {
+                if entry.is_zero_sized_buffer() {
+                    panic!("cannot bind zero-sized buffer to binding `{}`", binding);
+                }
+
                 let web_sys_entry =
                     GpuBindGroupEntry::new(binding as u32, entry.as_web_sys().as_ref());
 
@@ -112,10 +116,19 @@ impl BindGroupEntry {
             BindGroupEntry::Sampler(_) => None,
         }
     }
+
+    pub(crate) fn is_zero_sized_buffer(&self) -> bool {
+        if let BindGroupEntry::BufferView(resource) = self {
+            resource.size == 0
+        } else {
+            false
+        }
+    }
 }
 
 pub struct BufferViewResource {
     inner: GpuBufferBinding,
+    size: usize,
     _destroyer: Arc<BufferDestroyer>,
 }
 
@@ -560,7 +573,7 @@ where
         inner.size(self.size as f64);
 
         BindGroupEntry::BufferView(BufferViewResource {
-            inner,
+            inner,size: self.size,
             _destroyer: self.inner.clone(),
         })
     }
@@ -580,6 +593,7 @@ where
 
         BindGroupEntry::BufferView(BufferViewResource {
             inner,
+            size: self.size,
             _destroyer: self.inner.clone(),
         })
     }
@@ -599,6 +613,7 @@ where
 
         BindGroupEntry::BufferView(BufferViewResource {
             inner,
+            size: self.size,
             _destroyer: self.inner.clone(),
         })
     }
