@@ -18,7 +18,7 @@ use crate::texture::{
     CopyDst, CopySrc, FormatKind, ImageCopyDst, ImageCopyFromTextureDst, ImageCopySrc,
     ImageCopyTexture, ImageCopyToTextureSrc, MipmapLevels, StorageBinding, SubImageCopyDst,
     SubImageCopyFromTextureDst, SubImageCopySrc, SubImageCopyToTextureSrc, TextureBinding,
-    TextureDestroyer, UnsupportedViewFormat, UsageFlags,
+    TextureHandle, UnsupportedViewFormat, UsageFlags,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -61,7 +61,7 @@ pub struct SubImageCopy3DDescriptor {
 }
 
 pub struct Texture3D<F, Usage> {
-    inner: Arc<TextureDestroyer>,
+    inner: Arc<TextureHandle>,
     mip_level_count: u8,
     format: FormatKind<F>,
     width: u32,
@@ -109,7 +109,7 @@ where
         let view_formats = view_formats.formats().collect();
 
         Texture3D {
-            inner: Arc::new(TextureDestroyer::new(inner, false)),
+            inner: Arc::new(TextureHandle::new(inner, false)),
             format: FormatKind::Typed(Default::default()),
             width: *width,
             height: *height,
@@ -195,7 +195,7 @@ impl<F, U> Texture3D<F, U> {
     {
         Sampled3DFloat {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -210,7 +210,7 @@ impl<F, U> Texture3D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled3DFloat {
                 inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -230,7 +230,7 @@ impl<F, U> Texture3D<F, U> {
     {
         Sampled3DUnfilteredFloat {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -245,7 +245,7 @@ impl<F, U> Texture3D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled3DUnfilteredFloat {
                 inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -262,7 +262,7 @@ impl<F, U> Texture3D<F, U> {
     {
         Sampled3DSignedInteger {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -277,7 +277,7 @@ impl<F, U> Texture3D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled3DSignedInteger {
                 inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -297,7 +297,7 @@ impl<F, U> Texture3D<F, U> {
     {
         Sampled3DUnsignedInteger {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -312,7 +312,7 @@ impl<F, U> Texture3D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled3DUnsignedInteger {
                 inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -345,7 +345,7 @@ impl<F, U> Texture3D<F, U> {
     {
         Storage3D {
             inner: self.storage_internal(F::FORMAT_ID.to_web_sys(), mipmap_level),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
             _marker: Default::default(),
         }
     }
@@ -361,7 +361,7 @@ impl<F, U> Texture3D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Storage3D {
                 inner: self.storage_internal(ViewedFormat::FORMAT_ID.to_web_sys(), mipmap_level),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
                 _marker: Default::default(),
             })
         } else {
@@ -532,33 +532,33 @@ impl<F, U> Texture3D<F, U> {
 /// View on a 3D texture that can be bound to a pipeline as a float sampled texture resource.
 pub struct Sampled3DFloat {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 /// View on a 3D texture that can be bound to a pipeline as a unfiltered float sampled texture
 /// resource.
 pub struct Sampled3DUnfilteredFloat {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 /// View on a 3D texture that can be bound to a pipeline as a signed integer sampled texture
 /// resource.
 pub struct Sampled3DSignedInteger {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 /// View on a 3D texture that can be bound to a pipeline as a unsigned integer sampled texture
 /// resource.
 pub struct Sampled3DUnsignedInteger {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 /// View on a 3D texture that can be bound to a pipeline as a texture storage resource.
 pub struct Storage3D<F> {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
     _marker: marker::PhantomData<*const F>,
 }

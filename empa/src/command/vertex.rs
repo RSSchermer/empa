@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use crate::buffer;
-use crate::buffer::{Buffer, BufferDestroyer};
+use crate::buffer::{Buffer, BufferHandle};
 use crate::render_pipeline::{TypedVertexLayout, Vertex};
 
 pub struct VertexBufferEncoding {
-    pub(crate) buffer: Arc<BufferDestroyer>,
+    pub(crate) buffer: Arc<BufferHandle>,
     pub(crate) id: usize,
     pub(crate) offset: u32,
     pub(crate) size: u32,

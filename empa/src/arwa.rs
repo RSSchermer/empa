@@ -25,7 +25,7 @@ use crate::texture::format::{
     rgb10a2unorm, rgba16float, rgba32float, rgba8unorm, rgba8unorm_srgb, TextureFormat,
     TextureFormatId, ViewFormats,
 };
-use crate::texture::{ImageCopySize2D, Texture2D, TextureDestroyer};
+use crate::texture::{ImageCopySize2D, Texture2D, TextureHandle};
 
 mod navigator_ext_seal {
     pub trait Seal {}
@@ -450,7 +450,7 @@ pub struct ExternalSubImageCopyDstDescriptor {
 
 pub struct ExternalImageCopyDst {
     inner: GpuImageCopyTextureTagged,
-    _texture: Arc<TextureDestroyer>,
+    _texture: Arc<TextureHandle>,
     width: u32,
     height: u32,
 }

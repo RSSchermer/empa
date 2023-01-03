@@ -20,7 +20,7 @@ use crate::texture::{
     CopyDst, CopySrc, FormatKind, ImageCopyDst, ImageCopyFromTextureDst, ImageCopySrc,
     ImageCopyTexture, ImageCopyToTextureSrc, MipmapLevels, RenderAttachment, StorageBinding,
     SubImageCopyDst, SubImageCopyFromTextureDst, SubImageCopySrc, SubImageCopyToTextureSrc,
-    TextureBinding, TextureDestroyer, UnsupportedViewFormat, UsageFlags,
+    TextureBinding, TextureHandle, UnsupportedViewFormat, UsageFlags,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -148,7 +148,7 @@ pub struct SubImageCopy2DDescriptor {
 }
 
 pub struct Texture2D<F, Usage> {
-    pub(crate) inner: Arc<TextureDestroyer>,
+    pub(crate) inner: Arc<TextureHandle>,
     pub(crate) width: u32,
     pub(crate) height: u32,
     pub(crate) layers: u32,
@@ -173,7 +173,7 @@ where
         let view_formats = StaticVec::from(view_formats);
 
         Texture2D {
-            inner: Arc::new(TextureDestroyer::new(web_sys, true)),
+            inner: Arc::new(TextureHandle::new(web_sys, true)),
             width,
             height,
             layers: 1,
@@ -236,7 +236,7 @@ where
         let view_formats = view_formats.formats().collect();
 
         Texture2D {
-            inner: Arc::new(TextureDestroyer::new(inner, false)),
+            inner: Arc::new(TextureHandle::new(inner, false)),
             width: *width,
             height: *height,
             layers: *layers,
@@ -325,7 +325,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DFloat {
             inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -340,7 +340,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DFloat {
                 inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -360,7 +360,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DUnfilteredFloat {
             inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -375,7 +375,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DUnfilteredFloat {
                 inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -392,7 +392,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DSignedInteger {
             inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -407,7 +407,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DSignedInteger {
                 inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -427,7 +427,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DUnsignedInteger {
             inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -442,7 +442,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DUnsignedInteger {
                 inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -459,7 +459,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DDepth {
             inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -474,7 +474,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DDepth {
                 inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -491,7 +491,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DDepth {
             inner: self.view_2d_internal(F::DepthAspect::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -554,7 +554,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DArrayFloat {
             inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -570,7 +570,7 @@ impl<F, U> Texture2D<F, U> {
             Ok(Sampled2DArrayFloat {
                 inner: self
                     .view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -590,7 +590,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DArrayUnfilteredFloat {
             inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -606,7 +606,7 @@ impl<F, U> Texture2D<F, U> {
             Ok(Sampled2DArrayUnfilteredFloat {
                 inner: self
                     .view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -626,7 +626,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DArraySignedInteger {
             inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -642,7 +642,7 @@ impl<F, U> Texture2D<F, U> {
             Ok(Sampled2DArraySignedInteger {
                 inner: self
                     .view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -662,7 +662,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DArrayUnsignedInteger {
             inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -678,7 +678,7 @@ impl<F, U> Texture2D<F, U> {
             Ok(Sampled2DArrayUnsignedInteger {
                 inner: self
                     .view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -695,7 +695,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DArrayDepth {
             inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -711,7 +711,7 @@ impl<F, U> Texture2D<F, U> {
             Ok(Sampled2DArrayDepth {
                 inner: self
                     .view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -731,7 +731,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DArrayDepth {
             inner: self.view_2d_array_internal(F::DepthAspect::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -787,7 +787,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeFloat {
             inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -802,7 +802,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeFloat {
                 inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -822,7 +822,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeUnfilteredFloat {
             inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -837,7 +837,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeUnfilteredFloat {
                 inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -857,7 +857,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeSignedInteger {
             inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -872,7 +872,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeSignedInteger {
                 inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -892,7 +892,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeUnsignedInteger {
             inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -907,7 +907,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeUnsignedInteger {
                 inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -924,7 +924,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeDepth {
             inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -939,7 +939,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeDepth {
                 inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -956,7 +956,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeDepth {
             inner: self.view_cube_internal(F::DepthAspect::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -1027,7 +1027,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeArrayFloat {
             inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -1043,7 +1043,7 @@ impl<F, U> Texture2D<F, U> {
             Ok(SampledCubeArrayFloat {
                 inner: self
                     .view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -1063,7 +1063,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeArrayUnfilteredFloat {
             inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -1079,7 +1079,7 @@ impl<F, U> Texture2D<F, U> {
             Ok(SampledCubeArrayUnfilteredFloat {
                 inner: self
                     .view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -1099,7 +1099,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeArraySignedInteger {
             inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -1115,7 +1115,7 @@ impl<F, U> Texture2D<F, U> {
             Ok(SampledCubeArraySignedInteger {
                 inner: self
                     .view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -1135,7 +1135,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeArrayUnsignedInteger {
             inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -1151,7 +1151,7 @@ impl<F, U> Texture2D<F, U> {
             Ok(SampledCubeArrayUnsignedInteger {
                 inner: self
                     .view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -1171,7 +1171,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeArrayDepth {
             inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -1187,7 +1187,7 @@ impl<F, U> Texture2D<F, U> {
             Ok(SampledCubeArrayDepth {
                 inner: self
                     .view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -1208,7 +1208,7 @@ impl<F, U> Texture2D<F, U> {
         SampledCubeArrayDepth {
             inner: self
                 .view_cube_array_internal(F::DepthAspect::FORMAT_ID.to_web_sys(), descriptor),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -1244,7 +1244,7 @@ impl<F, U> Texture2D<F, U> {
             inner,
             width: self.width,
             height: self.height,
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
             _marker: Default::default(),
         }
     }
@@ -1306,7 +1306,7 @@ impl<F, U> Texture2D<F, U> {
 
         Storage2D {
             inner,
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
             _marker: Default::default(),
         }
     }
@@ -1373,7 +1373,7 @@ impl<F, U> Texture2D<F, U> {
 
         Storage2DArray {
             inner,
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
             _marker: Default::default(),
         }
     }
@@ -1653,113 +1653,113 @@ impl<F, U> Texture2D<F, U> {
 
 pub struct Sampled2DFloat {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct Sampled2DUnfilteredFloat {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct Sampled2DSignedInteger {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct Sampled2DUnsignedInteger {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct Sampled2DDepth {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct Sampled2DArrayFloat {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct Sampled2DArrayUnfilteredFloat {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct Sampled2DArraySignedInteger {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct Sampled2DArrayUnsignedInteger {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct Sampled2DArrayDepth {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct SampledCubeFloat {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct SampledCubeUnfilteredFloat {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct SampledCubeSignedInteger {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct SampledCubeUnsignedInteger {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct SampledCubeDepth {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct SampledCubeArrayFloat {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct SampledCubeArrayUnfilteredFloat {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct SampledCubeArraySignedInteger {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct SampledCubeArrayUnsignedInteger {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct SampledCubeArrayDepth {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 pub struct Storage2D<F> {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
     _marker: marker::PhantomData<*const F>,
 }
 
 pub struct Storage2DArray<F> {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
     _marker: marker::PhantomData<*const F>,
 }
 
@@ -1767,6 +1767,6 @@ pub struct AttachableImage<F> {
     pub(crate) inner: GpuTextureView,
     pub(crate) width: u32,
     pub(crate) height: u32,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
     _marker: marker::PhantomData<*const F>,
 }

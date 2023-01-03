@@ -9,7 +9,7 @@ use web_sys::{
 };
 
 use crate::abi;
-use crate::buffer::{BufferDestroyer, ReadOnlyStorage, Storage, Uniform};
+use crate::buffer::{BufferHandle, ReadOnlyStorage, Storage, Uniform};
 use crate::command::BindGroupEncoding;
 use crate::device::{Device, ID_GEN};
 use crate::resource_binding::typed_bind_group_entry::{
@@ -27,19 +27,20 @@ use crate::texture::{
     SampledCubeArrayDepth, SampledCubeArrayFloat, SampledCubeArraySignedInteger,
     SampledCubeArrayUnfilteredFloat, SampledCubeArrayUnsignedInteger, SampledCubeDepth,
     SampledCubeFloat, SampledCubeSignedInteger, SampledCubeUnfilteredFloat,
-    SampledCubeUnsignedInteger, Storage1D, Storage2D, Storage2DArray, Storage3D, TextureDestroyer,
+    SampledCubeUnsignedInteger, Storage1D, Storage2D, Storage2DArray, Storage3D, TextureHandle,
 };
 use crate::type_flag::O;
 
-pub(crate) enum EntryDestroyer {
-    Buffer(Arc<BufferDestroyer>),
-    Texture(Arc<TextureDestroyer>),
+pub(crate) enum BindGroupResource {
+    Buffer(Arc<BufferHandle>),
+    Texture(Arc<TextureHandle>),
 }
 
 pub struct BindGroup<T> {
     inner: GpuBindGroup,
     id: usize,
-    _resource_destroyers: Arc<Vec<EntryDestroyer>>,
+    // TODO: staticvec with capacity 16?
+    _referenced_resources: Arc<Vec<BindGroupResource>>,
     _marker: marker::PhantomData<*const T>,
 }
 
@@ -53,7 +54,7 @@ where
     {
         let id = ID_GEN.get();
         let entries = js_sys::Array::new();
-        let mut resource_destroyers = Vec::new();
+        let mut resource_handles = Vec::new();
 
         for (binding, entry) in resources.to_entries().enumerate() {
             if let Some(entry) = entry {
@@ -66,8 +67,8 @@ where
 
                 entries.push(web_sys_entry.as_ref());
 
-                if let Some(destroyer) = entry.entry_destroyer() {
-                    resource_destroyers.push(destroyer);
+                if let Some(handle) = entry.resource_handle() {
+                    resource_handles.push(handle);
                 }
             }
         }
@@ -78,7 +79,7 @@ where
         BindGroup {
             inner,
             id,
-            _resource_destroyers: Arc::new(resource_destroyers),
+            _referenced_resources: Arc::new(resource_handles),
             _marker: Default::default(),
         }
     }
@@ -89,7 +90,7 @@ impl<T> BindGroup<T> {
         BindGroupEncoding {
             bind_group: self.inner.clone(),
             id: self.id,
-            _resource_destroyers: self._resource_destroyers.clone(),
+            _resource_handles: self._referenced_resources.clone(),
         }
     }
 }
@@ -109,10 +110,14 @@ impl BindGroupEntry {
         }
     }
 
-    pub(crate) fn entry_destroyer(&self) -> Option<EntryDestroyer> {
+    pub(crate) fn resource_handle(&self) -> Option<BindGroupResource> {
         match self {
-            BindGroupEntry::BufferView(e) => Some(EntryDestroyer::Buffer(e._destroyer.clone())),
-            BindGroupEntry::TextureView(e) => Some(EntryDestroyer::Texture(e._destroyer.clone())),
+            BindGroupEntry::BufferView(e) => {
+                Some(BindGroupResource::Buffer(e._resource_reference.clone()))
+            }
+            BindGroupEntry::TextureView(e) => {
+                Some(BindGroupResource::Texture(e._resource_reference.clone()))
+            }
             BindGroupEntry::Sampler(_) => None,
         }
     }
@@ -129,12 +134,12 @@ impl BindGroupEntry {
 pub struct BufferViewResource {
     inner: GpuBufferBinding,
     size: usize,
-    _destroyer: Arc<BufferDestroyer>,
+    _resource_reference: Arc<BufferHandle>,
 }
 
 pub struct TextureViewResource {
     inner: GpuTextureView,
-    _destroyer: Arc<TextureDestroyer>,
+    _resource_reference: Arc<TextureHandle>,
 }
 
 pub struct SamplerResource {
@@ -172,7 +177,7 @@ unsafe impl Resource for Sampled1DFloat {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -183,7 +188,7 @@ unsafe impl Resource for Sampled1DUnfilteredFloat {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -194,7 +199,7 @@ unsafe impl Resource for Sampled1DSignedInteger {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -205,7 +210,7 @@ unsafe impl Resource for Sampled1DUnsignedInteger {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -219,7 +224,7 @@ where
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -230,7 +235,7 @@ unsafe impl Resource for Sampled2DFloat {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -241,7 +246,7 @@ unsafe impl Resource for Sampled2DUnfilteredFloat {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -252,7 +257,7 @@ unsafe impl Resource for Sampled2DSignedInteger {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -263,7 +268,7 @@ unsafe impl Resource for Sampled2DUnsignedInteger {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -274,7 +279,7 @@ unsafe impl Resource for Sampled2DDepth {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -285,7 +290,7 @@ unsafe impl Resource for Sampled2DArrayFloat {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -296,7 +301,7 @@ unsafe impl Resource for Sampled2DArrayUnfilteredFloat {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -307,7 +312,7 @@ unsafe impl Resource for Sampled2DArraySignedInteger {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -318,7 +323,7 @@ unsafe impl Resource for Sampled2DArrayUnsignedInteger {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -329,7 +334,7 @@ unsafe impl Resource for Sampled2DArrayDepth {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -340,7 +345,7 @@ unsafe impl Resource for SampledCubeFloat {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -351,7 +356,7 @@ unsafe impl Resource for SampledCubeUnfilteredFloat {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -362,7 +367,7 @@ unsafe impl Resource for SampledCubeSignedInteger {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -373,7 +378,7 @@ unsafe impl Resource for SampledCubeUnsignedInteger {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -384,7 +389,7 @@ unsafe impl Resource for SampledCubeDepth {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -395,7 +400,7 @@ unsafe impl Resource for SampledCubeArrayFloat {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -406,7 +411,7 @@ unsafe impl Resource for SampledCubeArrayUnfilteredFloat {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -417,7 +422,7 @@ unsafe impl Resource for SampledCubeArraySignedInteger {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -428,7 +433,7 @@ unsafe impl Resource for SampledCubeArrayUnsignedInteger {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -439,7 +444,7 @@ unsafe impl Resource for SampledCubeArrayDepth {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -453,7 +458,7 @@ where
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -467,7 +472,7 @@ where
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -478,7 +483,7 @@ unsafe impl Resource for Sampled3DFloat {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -489,7 +494,7 @@ unsafe impl Resource for Sampled3DUnfilteredFloat {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -500,7 +505,7 @@ unsafe impl Resource for Sampled3DSignedInteger {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -511,7 +516,7 @@ unsafe impl Resource for Sampled3DUnsignedInteger {
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -525,7 +530,7 @@ where
     fn to_entry(&self) -> BindGroupEntry {
         BindGroupEntry::TextureView(TextureViewResource {
             inner: self.inner.clone(),
-            _destroyer: self.texture_destroyer.clone(),
+            _resource_reference: self.texture_handle.clone(),
         })
     }
 }
@@ -573,8 +578,9 @@ where
         inner.size(self.size as f64);
 
         BindGroupEntry::BufferView(BufferViewResource {
-            inner,size: self.size,
-            _destroyer: self.inner.clone(),
+            inner,
+            size: self.size,
+            _resource_reference: self.inner.clone(),
         })
     }
 }
@@ -594,7 +600,7 @@ where
         BindGroupEntry::BufferView(BufferViewResource {
             inner,
             size: self.size,
-            _destroyer: self.inner.clone(),
+            _resource_reference: self.inner.clone(),
         })
     }
 }
@@ -614,7 +620,7 @@ where
         BindGroupEntry::BufferView(BufferViewResource {
             inner,
             size: self.size,
-            _destroyer: self.inner.clone(),
+            _resource_reference: self.inner.clone(),
         })
     }
 }

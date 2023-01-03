@@ -10,7 +10,7 @@ use crate::device::Device;
 use crate::texture::format::MultisampleFormat;
 use crate::texture::{
     CopyDst, CopySrc, FormatKind, ImageCopyTexture, ImageCopyToTextureDstMultisample,
-    ImageCopyToTextureSrcMultisample, RenderAttachment, TextureDestroyer, UsageFlags,
+    ImageCopyToTextureSrcMultisample, RenderAttachment, TextureHandle, UsageFlags,
 };
 
 pub struct TextureMultisampled2DDescriptor {
@@ -19,7 +19,7 @@ pub struct TextureMultisampled2DDescriptor {
 }
 
 pub struct TextureMultisampled2D<F, Usage, const SAMPLES: u8> {
-    inner: Arc<TextureDestroyer>,
+    inner: Arc<TextureHandle>,
     width: u32,
     height: u32,
     format: FormatKind<F>,
@@ -60,7 +60,7 @@ where
         let inner = device.inner.create_texture(&desc);
 
         TextureMultisampled2D {
-            inner: Arc::new(TextureDestroyer::new(inner, false)),
+            inner: Arc::new(TextureHandle::new(inner, false)),
             width,
             height,
             format: FormatKind::Typed(Default::default()),
@@ -80,7 +80,7 @@ where
             inner,
             width: self.width,
             height: self.height,
-            _texture_destroyer: self.inner.clone(),
+            _texture_handle: self.inner.clone(),
             _marker: Default::default(),
         }
     }
@@ -125,6 +125,6 @@ pub struct AttachableMultisampledImage<F, const SAMPLES: u8> {
     pub(crate) inner: GpuTextureView,
     pub(crate) width: u32,
     pub(crate) height: u32,
-    pub(crate) _texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) _texture_handle: Arc<TextureHandle>,
     _marker: marker::PhantomData<*const F>,
 }

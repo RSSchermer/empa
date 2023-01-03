@@ -17,7 +17,7 @@ use crate::texture::{
     CopyDst, CopySrc, FormatKind, ImageCopyDst, ImageCopyFromTextureDst, ImageCopySrc,
     ImageCopyTexture, ImageCopyToTextureSrc, StorageBinding, SubImageCopyDst,
     SubImageCopyFromTextureDst, SubImageCopySrc, SubImageCopyToTextureSrc, TextureBinding,
-    TextureDestroyer, UnsupportedViewFormat, UsageFlags,
+    TextureHandle, UnsupportedViewFormat, UsageFlags,
 };
 
 pub struct Texture1DDescriptor<F, U, V>
@@ -33,7 +33,7 @@ where
 }
 
 pub struct Texture1D<F, Usage> {
-    inner: Arc<TextureDestroyer>,
+    inner: Arc<TextureHandle>,
     format: FormatKind<F>,
     size: u32,
     view_formats: StaticVec<TextureFormatId, 8>,
@@ -68,7 +68,7 @@ where
         let view_formats = view_formats.formats().collect();
 
         Texture1D {
-            inner: Arc::new(TextureDestroyer::new(inner, false)),
+            inner: Arc::new(TextureHandle::new(inner, false)),
             format: FormatKind::Typed(Default::default()),
             size: *size,
             view_formats,
@@ -111,7 +111,7 @@ impl<F, U> Texture1D<F, U> {
     {
         Sampled1DFloat {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys()),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -125,7 +125,7 @@ impl<F, U> Texture1D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled1DFloat {
                 inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys()),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -142,7 +142,7 @@ impl<F, U> Texture1D<F, U> {
     {
         Sampled1DUnfilteredFloat {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys()),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -156,7 +156,7 @@ impl<F, U> Texture1D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled1DUnfilteredFloat {
                 inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys()),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -173,7 +173,7 @@ impl<F, U> Texture1D<F, U> {
     {
         Sampled1DSignedInteger {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys()),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -187,7 +187,7 @@ impl<F, U> Texture1D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled1DSignedInteger {
                 inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys()),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -204,7 +204,7 @@ impl<F, U> Texture1D<F, U> {
     {
         Sampled1DUnsignedInteger {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys()),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
         }
     }
 
@@ -218,7 +218,7 @@ impl<F, U> Texture1D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled1DUnsignedInteger {
                 inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys()),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -235,7 +235,7 @@ impl<F, U> Texture1D<F, U> {
     {
         Storage1D {
             inner: self.view_internal(F::FORMAT_ID.to_web_sys()),
-            texture_destroyer: self.inner.clone(),
+            texture_handle: self.inner.clone(),
             _marker: Default::default(),
         }
     }
@@ -250,7 +250,7 @@ impl<F, U> Texture1D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Storage1D {
                 inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys()),
-                texture_destroyer: self.inner.clone(),
+                texture_handle: self.inner.clone(),
                 _marker: Default::default(),
             })
         } else {
@@ -369,33 +369,33 @@ impl<F, U> Texture1D<F, U> {
 /// View on a 1D texture that can be bound to a pipeline as a float sampled texture resource.
 pub struct Sampled1DFloat {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 /// View on a 1D texture that can be bound to a pipeline as a unfiltered float sampled texture
 /// resource.
 pub struct Sampled1DUnfilteredFloat {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 /// View on a 1D texture that can be bound to a pipeline as a signed integer sampled texture
 /// resource.
 pub struct Sampled1DSignedInteger {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 /// View on a 1D texture that can be bound to a pipeline as a unsigned integer sampled texture
 /// resource.
 pub struct Sampled1DUnsignedInteger {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 /// View on a 1D texture that can be bound to a pipeline as a texture storage resource.
 pub struct Storage1D<F> {
     pub(crate) inner: GpuTextureView,
-    pub(crate) texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) texture_handle: Arc<TextureHandle>,
     _marker: marker::PhantomData<*const F>,
 }

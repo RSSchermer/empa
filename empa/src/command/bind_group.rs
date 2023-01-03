@@ -3,14 +3,14 @@ use std::sync::Arc;
 use web_sys::GpuBindGroup;
 
 use crate::resource_binding::{
-    BindGroup, EntryDestroyer, TypedBindGroupLayout, TypedPipelineLayout,
+    BindGroup, BindGroupResource, TypedBindGroupLayout, TypedPipelineLayout,
 };
 use std::iter;
 
 pub struct BindGroupEncoding {
     pub(crate) bind_group: GpuBindGroup,
     pub(crate) id: usize,
-    pub(crate) _resource_destroyers: Arc<Vec<EntryDestroyer>>,
+    pub(crate) _resource_handles: Arc<Vec<BindGroupResource>>,
 }
 
 mod bind_groups_seal {

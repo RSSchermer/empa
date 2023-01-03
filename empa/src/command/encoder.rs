@@ -13,7 +13,7 @@ use web_sys::{
 
 use crate::abi;
 use crate::abi::{MemoryUnit, MemoryUnitLayout};
-use crate::buffer::BufferDestroyer;
+use crate::buffer::BufferHandle;
 use crate::command::{
     BindGroupEncoding, BindGroups, IndexBuffer, IndexBufferEncoding, VertexBufferEncoding,
     VertexBuffers,
@@ -26,54 +26,54 @@ use crate::render_target::{
     MultisampleRenderLayout, ReadOnly, RenderLayout, RenderTargetEncoding, TypedColorLayout,
     TypedMultisampleColorLayout, ValidRenderTarget,
 };
-use crate::resource_binding::EntryDestroyer;
+use crate::resource_binding::BindGroupResource;
 use crate::texture::format::{DepthStencilRenderable, ImageData, TextureFormat};
-use crate::texture::{ImageCopySize3D, TextureDestroyer};
+use crate::texture::{ImageCopySize3D, TextureHandle};
 use crate::type_flag::{TypeFlag, O, X};
 use crate::{buffer, texture};
 use zeroable::Zeroable;
 
-enum ResourceDestroyer {
-    Buffer(Arc<BufferDestroyer>),
-    Texture(Arc<TextureDestroyer>),
-    BindGroup(Arc<Vec<EntryDestroyer>>),
-    RenderTarget(Arc<StaticVec<Arc<TextureDestroyer>, 9>>),
-    RenderBundle(Arc<Vec<ResourceDestroyer>>),
+enum ResourceHandle {
+    Buffer(Arc<BufferHandle>),
+    Texture(Arc<TextureHandle>),
+    BindGroup(Arc<Vec<BindGroupResource>>),
+    RenderTarget(Arc<StaticVec<Arc<TextureHandle>, 9>>),
+    RenderBundle(Arc<Vec<ResourceHandle>>),
 }
 
-impl From<Arc<BufferDestroyer>> for ResourceDestroyer {
-    fn from(destroyer: Arc<BufferDestroyer>) -> Self {
-        ResourceDestroyer::Buffer(destroyer)
+impl From<Arc<BufferHandle>> for ResourceHandle {
+    fn from(resource_handle: Arc<BufferHandle>) -> Self {
+        ResourceHandle::Buffer(resource_handle)
     }
 }
 
-impl From<Arc<TextureDestroyer>> for ResourceDestroyer {
-    fn from(destroyer: Arc<TextureDestroyer>) -> Self {
-        ResourceDestroyer::Texture(destroyer)
+impl From<Arc<TextureHandle>> for ResourceHandle {
+    fn from(resource_handle: Arc<TextureHandle>) -> Self {
+        ResourceHandle::Texture(resource_handle)
     }
 }
 
-impl From<Arc<Vec<EntryDestroyer>>> for ResourceDestroyer {
-    fn from(destroyer: Arc<Vec<EntryDestroyer>>) -> Self {
-        ResourceDestroyer::BindGroup(destroyer)
+impl From<Arc<Vec<BindGroupResource>>> for ResourceHandle {
+    fn from(bind_group_resources: Arc<Vec<BindGroupResource>>) -> Self {
+        ResourceHandle::BindGroup(bind_group_resources)
     }
 }
 
-impl From<Arc<StaticVec<Arc<TextureDestroyer>, 9_usize>>> for ResourceDestroyer {
-    fn from(destroyer: Arc<StaticVec<Arc<TextureDestroyer>, 9>>) -> Self {
-        ResourceDestroyer::RenderTarget(destroyer)
+impl From<Arc<StaticVec<Arc<TextureHandle>, 9_usize>>> for ResourceHandle {
+    fn from(render_target_resources: Arc<StaticVec<Arc<TextureHandle>, 9>>) -> Self {
+        ResourceHandle::RenderTarget(render_target_resources)
     }
 }
 
-impl From<Arc<Vec<ResourceDestroyer>>> for ResourceDestroyer {
-    fn from(destroyer: Arc<Vec<ResourceDestroyer>>) -> Self {
-        ResourceDestroyer::RenderBundle(destroyer)
+impl From<Arc<Vec<ResourceHandle>>> for ResourceHandle {
+    fn from(render_bundle_resources: Arc<Vec<ResourceHandle>>) -> Self {
+        ResourceHandle::RenderBundle(render_bundle_resources)
     }
 }
 
 pub struct CommandBuffer {
     inner: GpuCommandBuffer,
-    _resource_destroyers: Vec<ResourceDestroyer>,
+    _resource_handles: Vec<ResourceHandle>,
 }
 
 impl CommandBuffer {
@@ -84,14 +84,14 @@ impl CommandBuffer {
 
 pub struct CommandEncoder {
     inner: GpuCommandEncoder,
-    _resource_destroyers: Vec<ResourceDestroyer>,
+    _resource_handles: Vec<ResourceHandle>,
 }
 
 impl CommandEncoder {
     pub(crate) fn new(device: &Device) -> Self {
         CommandEncoder {
             inner: device.inner.create_command_encoder(),
-            _resource_destroyers: Vec::new(),
+            _resource_handles: Vec::new(),
         }
     }
 
@@ -114,7 +114,7 @@ impl CommandEncoder {
         self.inner
             .clear_buffer_with_u32_and_u32(buffer.as_web_sys(), offset, size);
 
-        self._resource_destroyers
+        self._resource_handles
             .push(buffer.buffer.inner.clone().into());
 
         self
@@ -139,7 +139,7 @@ impl CommandEncoder {
         self.inner
             .clear_buffer_with_u32_and_u32(buffer.as_web_sys(), offset, size);
 
-        self._resource_destroyers
+        self._resource_handles
             .push(buffer.buffer.inner.clone().into());
 
         self
@@ -182,10 +182,8 @@ impl CommandEncoder {
             size as u32,
         );
 
-        self._resource_destroyers
-            .push(src.buffer.inner.clone().into());
-        self._resource_destroyers
-            .push(dst.buffer.inner.clone().into());
+        self._resource_handles.push(src.buffer.inner.clone().into());
+        self._resource_handles.push(dst.buffer.inner.clone().into());
 
         self
     }
@@ -233,10 +231,8 @@ impl CommandEncoder {
             size as u32,
         );
 
-        self._resource_destroyers
-            .push(src.buffer.inner.clone().into());
-        self._resource_destroyers
-            .push(dst.buffer.inner.clone().into());
+        self._resource_handles.push(src.buffer.inner.clone().into());
+        self._resource_handles.push(dst.buffer.inner.clone().into());
 
         self
     }
@@ -270,8 +266,8 @@ impl CommandEncoder {
             &extent,
         );
 
-        self._resource_destroyers.push(src.buffer.clone().into());
-        self._resource_destroyers
+        self._resource_handles.push(src.buffer.clone().into());
+        self._resource_handles
             .push(dst.inner.texture.clone().into());
 
         self
@@ -318,8 +314,8 @@ impl CommandEncoder {
             &size.to_web_sys(),
         );
 
-        self._resource_destroyers.push(src.buffer.clone().into());
-        self._resource_destroyers
+        self._resource_handles.push(src.buffer.clone().into());
+        self._resource_handles
             .push(dst.inner.texture.clone().into());
 
         self
@@ -381,9 +377,9 @@ impl CommandEncoder {
             &extent,
         );
 
-        self._resource_destroyers
+        self._resource_handles
             .push(src.inner.texture.clone().into());
-        self._resource_destroyers.push(dst.buffer.clone().into());
+        self._resource_handles.push(dst.buffer.clone().into());
 
         self
     }
@@ -429,9 +425,9 @@ impl CommandEncoder {
             &size.to_web_sys(),
         );
 
-        self._resource_destroyers
+        self._resource_handles
             .push(src.inner.texture.clone().into());
-        self._resource_destroyers.push(dst.buffer.clone().into());
+        self._resource_handles.push(dst.buffer.clone().into());
 
         self
     }
@@ -492,9 +488,9 @@ impl CommandEncoder {
             &extent,
         );
 
-        self._resource_destroyers
+        self._resource_handles
             .push(src.inner.texture.clone().into());
-        self._resource_destroyers
+        self._resource_handles
             .push(dst.inner.texture.clone().into());
 
         self
@@ -543,9 +539,9 @@ impl CommandEncoder {
             &extent,
         );
 
-        self._resource_destroyers
+        self._resource_handles
             .push(src.inner.texture.clone().into());
-        self._resource_destroyers
+        self._resource_handles
             .push(dst.inner.texture.clone().into());
 
         self
@@ -569,8 +565,8 @@ impl CommandEncoder {
     ) -> ClearRenderPassEncoder<T, Q> {
         let inner = self.inner.begin_render_pass(&descriptor.inner);
 
-        self._resource_destroyers
-            .push(descriptor._texture_destroyers.clone().into());
+        self._resource_handles
+            .push(descriptor._resource_handles.clone().into());
 
         RenderPassEncoder {
             inner,
@@ -611,12 +607,12 @@ impl CommandEncoder {
     pub fn finish(self) -> CommandBuffer {
         let CommandEncoder {
             inner,
-            _resource_destroyers,
+            _resource_handles,
         } = self;
 
         CommandBuffer {
             inner: inner.finish(),
-            _resource_destroyers,
+            _resource_handles,
         }
     }
 }
@@ -686,14 +682,14 @@ impl<P, R> ResourceBindingCommandEncoder for ComputePassEncoder<P, R> {
             let BindGroupEncoding {
                 bind_group,
                 id,
-                _resource_destroyers,
+                _resource_handles,
             } = encoding;
 
             if current_bind_group_ids[i] != Some(id) {
                 inner.set_bind_group(i as u32, &bind_group);
                 command_encoder
-                    ._resource_destroyers
-                    .push(_resource_destroyers.into());
+                    ._resource_handles
+                    .push(_resource_handles.into());
 
                 current_bind_group_ids[i] = Some(id);
             }
@@ -960,7 +956,7 @@ impl EndRenderPass for () {}
 
 pub struct RenderPassDescriptor<RenderTarget, OcclusionQueryState> {
     inner: GpuRenderPassDescriptor,
-    _texture_destroyers: Arc<StaticVec<Arc<TextureDestroyer>, 9>>,
+    _resource_handles: Arc<StaticVec<Arc<TextureHandle>, 9>>,
     _marker: marker::PhantomData<(*const RenderTarget, OcclusionQueryState)>,
 }
 
@@ -1002,23 +998,23 @@ impl RenderPassDescriptor<(), ()> {
         }
 
         let color_array = js_sys::Array::new();
-        let mut texture_destroyers = StaticVec::new();
+        let mut texture_handles = StaticVec::new();
 
         for attachment in color_attachments {
             color_array.push(attachment.inner.as_ref());
-            texture_destroyers.push(attachment._texture_destroyer);
+            texture_handles.push(attachment._texture_handle);
         }
 
         let mut inner = GpuRenderPassDescriptor::new(&color_array);
 
         if let Some(depth_stencil_attachment) = depth_stencil_attachment {
             inner.depth_stencil_attachment(&depth_stencil_attachment.inner);
-            texture_destroyers.push(depth_stencil_attachment._texture_destroyer);
+            texture_handles.push(depth_stencil_attachment._texture_handle);
         }
 
         RenderPassDescriptor {
             inner,
-            _texture_destroyers: Arc::new(texture_destroyers),
+            _resource_handles: Arc::new(texture_handles),
             _marker: Default::default(),
         }
     }
@@ -1034,7 +1030,7 @@ impl<T> RenderPassDescriptor<T, ()> {
 
         RenderPassDescriptor {
             inner: self.inner,
-            _texture_destroyers: self._texture_destroyers,
+            _resource_handles: self._resource_handles,
             _marker: Default::default(),
         }
     }
@@ -1084,14 +1080,14 @@ impl<T, P, V, I, R, Q> ResourceBindingCommandEncoder for RenderPassEncoder<T, P,
             let BindGroupEncoding {
                 bind_group,
                 id,
-                _resource_destroyers,
+                _resource_handles,
             } = encoding;
 
             if current_bind_group_ids[i] != Some(id) {
                 inner.set_bind_group(i as u32, &bind_group);
                 command_encoder
-                    ._resource_destroyers
-                    .push(_resource_destroyers.into());
+                    ._resource_handles
+                    .push(_resource_handles.into());
 
                 current_bind_group_ids[i] = Some(id);
             }
@@ -1170,7 +1166,7 @@ impl<T, P, V, I, R, Q> RenderStateEncoder<T> for RenderPassEncoder<T, P, V, I, R
 
             if current_vertex_buffers[i] != Some(range) {
                 inner.set_vertex_buffer_with_u32_and_u32(i as u32, &buffer.buffer, offset, size);
-                command_encoder._resource_destroyers.push(buffer.into());
+                command_encoder._resource_handles.push(buffer.into());
 
                 current_vertex_buffers[i] = Some(range);
             }
@@ -1213,7 +1209,7 @@ impl<T, P, V, I, R, Q> RenderStateEncoder<T> for RenderPassEncoder<T, P, V, I, R
 
         if current_index_buffer != Some(range) {
             inner.set_index_buffer_with_u32_and_u32(&buffer.buffer, format, offset, size);
-            command_encoder._resource_destroyers.push(buffer.into());
+            command_encoder._resource_handles.push(buffer.into());
 
             current_index_buffer = Some(range);
         }
@@ -1316,8 +1312,8 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
         inner.execute_bundles(array.as_ref());
 
         command_encoder
-            ._resource_destroyers
-            .push(render_bundle._resource_destroyers.clone().into());
+            ._resource_handles
+            .push(render_bundle._resource_handles.clone().into());
 
         RenderPassEncoder {
             inner,
@@ -1353,8 +1349,8 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
             array.push(bundle.inner.as_ref());
 
             command_encoder
-                ._resource_destroyers
-                .push(bundle._resource_destroyers.clone().into());
+                ._resource_handles
+                .push(bundle._resource_handles.clone().into());
         }
 
         inner.execute_bundles(array.as_ref());
@@ -1527,7 +1523,7 @@ where
 
 pub struct RenderBundle<Target> {
     inner: GpuRenderBundle,
-    _resource_destroyers: Arc<Vec<ResourceDestroyer>>,
+    _resource_handles: Arc<Vec<ResourceHandle>>,
     _marker: marker::PhantomData<Target>,
 }
 
@@ -1649,7 +1645,7 @@ pub struct RenderBundleEncoder<Target, Pipeline, Vertex, Index, Resources> {
     current_vertex_buffers: [Option<CurrentBufferRange>; 8],
     current_index_buffer: Option<CurrentBufferRange>,
     current_bind_group_ids: [Option<usize>; 4],
-    _resource_destroyers: Vec<ResourceDestroyer>,
+    _resource_handles: Vec<ResourceHandle>,
     _marker: marker::PhantomData<(
         *const Target,
         *const Pipeline,
@@ -1669,7 +1665,7 @@ impl<T, P, V, I, R> RenderBundleEncoder<T, P, V, I, R> {
             current_vertex_buffers: [None; 8],
             current_index_buffer: None,
             current_bind_group_ids: [None; 4],
-            _resource_destroyers: Vec::new(),
+            _resource_handles: Vec::new(),
             _marker: Default::default(),
         }
     }
@@ -1679,7 +1675,7 @@ impl<T, P, V, I, R> RenderBundleEncoder<T, P, V, I, R> {
     pub fn finish(self) -> RenderBundle<T> {
         RenderBundle {
             inner: self.inner.finish(),
-            _resource_destroyers: Arc::new(self._resource_destroyers),
+            _resource_handles: Arc::new(self._resource_handles),
             _marker: Default::default(),
         }
     }
@@ -1702,7 +1698,7 @@ impl<T, P, V, I, R> ResourceBindingCommandEncoder for RenderBundleEncoder<T, P, 
             current_vertex_buffers,
             current_index_buffer,
             mut current_bind_group_ids,
-            mut _resource_destroyers,
+            _resource_handles: mut _resource_handles,
             ..
         } = self;
 
@@ -1710,12 +1706,12 @@ impl<T, P, V, I, R> ResourceBindingCommandEncoder for RenderBundleEncoder<T, P, 
             let BindGroupEncoding {
                 bind_group,
                 id,
-                _resource_destroyers: bind_group_resource_destroyers,
+                _resource_handles: bind_group_resource_handles,
             } = encoding;
 
             if current_bind_group_ids[i] != Some(id) {
                 inner.set_bind_group(i as u32, &bind_group);
-                _resource_destroyers.push(bind_group_resource_destroyers.into());
+                _resource_handles.push(bind_group_resource_handles.into());
 
                 current_bind_group_ids[i] = Some(id);
             }
@@ -1727,7 +1723,7 @@ impl<T, P, V, I, R> ResourceBindingCommandEncoder for RenderBundleEncoder<T, P, 
             current_vertex_buffers,
             current_index_buffer,
             current_bind_group_ids,
-            _resource_destroyers,
+            _resource_handles,
             _marker: Default::default(),
         }
     }
@@ -1749,7 +1745,7 @@ impl<T, P, V, I, R> RenderStateEncoder<T> for RenderBundleEncoder<T, P, V, I, R>
             current_vertex_buffers,
             current_index_buffer,
             current_bind_group_ids,
-            _resource_destroyers,
+            _resource_handles,
             ..
         } = self;
 
@@ -1763,7 +1759,7 @@ impl<T, P, V, I, R> RenderStateEncoder<T> for RenderBundleEncoder<T, P, V, I, R>
             current_vertex_buffers,
             current_index_buffer,
             current_bind_group_ids,
-            _resource_destroyers,
+            _resource_handles,
             _marker: Default::default(),
         }
     }
@@ -1778,7 +1774,7 @@ impl<T, P, V, I, R> RenderStateEncoder<T> for RenderBundleEncoder<T, P, V, I, R>
             mut current_vertex_buffers,
             current_index_buffer,
             current_bind_group_ids,
-            mut _resource_destroyers,
+            mut _resource_handles,
             ..
         } = self;
 
@@ -1794,7 +1790,7 @@ impl<T, P, V, I, R> RenderStateEncoder<T> for RenderBundleEncoder<T, P, V, I, R>
 
             if current_vertex_buffers[i] != Some(range) {
                 inner.set_vertex_buffer_with_u32_and_u32(i as u32, &buffer.buffer, offset, size);
-                _resource_destroyers.push(buffer.into());
+                _resource_handles.push(buffer.into());
 
                 current_vertex_buffers[i] = Some(range);
             }
@@ -1806,7 +1802,7 @@ impl<T, P, V, I, R> RenderStateEncoder<T> for RenderBundleEncoder<T, P, V, I, R>
             current_vertex_buffers,
             current_index_buffer,
             current_bind_group_ids,
-            _resource_destroyers,
+            _resource_handles,
             _marker: Default::default(),
         }
     }
@@ -1821,7 +1817,7 @@ impl<T, P, V, I, R> RenderStateEncoder<T> for RenderBundleEncoder<T, P, V, I, R>
             current_vertex_buffers,
             mut current_index_buffer,
             current_bind_group_ids,
-            mut _resource_destroyers,
+            mut _resource_handles,
             ..
         } = self;
 
@@ -1837,7 +1833,7 @@ impl<T, P, V, I, R> RenderStateEncoder<T> for RenderBundleEncoder<T, P, V, I, R>
 
         if current_index_buffer != Some(range) {
             inner.set_index_buffer_with_u32_and_u32(&buffer.buffer, format, offset, size);
-            _resource_destroyers.push(buffer.into());
+            _resource_handles.push(buffer.into());
 
             current_index_buffer = Some(range);
         }
@@ -1848,7 +1844,7 @@ impl<T, P, V, I, R> RenderStateEncoder<T> for RenderBundleEncoder<T, P, V, I, R>
             current_vertex_buffers,
             current_index_buffer,
             current_bind_group_ids,
-            _resource_destroyers,
+            _resource_handles,
             _marker: Default::default(),
         }
     }

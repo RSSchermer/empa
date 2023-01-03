@@ -40,15 +40,11 @@ impl<T, P> Projection<T, P> {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! projection {
-    ($parent:ident => $projection:ident) => {
-        {
-            let offset_in_bytes = $crate::offset_of!($parent, $projection);
+    ($parent:ident => $projection:ident) => {{
+        let offset_in_bytes = $crate::offset_of!($parent, $projection);
 
-            unsafe {
-                $crate::buffer::Projection::from_offset_in_bytes(offset_in_bytes)
-            }
-        }
-    };
+        unsafe { $crate::buffer::Projection::from_offset_in_bytes(offset_in_bytes) }
+    }};
 }
 
 pub use crate::projection;
@@ -120,7 +116,7 @@ where
         }
 
         let internal = BufferInternal {
-            inner: Arc::new(BufferDestroyer::new(buffer)),
+            inner: Arc::new(BufferHandle::new(buffer)),
             id,
             len: 1,
             map_context: Mutex::new(map_context),
@@ -178,7 +174,7 @@ where
         }
 
         let internal = BufferInternal {
-            inner: Arc::new(BufferDestroyer::new(buffer)),
+            inner: Arc::new(BufferHandle::new(buffer)),
             id,
             len: slice_len,
             map_context: Mutex::new(map_context),
@@ -192,24 +188,24 @@ where
     }
 }
 
-pub(crate) struct BufferDestroyer {
+pub(crate) struct BufferHandle {
     pub(crate) buffer: GpuBuffer,
 }
 
-impl BufferDestroyer {
+impl BufferHandle {
     fn new(buffer: GpuBuffer) -> Self {
-        BufferDestroyer { buffer }
+        BufferHandle { buffer }
     }
 }
 
-impl Drop for BufferDestroyer {
+impl Drop for BufferHandle {
     fn drop(&mut self) {
         self.buffer.destroy();
     }
 }
 
 pub(crate) struct BufferInternal<U> {
-    pub(crate) inner: Arc<BufferDestroyer>,
+    pub(crate) inner: Arc<BufferHandle>,
     id: usize,
     len: usize,
     map_context: Mutex<MapContext>,
@@ -301,7 +297,7 @@ where
         }
 
         let internal = BufferInternal {
-            inner: Arc::new(BufferDestroyer::new(buffer)),
+            inner: Arc::new(BufferHandle::new(buffer)),
             id,
             len: 1,
             map_context: Mutex::new(map_context),
@@ -355,7 +351,7 @@ where
         }
 
         let internal = BufferInternal {
-            inner: Arc::new(BufferDestroyer::new(buffer)),
+            inner: Arc::new(BufferHandle::new(buffer)),
             id,
             len,
             map_context: Mutex::new(map_context),
@@ -1480,7 +1476,7 @@ pub struct Uniform<T>
 where
     T: ?Sized,
 {
-    pub(crate) inner: Arc<BufferDestroyer>,
+    pub(crate) inner: Arc<BufferHandle>,
     pub(crate) offset: usize,
     pub(crate) size: usize,
     _marker: marker::PhantomData<*const T>,
@@ -1490,7 +1486,7 @@ pub struct Storage<T>
 where
     T: ?Sized,
 {
-    pub(crate) inner: Arc<BufferDestroyer>,
+    pub(crate) inner: Arc<BufferHandle>,
     pub(crate) offset: usize,
     pub(crate) size: usize,
     _marker: marker::PhantomData<*const T>,
@@ -1500,14 +1496,14 @@ pub struct ReadOnlyStorage<T>
 where
     T: ?Sized,
 {
-    pub(crate) inner: Arc<BufferDestroyer>,
+    pub(crate) inner: Arc<BufferHandle>,
     pub(crate) offset: usize,
     pub(crate) size: usize,
     _marker: marker::PhantomData<*const T>,
 }
 
 pub(crate) struct ImageCopyBuffer {
-    pub(crate) buffer: Arc<BufferDestroyer>,
+    pub(crate) buffer: Arc<BufferHandle>,
     pub(crate) offset: usize,
     pub(crate) size: usize,
     pub(crate) bytes_per_block: u32,

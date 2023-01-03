@@ -30,21 +30,21 @@ use web_sys::{GpuExtent3dDict, GpuImageDataLayout};
 
 use crate::texture::format::TextureFormatId;
 
-pub(crate) struct TextureDestroyer {
+pub(crate) struct TextureHandle {
     texture: web_sys::GpuTexture,
     is_swap_chain: bool,
 }
 
-impl TextureDestroyer {
+impl TextureHandle {
     fn new(texture: web_sys::GpuTexture, is_swap_chain: bool) -> Self {
-        TextureDestroyer {
+        TextureHandle {
             texture,
             is_swap_chain,
         }
     }
 }
 
-impl Drop for TextureDestroyer {
+impl Drop for TextureHandle {
     fn drop(&mut self) {
         if !self.is_swap_chain {
             self.texture.destroy();

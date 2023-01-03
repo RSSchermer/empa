@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use web_sys::{GpuColorDict, GpuLoadOp, GpuStoreOp};
 
-use crate::texture::TextureDestroyer;
+use crate::texture::TextureHandle;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct InvalidDepthValue(f32);
@@ -137,12 +137,12 @@ pub struct ColorTargetEncoding {
     pub(crate) inner: web_sys::GpuRenderPassColorAttachment,
     pub(crate) width: u32,
     pub(crate) height: u32,
-    pub(crate) _texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) _texture_handle: Arc<TextureHandle>,
 }
 
 pub struct DepthStencilTargetEncoding {
     pub(crate) inner: web_sys::GpuRenderPassDepthStencilAttachment,
     pub(crate) width: u32,
     pub(crate) height: u32,
-    pub(crate) _texture_destroyer: Arc<TextureDestroyer>,
+    pub(crate) _texture_handle: Arc<TextureHandle>,
 }

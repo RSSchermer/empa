@@ -3,11 +3,11 @@ use std::sync::Arc;
 use web_sys::GpuIndexFormat;
 
 use crate::buffer;
-use crate::buffer::{Buffer, BufferDestroyer};
+use crate::buffer::{Buffer, BufferHandle};
 use crate::render_pipeline::IndexData;
 
 pub struct IndexBufferEncoding {
-    pub(crate) buffer: Arc<BufferDestroyer>,
+    pub(crate) buffer: Arc<BufferHandle>,
     pub(crate) id: usize,
     pub(crate) format: GpuIndexFormat,
     pub(crate) offset: u32,

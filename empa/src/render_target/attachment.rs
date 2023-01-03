@@ -97,7 +97,7 @@ where
             inner,
             width: image.width,
             height: image.height,
-            _texture_destroyer: image.texture_destroyer.clone(),
+            _texture_handle: image.texture_handle.clone(),
         }
     }
 }
@@ -142,7 +142,7 @@ where
             inner,
             width: image.width,
             height: image.height,
-            _texture_destroyer: image.texture_destroyer.clone(),
+            _texture_handle: image.texture_handle.clone(),
         }
     }
 }
@@ -187,7 +187,7 @@ where
             inner,
             width: image.width,
             height: image.height,
-            _texture_destroyer: image.texture_destroyer.clone(),
+            _texture_handle: image.texture_handle.clone(),
         }
     }
 }
@@ -254,7 +254,7 @@ where
             inner,
             width: image.width,
             height: image.height,
-            _texture_destroyer: image.texture_destroyer.clone(),
+            _texture_handle: image.texture_handle.clone(),
         }
     }
 }
@@ -288,7 +288,7 @@ where
             inner,
             width: image.width,
             height: image.height,
-            _texture_destroyer: image.texture_destroyer.clone(),
+            _texture_handle: image.texture_handle.clone(),
         }
     }
 }
@@ -330,7 +330,7 @@ where
             inner,
             width: image.width,
             height: image.height,
-            _texture_destroyer: image.texture_destroyer.clone(),
+            _texture_handle: image.texture_handle.clone(),
         }
     }
 }
@@ -363,7 +363,7 @@ where
             inner,
             width: image.width,
             height: image.height,
-            _texture_destroyer: image.texture_destroyer.clone(),
+            _texture_handle: image.texture_handle.clone(),
         }
     }
 }
@@ -405,7 +405,7 @@ where
             inner,
             width: image.width,
             height: image.height,
-            _texture_destroyer: image.texture_destroyer.clone(),
+            _texture_handle: image.texture_handle.clone(),
         }
     }
 }
@@ -438,7 +438,7 @@ where
             inner,
             width: image.width,
             height: image.height,
-            _texture_destroyer: image.texture_destroyer.clone(),
+            _texture_handle: image.texture_handle.clone(),
         }
     }
 }
