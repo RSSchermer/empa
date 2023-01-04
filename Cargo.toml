@@ -13,5 +13,6 @@ members = [
     "examples/web/5_compute_prefix_sum",
     "examples/web/6_compute_atomic_array",
     "examples/web/7_buffer_projection",
-    "examples/web/8_persistent_threads"
+    "examples/web/8_persistent_threads",
+    "examples/web/9_timestamp"
 ]

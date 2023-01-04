@@ -10,7 +10,7 @@ use crate::command::{
     CommandBuffer, CommandEncoder, RenderBundleEncoder, RenderBundleEncoderDescriptor,
 };
 use crate::compute_pipeline::{ComputePipeline, ComputePipelineDescriptor};
-use crate::query::OcclusionQuerySet;
+use crate::query::{OcclusionQuerySet, TimestampQuerySet};
 use crate::render_pipeline::{RenderPipeline, RenderPipelineDescriptor};
 use crate::resource_binding::{
     BindGroup, BindGroupLayout, BindGroupLayoutEntry, BindGroupLayouts, PipelineLayout, Resources,
@@ -261,6 +261,10 @@ impl Device {
 
     pub fn create_occlusion_query_set(&self, len: u32) -> OcclusionQuerySet {
         OcclusionQuerySet::new(self, len)
+    }
+
+    pub fn create_timestamp_query_set(&self, len: u32) -> TimestampQuerySet {
+        TimestampQuerySet::new(self, len)
     }
 
     pub fn create_command_encoder(&self) -> CommandEncoder {

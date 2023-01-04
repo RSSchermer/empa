@@ -8,7 +8,8 @@ use wasm_bindgen::JsValue;
 use web_sys::{
     GpuColorDict, GpuCommandBuffer, GpuCommandEncoder, GpuComputePassEncoder, GpuExtent3dDict,
     GpuRenderBundle, GpuRenderBundleEncoder, GpuRenderBundleEncoderDescriptor,
-    GpuRenderPassDescriptor, GpuRenderPassEncoder,
+    GpuRenderPassDescriptor, GpuRenderPassEncoder, GpuRenderPassTimestampLocation,
+    GpuRenderPassTimestampWrite,
 };
 
 use crate::abi;
@@ -20,7 +21,7 @@ use crate::command::{
 };
 use crate::compute_pipeline::ComputePipeline;
 use crate::device::Device;
-use crate::query::OcclusionQuerySet;
+use crate::query::{OcclusionQuerySet, QuerySetHandle, TimestampQuerySet};
 use crate::render_pipeline::{PipelineIndexFormat, PipelineIndexFormatCompatible, RenderPipeline};
 use crate::render_target::{
     MultisampleRenderLayout, ReadOnly, RenderLayout, RenderTargetEncoding, TypedColorLayout,
@@ -39,6 +40,7 @@ enum ResourceHandle {
     BindGroup(Arc<Vec<BindGroupResource>>),
     RenderTarget(Arc<StaticVec<Arc<TextureHandle>, 9>>),
     RenderBundle(Arc<Vec<ResourceHandle>>),
+    QuerySet(Arc<QuerySetHandle>),
 }
 
 impl From<Arc<BufferHandle>> for ResourceHandle {
@@ -68,6 +70,12 @@ impl From<Arc<StaticVec<Arc<TextureHandle>, 9_usize>>> for ResourceHandle {
 impl From<Arc<Vec<ResourceHandle>>> for ResourceHandle {
     fn from(render_bundle_resources: Arc<Vec<ResourceHandle>>) -> Self {
         ResourceHandle::RenderBundle(render_bundle_resources)
+    }
+}
+
+impl From<Arc<QuerySetHandle>> for ResourceHandle {
+    fn from(resource_handle: Arc<QuerySetHandle>) -> Self {
+        ResourceHandle::QuerySet(resource_handle)
     }
 }
 
@@ -566,7 +574,11 @@ impl CommandEncoder {
         let inner = self.inner.begin_render_pass(&descriptor.inner);
 
         self._resource_handles
-            .push(descriptor._resource_handles.clone().into());
+            .push(descriptor._texture_handles.clone().into());
+
+        if let Some(query_set_handle) = &descriptor._occlusion_query_set_handle {
+            self._resource_handles.push(query_set_handle.clone().into());
+        }
 
         RenderPassEncoder {
             inner,
@@ -579,27 +591,70 @@ impl CommandEncoder {
         }
     }
 
+    pub fn write_timestamp(mut self, query_set: &TimestampQuerySet, index: u32) -> Self {
+        assert!(index < query_set.len(), "index out of bounds");
+
+        self.inner.write_timestamp(query_set.as_web_sys(), index);
+
+        self._resource_handles.push(query_set.inner.clone().into());
+
+        self
+    }
+
     pub fn resolve_occlusion_query_set<U>(
-        self,
-        query: &OcclusionQuerySet,
+        mut self,
+        query_set: &OcclusionQuerySet,
         offset: u32,
-        view: buffer::View<[u32], U>,
+        view: buffer::View<[u64], U>,
     ) -> Self
     where
         U: buffer::QueryResolve,
     {
         assert!(
-            offset + view.len() as u32 <= query.len(),
+            offset + view.len() as u32 <= query_set.len(),
             "resolve range out of bounds"
         );
 
         self.inner.resolve_query_set_with_u32(
-            query.as_web_sys(),
+            query_set.as_web_sys(),
             offset,
             view.len() as u32,
             view.as_web_sys(),
             view.offset_in_bytes() as u32,
         );
+
+        self._resource_handles.push(query_set.inner.clone().into());
+        self._resource_handles
+            .push(view.buffer.inner.clone().into());
+
+        self
+    }
+
+    pub fn resolve_timestamp_query_set<U>(
+        mut self,
+        query_set: &TimestampQuerySet,
+        offset: u32,
+        view: buffer::View<[u64], U>,
+    ) -> Self
+    where
+        U: buffer::QueryResolve,
+    {
+        assert!(
+            offset + view.len() as u32 <= query_set.len(),
+            "resolve range out of bounds"
+        );
+
+        self.inner.resolve_query_set_with_u32(
+            query_set.as_web_sys(),
+            offset,
+            view.len() as u32,
+            view.as_web_sys(),
+            view.offset_in_bytes() as u32,
+        );
+
+        self._resource_handles.push(query_set.inner.clone().into());
+        self._resource_handles
+            .push(view.buffer.inner.clone().into());
 
         self
     }
@@ -954,9 +1009,15 @@ impl EndRenderPass for OcclusionQueryState<O> {}
 impl end_render_pass_seal::Seal for () {}
 impl EndRenderPass for () {}
 
+struct RenderPassTimestampQuery {
+    inner: GpuRenderPassTimestampWrite,
+    _handle: Arc<QuerySetHandle>,
+}
+
 pub struct RenderPassDescriptor<RenderTarget, OcclusionQueryState> {
     inner: GpuRenderPassDescriptor,
-    _resource_handles: Arc<StaticVec<Arc<TextureHandle>, 9>>,
+    _texture_handles: Arc<StaticVec<Arc<TextureHandle>, 9>>,
+    _occlusion_query_set_handle: Option<Arc<QuerySetHandle>>,
     _marker: marker::PhantomData<(*const RenderTarget, OcclusionQueryState)>,
 }
 
@@ -1014,7 +1075,8 @@ impl RenderPassDescriptor<(), ()> {
 
         RenderPassDescriptor {
             inner,
-            _resource_handles: Arc::new(texture_handles),
+            _texture_handles: Arc::new(texture_handles),
+            _occlusion_query_set_handle: None,
             _marker: Default::default(),
         }
     }
@@ -1030,7 +1092,8 @@ impl<T> RenderPassDescriptor<T, ()> {
 
         RenderPassDescriptor {
             inner: self.inner,
-            _resource_handles: self._resource_handles,
+            _texture_handles: self._texture_handles,
+            _occlusion_query_set_handle: Some(occlusion_query_set.inner.clone()),
             _marker: Default::default(),
         }
     }

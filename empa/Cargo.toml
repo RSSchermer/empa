@@ -95,6 +95,8 @@ features = [
     "GpuRenderPassDepthStencilAttachment",
     "GpuRenderPassDescriptor",
     "GpuRenderPassEncoder",
+    "GpuRenderPassTimestampLocation",
+    "GpuRenderPassTimestampWrite",
     "GpuRenderPipeline",
     "GpuRenderPipelineDescriptor",
     "GpuRequestAdapterOptions",
