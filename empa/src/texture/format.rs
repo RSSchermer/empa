@@ -599,6 +599,7 @@ impl SignedIntegerSamplable for r16sint {}
 impl SignedIntegerSamplable for rg16sint {}
 impl SignedIntegerSamplable for rgba16sint {}
 impl SignedIntegerSamplable for r32sint {}
+impl SignedIntegerSamplable for rg32sint {}
 impl SignedIntegerSamplable for rgba32sint {}
 
 pub trait UnsignedIntegerSamplable: TextureFormat {}
@@ -610,6 +611,7 @@ impl UnsignedIntegerSamplable for r16uint {}
 impl UnsignedIntegerSamplable for rg16uint {}
 impl UnsignedIntegerSamplable for rgba16uint {}
 impl UnsignedIntegerSamplable for r32uint {}
+impl UnsignedIntegerSamplable for rg32uint {}
 impl UnsignedIntegerSamplable for rgba32uint {}
 
 pub trait DepthSamplable: TextureFormat {}
