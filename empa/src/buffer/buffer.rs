@@ -23,6 +23,7 @@ use crate::buffer::{
 use crate::device::{Device, ID_GEN};
 use crate::texture::{ImageCopySize3D, ImageDataByteLayout, ImageDataLayout};
 
+#[derive(Clone, Copy)]
 pub struct Projection<T, P> {
     offset_in_bytes: usize,
     _marker: marker::PhantomData<(T, P)>,

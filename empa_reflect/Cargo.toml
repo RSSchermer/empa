@@ -9,5 +9,5 @@ repository = "https://github.com/RSSchermer/empa"
 license = "MIT"
 
 [dependencies.naga]
-path = "../../naga"
+git = "https://github.com/gfx-rs/naga.git"
 features = ["wgsl-in", "span"]

@@ -253,12 +253,14 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
                 .with_message(err.message().to_string())
                 .with_labels(
                     err.labels()
-                        .map(|label| {
-                            let source_range = label.0.clone();
+                        .flat_map(|label| {
+                            let source_range = label.0.clone().to_range()?;
                             let mapped_span = output.source_map.mapped_span(source_range).unwrap();
 
-                            Label::primary(mapped_span.file_id, mapped_span.range.clone())
-                                .with_message(label.1.to_string())
+                            Some(
+                                Label::primary(mapped_span.file_id, mapped_span.range.clone())
+                                    .with_message(label.1.to_string()),
+                            )
                         })
                         .collect(),
                 );
