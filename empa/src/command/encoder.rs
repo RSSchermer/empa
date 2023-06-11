@@ -8,8 +8,7 @@ use wasm_bindgen::JsValue;
 use web_sys::{
     GpuColorDict, GpuCommandBuffer, GpuCommandEncoder, GpuComputePassEncoder, GpuExtent3dDict,
     GpuRenderBundle, GpuRenderBundleEncoder, GpuRenderBundleEncoderDescriptor,
-    GpuRenderPassDescriptor, GpuRenderPassEncoder, GpuRenderPassTimestampLocation,
-    GpuRenderPassTimestampWrite,
+    GpuRenderPassDescriptor, GpuRenderPassEncoder, GpuRenderPassTimestampWrite,
 };
 
 use crate::abi;
@@ -32,7 +31,6 @@ use crate::texture::format::{DepthStencilRenderable, ImageData, TextureFormat};
 use crate::texture::{ImageCopySize3D, TextureHandle};
 use crate::type_flag::{TypeFlag, O, X};
 use crate::{buffer, texture};
-use zeroable::Zeroable;
 
 enum ResourceHandle {
     Buffer(Arc<BufferHandle>),

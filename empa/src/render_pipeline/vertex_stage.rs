@@ -5,7 +5,8 @@ use web_sys::{GpuVertexBufferLayout, GpuVertexState};
 
 use crate::pipeline_constants::PipelineConstants;
 use crate::render_pipeline::TypedVertexLayout;
-use crate::shader_module::{ShaderModule, ShaderSourceInternal, StaticShaderStage};
+use crate::shader_module::{ShaderModule, ShaderSourceInternal};
+use empa_reflect::ShaderStage;
 
 pub struct VertexStage<V> {
     pub(crate) inner: GpuVertexState,
@@ -27,15 +28,13 @@ impl VertexStageBuilder<()> {
         let inner = GpuVertexState::new(entry_point, &shader_module.inner);
         let shader_meta = shader_module.meta.clone();
 
-        let (entry_index, entry) = shader_meta
-            .entry_points()
-            .iter()
-            .enumerate()
-            .find(|(_, e)| e.name == entry_point)
+        let entry_index = shader_meta
+            .resolve_entry_point_index(entry_point)
             .expect("could not find entry point in shader module");
+        let stage = shader_meta.entry_point_stage(entry_index);
 
         assert!(
-            entry.stage == StaticShaderStage::Vertex,
+            stage == Some(ShaderStage::Vertex),
             "entry point is not a vertex stage"
         );
 
@@ -58,17 +57,20 @@ impl VertexStageBuilder<()> {
         } = self;
 
         let layout = V::LAYOUT;
-        let entry = &shader_meta.entry_points()[entry_index];
+
+        let input_bindings = shader_meta.entry_point_input_bindings(entry_index).unwrap();
 
         // Unclear if this can be optimized by e.g. sorting first. The default limit for attributes
         // is 16, so the upper limit would be roughly 1024 reads and comparisons on a piece of
         // data that easily fits in cache; may not be able to beat simple repeated iteration.
-        'outer: for binding in entry.input_bindings {
+        'outer: for binding in input_bindings {
+            let location = binding.location();
+
             for descriptor in layout {
                 for attribute in descriptor.attribute_descriptors {
-                    if attribute.shader_location == binding.location {
-                        if !attribute.format.is_compatible(binding.binding_type) {
-                            panic!("attribute for location `{}` is not compatible with the shader type", binding.location);
+                    if attribute.shader_location == location {
+                        if !attribute.format.is_compatible(binding.binding_type()) {
+                            panic!("attribute for location `{}` is not compatible with the shader type", location);
                         }
 
                         continue 'outer;
@@ -76,7 +78,7 @@ impl VertexStageBuilder<()> {
                 }
             }
 
-            panic!("no attribute found for location `{}`", binding.location);
+            panic!("no attribute found for location `{}`", location);
         }
 
         let layout_array = js_sys::Array::new();
@@ -147,7 +149,7 @@ where
             ..
         } = self;
 
-        if !has_constants && shader_meta.constants().iter().any(|c| c.required) {
+        if !has_constants && shader_meta.has_required_constants() {
             panic!("the shader declares pipeline constants without fallback values, but no pipeline constants were set");
         }
 

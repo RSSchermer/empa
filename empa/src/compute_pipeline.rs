@@ -7,7 +7,8 @@ use web_sys::{GpuComputePipeline, GpuComputePipelineDescriptor, GpuProgrammableS
 use crate::device::{Device, ID_GEN};
 use crate::pipeline_constants::PipelineConstants;
 use crate::resource_binding::{PipelineLayout, ShaderStages, TypedPipelineLayout};
-use crate::shader_module::{ShaderModule, ShaderSourceInternal, StaticShaderStage};
+use crate::shader_module::{ShaderModule, ShaderSourceInternal};
+use empa_reflect::ShaderStage;
 
 pub struct ComputePipeline<L> {
     inner: GpuComputePipeline,
@@ -123,9 +124,21 @@ impl<Layout: TypedPipelineLayout> ComputePipelineDescriptorBuilder<PipelineLayou
     }
 }
 
-impl<Layout: TypedPipelineLayout>
-    ComputePipelineDescriptorBuilder<PipelineLayout<Layout>, ComputeStage>
-{
+impl<Layout> ComputePipelineDescriptorBuilder<PipelineLayout<Layout>, ()> {
+    pub unsafe fn compute_unchecked(
+        mut self,
+        compute_stage: &ComputeStage,
+    ) -> ComputePipelineDescriptorBuilder<PipelineLayout<Layout>, ComputeStage> {
+        self.inner.compute(&compute_stage.inner);
+
+        ComputePipelineDescriptorBuilder {
+            inner: self.inner,
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<Layout> ComputePipelineDescriptorBuilder<PipelineLayout<Layout>, ComputeStage> {
     pub fn finish(self) -> ComputePipelineDescriptor<Layout> {
         ComputePipelineDescriptor {
             inner: self.inner,
@@ -151,15 +164,13 @@ impl ComputeStageBuilder {
         let inner = GpuProgrammableStage::new(entry_point, &shader_module.inner);
         let shader_meta = shader_module.meta.clone();
 
-        let (entry_index, entry) = shader_meta
-            .entry_points()
-            .iter()
-            .enumerate()
-            .find(|(_, e)| e.name == entry_point)
+        let entry_index = shader_meta
+            .resolve_entry_point_index(entry_point)
             .expect("could not find entry point in shader module");
+        let stage = shader_meta.entry_point_stage(entry_index);
 
         assert!(
-            entry.stage == StaticShaderStage::Compute,
+            stage == Some(ShaderStage::Compute),
             "entry point is not a compute stage"
         );
 
@@ -203,7 +214,7 @@ impl ComputeStageBuilder {
             ..
         } = self;
 
-        if !has_constants && shader_meta.constants().iter().any(|c| c.required) {
+        if !has_constants && shader_meta.has_required_constants() {
             panic!("the shader declares pipeline constants without fallback values, but no pipeline constants were set");
         }
 

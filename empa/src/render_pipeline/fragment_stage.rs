@@ -8,8 +8,9 @@ use web_sys::{
 
 use crate::pipeline_constants::PipelineConstants;
 use crate::render_target::TypedColorLayout;
-use crate::shader_module::{ShaderModule, ShaderSourceInternal, StaticShaderStage};
+use crate::shader_module::{ShaderModule, ShaderSourceInternal};
 use crate::texture::format::{Blendable, ColorRenderable};
+use empa_reflect::ShaderStage;
 
 pub enum BlendFactor {
     Zero,
@@ -277,15 +278,13 @@ impl FragmentStageBuilder<()> {
         let inner = GpuFragmentState::new(entry_point, &shader_module.inner, &JsValue::null());
         let shader_meta = shader_module.meta.clone();
 
-        let (entry_index, entry) = shader_meta
-            .entry_points()
-            .iter()
-            .enumerate()
-            .find(|(_, e)| e.name == entry_point)
+        let entry_index = shader_meta
+            .resolve_entry_point_index(entry_point)
             .expect("could not find entry point in shader module");
+        let stage = shader_meta.entry_point_stage(entry_index);
 
         assert!(
-            entry.stage == StaticShaderStage::Fragment,
+            stage == Some(ShaderStage::Fragment),
             "entry point is not a fragment stage"
         );
 
@@ -311,45 +310,51 @@ impl FragmentStageBuilder<()> {
         } = self;
 
         let layout = O::Layout::COLOR_FORMATS;
-        let entry = &shader_meta.entry_points()[entry_index];
 
-        for binding in entry.output_bindings {
-            if let Some(format) = layout.get(binding.location as usize) {
+        let output_bindings = shader_meta
+            .entry_point_output_bindings(entry_index)
+            .unwrap();
+
+        for binding in output_bindings {
+            let location = binding.location();
+            let binding_type = binding.binding_type();
+
+            if let Some(format) = layout.get(location as usize) {
                 // TODO: it's not clear from the spec what it means for a format to be compatible
                 // with an output. Assuming for now that compatibility is solely about the main
                 // component type (float, half-float, uint, sint) and not the number of components
                 // (as this is how it works in OpenGL); needs confirmation.
-                if binding.binding_type.is_float() && !format.is_float() {
+                if binding_type.is_float() && !format.is_float() {
                     panic!(
                         "shader expects a float format binding for location `{}`",
-                        binding.location
+                        location
                     );
                 }
 
-                if binding.binding_type.is_half_float() && !format.is_half_float() {
+                if binding_type.is_half_float() && !format.is_half_float() {
                     panic!(
                         "shader expects a half-float format binding for location `{}`",
-                        binding.location
+                        location
                     );
                 }
 
-                if binding.binding_type.is_signed_integer() && !format.is_signed_integer() {
+                if binding_type.is_signed_integer() && !format.is_signed_integer() {
                     panic!(
                         "shader expects a signed integer format binding for location `{}`",
-                        binding.location
+                        location
                     );
                 }
 
-                if binding.binding_type.is_unsigned_integer() && !format.is_unsigned_integer() {
+                if binding_type.is_unsigned_integer() && !format.is_unsigned_integer() {
                     panic!(
                         "shader expects an unsigned integer format binding for location `{}`",
-                        binding.location
+                        location
                     );
                 }
             } else {
                 panic!(
                     "shader expects an output binding for location `{}`",
-                    binding.location
+                    location
                 );
             }
         }
@@ -412,7 +417,7 @@ where
             ..
         } = self;
 
-        if !has_constants && shader_meta.constants().iter().any(|c| c.required) {
+        if !has_constants && shader_meta.has_required_constants() {
             panic!("the shader declares pipeline constants without fallback values, but no pipeline constants were set");
         }
 

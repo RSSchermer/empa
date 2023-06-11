@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use empa_reflect::ShaderSource as DynamicShaderSource;
+use empa_reflect::{
+    Constant, ConstantIdentifier, ConstantType, EntryPointBinding as DynamicEntryPointBinding,
+    EntryPointBindingType, ShaderSource as DynamicShaderSource, ShaderStage,
+};
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::{GpuShaderModule, GpuShaderModuleDescriptor};
 
@@ -9,6 +12,8 @@ use crate::pipeline_constants::{PipelineConstantIdentifier, PipelineConstants};
 use crate::resource_binding::BindingType;
 
 pub use empa_macros::shader_source;
+use naga::front::wgsl;
+use std::{fmt, slice};
 
 /// Internal type for `shader_source` macro.
 #[doc(hidden)]
@@ -21,22 +26,11 @@ pub struct StaticConstantDescriptor {
 
 /// Internal type for `shader_source` macro.
 #[doc(hidden)]
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum StaticConstantType {
-    Float,
-    Bool,
-    SignedInteger,
-    UnsignedInteger,
-}
+pub type StaticConstantType = ConstantType;
 
 /// Internal type for `shader_source` macro.
 #[doc(hidden)]
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum StaticShaderStage {
-    Vertex,
-    Fragment,
-    Compute,
-}
+pub type StaticShaderStage = ShaderStage;
 
 /// Internal type for `shader_source` macro.
 #[doc(hidden)]
@@ -80,43 +74,42 @@ pub enum StaticEntryPointBindingType {
 }
 
 impl StaticEntryPointBindingType {
-    pub(crate) fn is_float(&self) -> bool {
+    pub fn to_entry_point_binding_type(&self) -> EntryPointBindingType {
         match self {
-            StaticEntryPointBindingType::Float
-            | StaticEntryPointBindingType::FloatVector2
-            | StaticEntryPointBindingType::FloatVector3
-            | StaticEntryPointBindingType::FloatVector4 => true,
-            _ => false,
-        }
-    }
-
-    pub(crate) fn is_half_float(&self) -> bool {
-        match self {
-            StaticEntryPointBindingType::HalfFloat
-            | StaticEntryPointBindingType::HalfFloatVector2
-            | StaticEntryPointBindingType::HalfFloatVector3
-            | StaticEntryPointBindingType::HalfFloatVector4 => true,
-            _ => false,
-        }
-    }
-
-    pub(crate) fn is_signed_integer(&self) -> bool {
-        match self {
-            StaticEntryPointBindingType::SignedInteger
-            | StaticEntryPointBindingType::SignedIntegerVector2
-            | StaticEntryPointBindingType::SignedIntegerVector3
-            | StaticEntryPointBindingType::SignedIntegerVector4 => true,
-            _ => false,
-        }
-    }
-
-    pub(crate) fn is_unsigned_integer(&self) -> bool {
-        match self {
-            StaticEntryPointBindingType::UnsignedInteger
-            | StaticEntryPointBindingType::UnsignedIntegerVector2
-            | StaticEntryPointBindingType::UnsignedIntegerVector3
-            | StaticEntryPointBindingType::UnsignedIntegerVector4 => true,
-            _ => false,
+            StaticEntryPointBindingType::SignedInteger => EntryPointBindingType::SignedInteger,
+            StaticEntryPointBindingType::SignedIntegerVector2 => {
+                EntryPointBindingType::SignedIntegerVector2
+            }
+            StaticEntryPointBindingType::SignedIntegerVector3 => {
+                EntryPointBindingType::SignedIntegerVector3
+            }
+            StaticEntryPointBindingType::SignedIntegerVector4 => {
+                EntryPointBindingType::SignedIntegerVector4
+            }
+            StaticEntryPointBindingType::UnsignedInteger => EntryPointBindingType::UnsignedInteger,
+            StaticEntryPointBindingType::UnsignedIntegerVector2 => {
+                EntryPointBindingType::UnsignedIntegerVector2
+            }
+            StaticEntryPointBindingType::UnsignedIntegerVector3 => {
+                EntryPointBindingType::UnsignedIntegerVector3
+            }
+            StaticEntryPointBindingType::UnsignedIntegerVector4 => {
+                EntryPointBindingType::UnsignedIntegerVector4
+            }
+            StaticEntryPointBindingType::Float => EntryPointBindingType::Float,
+            StaticEntryPointBindingType::FloatVector2 => EntryPointBindingType::FloatVector2,
+            StaticEntryPointBindingType::FloatVector3 => EntryPointBindingType::FloatVector3,
+            StaticEntryPointBindingType::FloatVector4 => EntryPointBindingType::FloatVector4,
+            StaticEntryPointBindingType::HalfFloat => EntryPointBindingType::HalfFloat,
+            StaticEntryPointBindingType::HalfFloatVector2 => {
+                EntryPointBindingType::HalfFloatVector2
+            }
+            StaticEntryPointBindingType::HalfFloatVector3 => {
+                EntryPointBindingType::HalfFloatVector3
+            }
+            StaticEntryPointBindingType::HalfFloatVector4 => {
+                EntryPointBindingType::HalfFloatVector4
+            }
         }
     }
 }
@@ -180,17 +173,62 @@ impl ShaderSourceInternal {
         }
     }
 
-    pub(crate) fn constants(&self) -> &[StaticConstantDescriptor] {
+    pub(crate) fn has_required_constants(&self) -> bool {
         match self {
-            ShaderSourceInternal::Static(source) => source.constants,
-            ShaderSourceInternal::Dynamic(_) => todo!(),
+            ShaderSourceInternal::Static(s) => s.constants.iter().any(|c| c.required),
+            ShaderSourceInternal::Dynamic(s) => s.constants().iter().any(|c| c.required()),
         }
     }
 
-    pub(crate) fn entry_points(&self) -> &[StaticEntryPoint] {
+    pub(crate) fn resolve_entry_point_index(&self, name: &str) -> Option<usize> {
         match self {
-            ShaderSourceInternal::Static(source) => source.entry_points,
-            ShaderSourceInternal::Dynamic(_) => todo!(),
+            ShaderSourceInternal::Static(source) => source
+                .entry_points
+                .iter()
+                .enumerate()
+                .find(|(_, e)| e.name == name)
+                .map(|(index, _)| index),
+            ShaderSourceInternal::Dynamic(source) => source
+                .entry_points()
+                .iter()
+                .enumerate()
+                .find(|(_, e)| e.name() == name)
+                .map(|(index, _)| index),
+        }
+    }
+
+    pub(crate) fn entry_point_stage(&self, index: usize) -> Option<ShaderStage> {
+        match self {
+            ShaderSourceInternal::Static(source) => source.entry_points.get(index).map(|e| e.stage),
+            ShaderSourceInternal::Dynamic(source) => {
+                source.entry_points().get(index).map(|e| e.stage())
+            }
+        }
+    }
+
+    pub(crate) fn entry_point_input_bindings(&self, index: usize) -> Option<EntryPointBindings> {
+        match self {
+            ShaderSourceInternal::Static(source) => source
+                .entry_points
+                .get(index)
+                .map(|e| EntryPointBindings::Static(e.input_bindings.iter())),
+            ShaderSourceInternal::Dynamic(source) => source
+                .entry_points()
+                .get(index)
+                .map(|e| EntryPointBindings::Dynamic(e.input_bindings().iter())),
+        }
+    }
+
+    pub(crate) fn entry_point_output_bindings(&self, index: usize) -> Option<EntryPointBindings> {
+        match self {
+            ShaderSourceInternal::Static(source) => source
+                .entry_points
+                .get(index)
+                .map(|e| EntryPointBindings::Static(e.output_bindings.iter())),
+            ShaderSourceInternal::Dynamic(source) => source
+                .entry_points()
+                .get(index)
+                .map(|e| EntryPointBindings::Dynamic(e.output_bindings().iter())),
         }
     }
 
@@ -198,32 +236,108 @@ impl ShaderSourceInternal {
         &self,
         pipeline_constants: &C,
     ) -> js_sys::Object {
-        let shader_constants = self.constants();
         let record = js_sys::Object::new();
 
-        for constant in shader_constants {
-            if let Some(supplied_value) = pipeline_constants.lookup(constant.identifier) {
-                if supplied_value.constant_type() != constant.constant_type {
-                    panic!("supplied value for pipeline constant `{}` does not match the type expected by the shader", constant.identifier)
+        let add_constant = |identifier: PipelineConstantIdentifier,
+                            tpe: ConstantType,
+                            required: bool| {
+            if let Some(supplied_value) = pipeline_constants.lookup(identifier) {
+                if supplied_value.constant_type() != tpe {
+                    panic!("supplied value for pipeline constant `{}` does not match the type expected by the shader", identifier)
                 }
 
                 js_sys::Reflect::set(
                     record.as_ref(),
-                    &constant.identifier.to_js_value(),
+                    &identifier.to_js_value(),
                     &supplied_value.to_js_value(),
                 )
                 .unwrap_throw();
             } else {
-                if constant.required {
+                if required {
                     panic!(
                         "could not find a value for the required constant `{}`",
-                        constant.identifier
+                        identifier
                     );
+                }
+            }
+        };
+
+        match self {
+            ShaderSourceInternal::Static(s) => {
+                for constant in s.constants {
+                    add_constant(
+                        constant.identifier,
+                        constant.constant_type,
+                        constant.required,
+                    );
+                }
+            }
+            ShaderSourceInternal::Dynamic(s) => {
+                for constant in s.constants() {
+                    let identifier = match constant.identifier() {
+                        ConstantIdentifier::Number(n) => PipelineConstantIdentifier::Number(*n),
+                        ConstantIdentifier::Name(n) => PipelineConstantIdentifier::Name(n),
+                    };
+
+                    add_constant(identifier, constant.constant_type(), constant.required());
                 }
             }
         }
 
         record
+    }
+}
+
+pub(crate) enum EntryPointBindings<'a> {
+    Static(slice::Iter<'a, StaticEntryPointBinding>),
+    Dynamic(slice::Iter<'a, DynamicEntryPointBinding>),
+}
+
+impl<'a> Iterator for EntryPointBindings<'a> {
+    type Item = EntryPointBinding<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            EntryPointBindings::Static(s) => s.next().map(|e| EntryPointBinding::Static(e)),
+            EntryPointBindings::Dynamic(s) => s.next().map(|e| EntryPointBinding::Dynamic(e)),
+        }
+    }
+}
+
+pub(crate) enum EntryPointBinding<'a> {
+    Static(&'a StaticEntryPointBinding),
+    Dynamic(&'a DynamicEntryPointBinding),
+}
+
+impl EntryPointBinding<'_> {
+    pub(crate) fn location(&self) -> u32 {
+        match self {
+            EntryPointBinding::Static(b) => b.location,
+            EntryPointBinding::Dynamic(b) => b.location(),
+        }
+    }
+
+    pub(crate) fn binding_type(&self) -> EntryPointBindingType {
+        match self {
+            EntryPointBinding::Static(b) => b.binding_type.to_entry_point_binding_type(),
+            EntryPointBinding::Dynamic(b) => b.binding_type(),
+        }
+    }
+}
+
+pub struct ParseError {
+    inner: wgsl::ParseError,
+}
+
+impl fmt::Debug for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <wgsl::ParseError as fmt::Debug>::fmt(&self.inner, f)
+    }
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <wgsl::ParseError as fmt::Display>::fmt(&self.inner, f)
     }
 }
 
@@ -238,6 +352,14 @@ impl ShaderSource {
         ShaderSource {
             inner: ShaderSourceInternal::Static(shader_source),
         }
+    }
+
+    pub fn parse(raw: String) -> Result<Self, ParseError> {
+        DynamicShaderSource::parse(raw)
+            .map(|ok| ShaderSource {
+                inner: ShaderSourceInternal::Dynamic(Arc::new(ok)),
+            })
+            .map_err(|err| ParseError { inner: err })
     }
 }
 

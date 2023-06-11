@@ -616,6 +616,48 @@ pub enum EntryPointBindingType {
     HalfFloatVector4,
 }
 
+impl EntryPointBindingType {
+    pub fn is_float(&self) -> bool {
+        match self {
+            EntryPointBindingType::Float
+            | EntryPointBindingType::FloatVector2
+            | EntryPointBindingType::FloatVector3
+            | EntryPointBindingType::FloatVector4 => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_half_float(&self) -> bool {
+        match self {
+            EntryPointBindingType::HalfFloat
+            | EntryPointBindingType::HalfFloatVector2
+            | EntryPointBindingType::HalfFloatVector3
+            | EntryPointBindingType::HalfFloatVector4 => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_signed_integer(&self) -> bool {
+        match self {
+            EntryPointBindingType::SignedInteger
+            | EntryPointBindingType::SignedIntegerVector2
+            | EntryPointBindingType::SignedIntegerVector3
+            | EntryPointBindingType::SignedIntegerVector4 => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_unsigned_integer(&self) -> bool {
+        match self {
+            EntryPointBindingType::UnsignedInteger
+            | EntryPointBindingType::UnsignedIntegerVector2
+            | EntryPointBindingType::UnsignedIntegerVector3
+            | EntryPointBindingType::UnsignedIntegerVector4 => true,
+            _ => false,
+        }
+    }
+}
+
 impl TryFrom<&'_ naga::TypeInner> for EntryPointBindingType {
     type Error = ();
 
