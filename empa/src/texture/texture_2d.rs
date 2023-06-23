@@ -1651,118 +1651,141 @@ impl<F, U> Texture2D<F, U> {
     }
 }
 
+#[derive(Clone)]
 pub struct Sampled2DFloat {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct Sampled2DUnfilteredFloat {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct Sampled2DSignedInteger {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct Sampled2DUnsignedInteger {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct Sampled2DDepth {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct Sampled2DArrayFloat {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct Sampled2DArrayUnfilteredFloat {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct Sampled2DArraySignedInteger {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct Sampled2DArrayUnsignedInteger {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct Sampled2DArrayDepth {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct SampledCubeFloat {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct SampledCubeUnfilteredFloat {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct SampledCubeSignedInteger {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct SampledCubeUnsignedInteger {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct SampledCubeDepth {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct SampledCubeArrayFloat {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct SampledCubeArrayUnfilteredFloat {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct SampledCubeArraySignedInteger {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct SampledCubeArrayUnsignedInteger {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct SampledCubeArrayDepth {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
+#[derive(Clone)]
 pub struct Storage2D<F> {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
     _marker: marker::PhantomData<*const F>,
 }
 
+#[derive(Clone)]
 pub struct Storage2DArray<F> {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
     _marker: marker::PhantomData<*const F>,
 }
 
+#[derive(Clone)]
 pub struct AttachableImage<F> {
     pub(crate) inner: GpuTextureView,
     pub(crate) width: u32,

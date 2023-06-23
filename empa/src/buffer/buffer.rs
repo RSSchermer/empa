@@ -1473,6 +1473,7 @@ unsafe fn slice_to_bytes<T>(slice: &[T]) -> &[u8] {
     slice::from_raw_parts(slice as *const [T] as *const u8, size_in_bytes)
 }
 
+#[derive(Clone)]
 pub struct Uniform<T>
 where
     T: ?Sized,
@@ -1483,6 +1484,7 @@ where
     _marker: marker::PhantomData<*const T>,
 }
 
+#[derive(Clone)]
 pub struct Storage<T>
 where
     T: ?Sized,
@@ -1493,6 +1495,7 @@ where
     _marker: marker::PhantomData<*const T>,
 }
 
+#[derive(Clone)]
 pub struct ReadOnlyStorage<T>
 where
     T: ?Sized,
@@ -1503,6 +1506,7 @@ where
     _marker: marker::PhantomData<*const T>,
 }
 
+#[derive(Clone)]
 pub(crate) struct ImageCopyBuffer {
     pub(crate) buffer: Arc<BufferHandle>,
     pub(crate) offset: usize,
@@ -1562,20 +1566,24 @@ impl ImageCopyBuffer {
     }
 }
 
+#[derive(Clone)]
 pub struct ImageCopySrc<T> {
     pub(crate) inner: ImageCopyBuffer,
     _marker: marker::PhantomData<*const T>,
 }
 
+#[derive(Clone)]
 pub struct ImageCopySrcRaw {
     pub(crate) inner: ImageCopyBuffer,
 }
 
+#[derive(Clone)]
 pub struct ImageCopyDst<T> {
     pub(crate) inner: ImageCopyBuffer,
     _marker: marker::PhantomData<*const T>,
 }
 
+#[derive(Clone)]
 pub struct ImageCopyDstRaw {
     pub(crate) inner: ImageCopyBuffer,
 }

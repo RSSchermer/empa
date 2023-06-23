@@ -367,6 +367,7 @@ impl<F, U> Texture1D<F, U> {
 }
 
 /// View on a 1D texture that can be bound to a pipeline as a float sampled texture resource.
+#[derive(Clone)]
 pub struct Sampled1DFloat {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
@@ -374,6 +375,7 @@ pub struct Sampled1DFloat {
 
 /// View on a 1D texture that can be bound to a pipeline as a unfiltered float sampled texture
 /// resource.
+#[derive(Clone)]
 pub struct Sampled1DUnfilteredFloat {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
@@ -381,6 +383,7 @@ pub struct Sampled1DUnfilteredFloat {
 
 /// View on a 1D texture that can be bound to a pipeline as a signed integer sampled texture
 /// resource.
+#[derive(Clone)]
 pub struct Sampled1DSignedInteger {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
@@ -388,12 +391,14 @@ pub struct Sampled1DSignedInteger {
 
 /// View on a 1D texture that can be bound to a pipeline as a unsigned integer sampled texture
 /// resource.
+#[derive(Clone)]
 pub struct Sampled1DUnsignedInteger {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
 }
 
 /// View on a 1D texture that can be bound to a pipeline as a texture storage resource.
+#[derive(Clone)]
 pub struct Storage1D<F> {
     pub(crate) inner: GpuTextureView,
     pub(crate) texture_handle: Arc<TextureHandle>,
