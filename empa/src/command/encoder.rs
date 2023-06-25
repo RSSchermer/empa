@@ -1942,7 +1942,7 @@ where
         U: buffer::Indirect,
     {
         self.inner
-            .draw_indirect_with_u32(view.as_web_sys(), view.size_in_bytes() as u32);
+            .draw_indirect_with_u32(view.as_web_sys(), view.offset_in_bytes() as u32);
 
         self
     }
@@ -1987,7 +1987,7 @@ where
         U: buffer::Indirect,
     {
         self.inner
-            .draw_indexed_indirect_with_u32(view.as_web_sys(), view.size_in_bytes() as u32);
+            .draw_indexed_indirect_with_u32(view.as_web_sys(), view.offset_in_bytes() as u32);
 
         self
     }
