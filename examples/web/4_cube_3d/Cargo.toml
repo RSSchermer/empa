@@ -10,6 +10,6 @@ publish = false
 arwa = { version = "0.1.0", path = "../../../../rudo/arwa" }
 empa = { version = "0.1.0", path = "../../../empa", features = ["arwa"] }
 empa-glam = { version = "0.1.0", path = "../../../empa_glam" }
-glam = "0.21.3"
+glam = "^0.24"
 futures = "0.3.21"
 wasm-bindgen = "0.2.81"
