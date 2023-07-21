@@ -138,7 +138,9 @@ impl DepthStencilTest<()> {
     where
         F: DepthStencilTestFormat,
     {
-        let inner = GpuDepthStencilState::new(F::FORMAT_ID.to_web_sys());
+        let mut inner = GpuDepthStencilState::new(F::FORMAT_ID.to_web_sys());
+
+        inner.depth_write_enabled(false);
 
         DepthStencilTest {
             inner,

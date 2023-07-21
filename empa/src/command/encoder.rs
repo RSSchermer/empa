@@ -23,8 +23,8 @@ use crate::device::Device;
 use crate::query::{OcclusionQuerySet, QuerySetHandle, TimestampQuerySet};
 use crate::render_pipeline::{PipelineIndexFormat, PipelineIndexFormatCompatible, RenderPipeline};
 use crate::render_target::{
-    MultisampleRenderLayout, ReadOnly, RenderLayout, RenderTargetEncoding, TypedColorLayout,
-    TypedMultisampleColorLayout, ValidRenderTarget,
+    MultisampleRenderLayout, ReadOnly, RenderLayout, RenderLayoutCompatible, RenderTargetEncoding,
+    TypedColorLayout, TypedMultisampleColorLayout, ValidRenderTarget,
 };
 use crate::resource_binding::BindGroupResource;
 use crate::texture::format::{DepthStencilRenderable, ImageData, TextureFormat};
@@ -899,10 +899,12 @@ pub trait RenderStateEncoder<T>: render_state_encoder_seal::Seal {
 
     type WithIndexBuffer<I>;
 
-    fn set_pipeline<PV, PI, PR>(
+    fn set_pipeline<PT, PV, PI, PR>(
         self,
-        pipeline: &RenderPipeline<T, PV, PI, PR>,
-    ) -> Self::WithPipeline<RenderPipeline<T, PV, PI, PR>>;
+        pipeline: &RenderPipeline<PT, PV, PI, PR>,
+    ) -> Self::WithPipeline<RenderPipeline<PT, PV, PI, PR>>
+    where
+        PT: RenderLayoutCompatible<T>;
 
     fn set_vertex_buffers<V>(self, vertex_buffers: V) -> Self::WithVertexBuffers<V>
     where
@@ -1172,10 +1174,13 @@ impl<T, P, V, I, R, Q> RenderStateEncoder<T> for RenderPassEncoder<T, P, V, I, R
     type WithVertexBuffers<VNew> = RenderPassEncoder<T, P, VNew, I, R, Q>;
     type WithIndexBuffer<INew> = RenderPassEncoder<T, P, V, INew, R, Q>;
 
-    fn set_pipeline<PV, PI, PR>(
+    fn set_pipeline<PT, PV, PI, PR>(
         self,
-        pipeline: &RenderPipeline<T, PV, PI, PR>,
-    ) -> Self::WithPipeline<RenderPipeline<T, PV, PI, PR>> {
+        pipeline: &RenderPipeline<PT, PV, PI, PR>,
+    ) -> Self::WithPipeline<RenderPipeline<PT, PV, PI, PR>>
+    where
+        PT: RenderLayoutCompatible<T>,
+    {
         let RenderPassEncoder {
             inner,
             command_encoder,
@@ -1429,8 +1434,8 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
 }
 
 impl<T, P, V, I, R, Q> draw_command_encoder_seal::Seal for RenderPassEncoder<T, P, V, I, R, Q> {}
-impl<T, PV, PI, PR, V, I, R, Q> DrawCommandEncoder
-    for RenderPassEncoder<T, RenderPipeline<T, PV, PI, PR>, V, I, R, Q>
+impl<T, PT, PV, PI, PR, V, I, R, Q> DrawCommandEncoder
+    for RenderPassEncoder<T, RenderPipeline<PT, PV, PI, PR>, V, I, R, Q>
 where
     V: VertexBuffers<Layout = PV>,
     R: BindGroups<Layout = PR>,
@@ -1469,14 +1474,14 @@ impl<T, P, V, I, R, Q> draw_indexed_command_encoder_seal::Seal
     for RenderPassEncoder<T, P, V, I, R, Q>
 {
 }
-impl<T, VLayout, IFormat, RLayout, V, I, R, Q> DrawIndexedCommandEncoder
-    for RenderPassEncoder<T, RenderPipeline<T, VLayout, IFormat, RLayout>, V, I, R, Q>
+impl<T, PT, PV, PI, PR, V, I, R, Q> DrawIndexedCommandEncoder
+    for RenderPassEncoder<T, RenderPipeline<PT, PV, PI, PR>, V, I, R, Q>
 where
-    IFormat: PipelineIndexFormat,
-    V: VertexBuffers<Layout = VLayout>,
+    PI: PipelineIndexFormat,
+    V: VertexBuffers<Layout = PV>,
     I: IndexBuffer,
-    I::IndexData: PipelineIndexFormatCompatible<IFormat>,
-    R: BindGroups<Layout = RLayout>,
+    I::IndexData: PipelineIndexFormatCompatible<PI>,
+    R: BindGroups<Layout = PR>,
 {
     fn draw_indexed(self, draw_indexed: DrawIndexed) -> Self {
         let DrawIndexed {
@@ -1796,10 +1801,13 @@ impl<T, P, V, I, R> RenderStateEncoder<T> for RenderBundleEncoder<T, P, V, I, R>
     type WithVertexBuffers<VNew> = RenderBundleEncoder<T, P, VNew, I, R>;
     type WithIndexBuffer<INew> = RenderBundleEncoder<T, P, V, INew, R>;
 
-    fn set_pipeline<PV, PI, PR>(
+    fn set_pipeline<PT, PV, PI, PR>(
         self,
-        pipeline: &RenderPipeline<T, PV, PI, PR>,
-    ) -> Self::WithPipeline<RenderPipeline<T, PV, PI, PR>> {
+        pipeline: &RenderPipeline<PT, PV, PI, PR>,
+    ) -> Self::WithPipeline<RenderPipeline<PT, PV, PI, PR>>
+    where
+        PT: RenderLayoutCompatible<T>,
+    {
         let RenderBundleEncoder {
             inner,
             current_pipeline_id,
@@ -1912,8 +1920,8 @@ impl<T, P, V, I, R> RenderStateEncoder<T> for RenderBundleEncoder<T, P, V, I, R>
 }
 
 impl<T, P, V, I, R> draw_command_encoder_seal::Seal for RenderBundleEncoder<T, P, V, I, R> {}
-impl<T, PV, PI, PR, V, I, R> DrawCommandEncoder
-    for RenderBundleEncoder<T, RenderPipeline<T, PV, PI, PR>, V, I, R>
+impl<T, PT, PV, PI, PR, V, I, R> DrawCommandEncoder
+    for RenderBundleEncoder<T, RenderPipeline<PT, PV, PI, PR>, V, I, R>
 where
     V: VertexBuffers<Layout = PV>,
     R: BindGroups<Layout = PR>,
@@ -1949,14 +1957,14 @@ where
 }
 
 impl<T, P, V, I, R> draw_indexed_command_encoder_seal::Seal for RenderBundleEncoder<T, P, V, I, R> {}
-impl<T, VLayout, IFormat, RLayout, V, I, R> DrawIndexedCommandEncoder
-    for RenderBundleEncoder<T, RenderPipeline<T, VLayout, IFormat, RLayout>, V, I, R>
+impl<T, PT, PV, PI, PR, V, I, R> DrawIndexedCommandEncoder
+    for RenderBundleEncoder<T, RenderPipeline<PT, PV, PI, PR>, V, I, R>
 where
-    IFormat: PipelineIndexFormat,
-    V: VertexBuffers<Layout = VLayout>,
+    PI: PipelineIndexFormat,
+    V: VertexBuffers<Layout = PV>,
     I: IndexBuffer,
-    I::IndexData: PipelineIndexFormatCompatible<IFormat>,
-    R: BindGroups<Layout = RLayout>,
+    I::IndexData: PipelineIndexFormatCompatible<PI>,
+    R: BindGroups<Layout = PR>,
 {
     fn draw_indexed(self, draw_indexed: DrawIndexed) -> Self {
         let DrawIndexed {

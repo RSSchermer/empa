@@ -92,7 +92,12 @@ pub struct DepthStencilLayout {
 }
 
 pub trait TypedDepthStencilLayout: typed_depth_stencil_layout_seal::Seal {
-    const LAYOUT: DepthStencilLayout;
+    const LAYOUT: Option<DepthStencilLayout>;
+}
+
+impl typed_depth_stencil_layout_seal::Seal for () {}
+impl TypedDepthStencilLayout for () {
+    const LAYOUT: Option<DepthStencilLayout> = None;
 }
 
 impl<F> typed_depth_stencil_layout_seal::Seal for F where F: DepthStencilRenderable {}
@@ -100,10 +105,10 @@ impl<F> TypedDepthStencilLayout for F
 where
     F: DepthStencilRenderable,
 {
-    const LAYOUT: DepthStencilLayout = DepthStencilLayout {
+    const LAYOUT: Option<DepthStencilLayout> = Some(DepthStencilLayout {
         format: F::FORMAT_ID,
         read_only: false,
-    };
+    });
 }
 
 impl<F> typed_depth_stencil_layout_seal::Seal for ReadOnly<F> where F: DepthStencilRenderable {}
@@ -111,10 +116,10 @@ impl<F> TypedDepthStencilLayout for ReadOnly<F>
 where
     F: DepthStencilRenderable,
 {
-    const LAYOUT: DepthStencilLayout = DepthStencilLayout {
+    const LAYOUT: Option<DepthStencilLayout> = Some(DepthStencilLayout {
         format: F::FORMAT_ID,
         read_only: true,
-    };
+    });
 }
 
 mod typed_render_layout_seal {
@@ -138,7 +143,7 @@ where
 {
     const LAYOUT: RenderLayoutDescriptor<'static> = RenderLayoutDescriptor {
         color_layout: C::COLOR_FORMATS,
-        depth_stencil_layout: Some(Ds::LAYOUT),
+        depth_stencil_layout: Ds::LAYOUT,
         samples: 1,
     };
 }
@@ -150,19 +155,7 @@ where
 {
     const LAYOUT: RenderLayoutDescriptor<'static> = RenderLayoutDescriptor {
         color_layout: &[],
-        depth_stencil_layout: Some(Ds::LAYOUT),
-        samples: 1,
-    };
-}
-
-impl<C> typed_render_layout_seal::Seal for RenderLayout<C, ()> where C: TypedColorLayout {}
-impl<C> TypedRenderLayout for RenderLayout<C, ()>
-where
-    C: TypedColorLayout,
-{
-    const LAYOUT: RenderLayoutDescriptor<'static> = RenderLayoutDescriptor {
-        color_layout: C::COLOR_FORMATS,
-        depth_stencil_layout: None,
+        depth_stencil_layout: Ds::LAYOUT,
         samples: 1,
     };
 }
@@ -181,24 +174,7 @@ where
 {
     const LAYOUT: RenderLayoutDescriptor<'static> = RenderLayoutDescriptor {
         color_layout: C::COLOR_FORMATS,
-        depth_stencil_layout: Some(Ds::LAYOUT),
-        samples: SAMPLES,
-    };
-}
-
-impl<C, const SAMPLES: u8> typed_render_layout_seal::Seal
-    for MultisampleRenderLayout<C, (), SAMPLES>
-where
-    C: TypedMultisampleColorLayout,
-{
-}
-impl<C, const SAMPLES: u8> TypedRenderLayout for MultisampleRenderLayout<C, (), SAMPLES>
-where
-    C: TypedMultisampleColorLayout,
-{
-    const LAYOUT: RenderLayoutDescriptor<'static> = RenderLayoutDescriptor {
-        color_layout: C::COLOR_FORMATS,
-        depth_stencil_layout: None,
+        depth_stencil_layout: Ds::LAYOUT,
         samples: SAMPLES,
     };
 }
@@ -215,7 +191,33 @@ where
 {
     const LAYOUT: RenderLayoutDescriptor<'static> = RenderLayoutDescriptor {
         color_layout: &[],
-        depth_stencil_layout: Some(Ds::LAYOUT),
+        depth_stencil_layout: Ds::LAYOUT,
         samples: SAMPLES,
     };
+}
+
+mod depth_stencil_layout_compatible_seal {
+    pub trait DepthStencilLayoutCompatible<T> {}
+}
+
+impl<T> depth_stencil_layout_compatible_seal::DepthStencilLayoutCompatible<T> for T where
+    T: TypedDepthStencilLayout
+{
+}
+
+impl<T> depth_stencil_layout_compatible_seal::DepthStencilLayoutCompatible<T> for ReadOnly<T> where
+    T: TypedDepthStencilLayout
+{
+}
+
+mod render_layout_compatible_seal {
+    pub trait Seal {}
+}
+
+pub trait RenderLayoutCompatible<T>: render_layout_compatible_seal::Seal {}
+
+impl<C, Ds> render_layout_compatible_seal::Seal for RenderLayout<C, Ds> {}
+impl<C, Ds0, Ds1> RenderLayoutCompatible<RenderLayout<C, Ds0>> for RenderLayout<C, Ds1> where
+    Ds1: depth_stencil_layout_compatible_seal::DepthStencilLayoutCompatible<Ds0>
+{
 }
