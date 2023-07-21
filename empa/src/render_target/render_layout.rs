@@ -26,6 +26,11 @@ pub trait TypedColorLayout: typed_color_layout_seal::Seal {
     const COLOR_FORMATS: &'static [TextureFormatId];
 }
 
+impl typed_color_layout_seal::Seal for () {}
+impl TypedColorLayout for () {
+    const COLOR_FORMATS: &'static [TextureFormatId] = &[];
+}
+
 macro_rules! impl_typed_color_layout {
     ($($color:ident),*) => {
         #[allow(unused_parens)]
@@ -53,6 +58,11 @@ mod typed_multisample_color_layout_seal {
 
 pub trait TypedMultisampleColorLayout: typed_multisample_color_layout_seal::Seal {
     const COLOR_FORMATS: &'static [TextureFormatId];
+}
+
+impl typed_multisample_color_layout_seal::Seal for () {}
+impl TypedMultisampleColorLayout for () {
+    const COLOR_FORMATS: &'static [TextureFormatId] = &[];
 }
 
 macro_rules! impl_typed_multisample_color_layout {
@@ -148,18 +158,6 @@ where
     };
 }
 
-impl<Ds> typed_render_layout_seal::Seal for RenderLayout<(), Ds> where Ds: TypedDepthStencilLayout {}
-impl<Ds> TypedRenderLayout for RenderLayout<(), Ds>
-where
-    Ds: TypedDepthStencilLayout,
-{
-    const LAYOUT: RenderLayoutDescriptor<'static> = RenderLayoutDescriptor {
-        color_layout: &[],
-        depth_stencil_layout: Ds::LAYOUT,
-        samples: 1,
-    };
-}
-
 impl<C, Ds, const SAMPLES: u8> typed_render_layout_seal::Seal
     for MultisampleRenderLayout<C, Ds, SAMPLES>
 where
@@ -174,23 +172,6 @@ where
 {
     const LAYOUT: RenderLayoutDescriptor<'static> = RenderLayoutDescriptor {
         color_layout: C::COLOR_FORMATS,
-        depth_stencil_layout: Ds::LAYOUT,
-        samples: SAMPLES,
-    };
-}
-
-impl<Ds, const SAMPLES: u8> typed_render_layout_seal::Seal
-    for MultisampleRenderLayout<(), Ds, SAMPLES>
-where
-    Ds: TypedDepthStencilLayout,
-{
-}
-impl<Ds, const SAMPLES: u8> TypedRenderLayout for MultisampleRenderLayout<(), Ds, SAMPLES>
-where
-    Ds: TypedDepthStencilLayout,
-{
-    const LAYOUT: RenderLayoutDescriptor<'static> = RenderLayoutDescriptor {
-        color_layout: &[],
         depth_stencil_layout: Ds::LAYOUT,
         samples: SAMPLES,
     };
