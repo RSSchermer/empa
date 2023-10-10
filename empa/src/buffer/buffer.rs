@@ -1,5 +1,5 @@
 use std::borrow::Borrow;
-use std::fmt::Display;
+use std::fmt;
 use std::future::Future;
 use std::mem::MaybeUninit;
 use std::ops::{
@@ -54,8 +54,8 @@ pub use crate::projection;
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MapError;
 
-impl Display for MapError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for MapError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "error occurred when trying to map a buffer")
     }
 }
@@ -1648,4 +1648,281 @@ extern "C" {
         wasm_memory: &JsValue,
         pointer: *mut (),
     );
+}
+
+#[cfg(feature = "bytemuck")]
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct CastError;
+
+#[cfg(feature = "bytemuck")]
+impl fmt::Display for CastError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "error occurred when trying cast a buffer")
+    }
+}
+
+#[cfg(feature = "bytemuck")]
+impl error::Error for CastError {}
+
+#[cfg(feature = "bytemuck")]
+pub fn bytes_of<T, U>(buffer: Buffer<T, U>) -> Buffer<[u8], U>
+where
+    T: bytemuck::NoUninit,
+{
+    let BufferInternal {
+        inner,
+        id,
+        map_context,
+        usage,
+        ..
+    } = buffer.internal;
+
+    let size_in_bytes = mem::size_of::<T>();
+
+    Buffer {
+        internal: BufferInternal {
+            inner,
+            id,
+            len: size_in_bytes,
+            map_context,
+            usage,
+        },
+        _marker: Default::default(),
+    }
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn bytes_of_slice<T, U>(buffer: Buffer<[T], U>) -> Buffer<[u8], U>
+where
+    T: bytemuck::NoUninit,
+{
+    let BufferInternal {
+        inner,
+        id,
+        map_context,
+        usage,
+        len,
+    } = buffer.internal;
+
+    let size_in_bytes = mem::size_of::<T>() * len;
+
+    Buffer {
+        internal: BufferInternal {
+            inner,
+            id,
+            len: size_in_bytes,
+            map_context,
+            usage,
+        },
+        _marker: Default::default(),
+    }
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn try_from_bytes<T, U>(bytes: Buffer<[u8], U>) -> Result<Buffer<T, U>, CastError>
+where
+    T: bytemuck::AnyBitPattern,
+{
+    let BufferInternal {
+        inner,
+        id,
+        map_context,
+        usage,
+        len,
+    } = bytes.internal;
+
+    let size_in_bytes = mem::size_of::<T>();
+
+    if len != size_in_bytes {
+        Err(CastError)
+    } else {
+        Ok(Buffer {
+            internal: BufferInternal {
+                inner,
+                id,
+                len: 1,
+                map_context,
+                usage,
+            },
+            _marker: Default::default(),
+        })
+    }
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn from_bytes<T, U>(bytes: Buffer<[u8], U>) -> Buffer<T, U>
+where
+    T: bytemuck::AnyBitPattern,
+{
+    if let Ok(ok) = try_from_bytes(bytes) {
+        ok
+    } else {
+        panic!("the length of the byte slice must be equal to the target type's size in bytes");
+    }
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn try_slice_from_bytes<T, U>(bytes: Buffer<[u8], U>) -> Result<Buffer<[T], U>, CastError>
+where
+    T: bytemuck::AnyBitPattern,
+{
+    let BufferInternal {
+        inner,
+        id,
+        map_context,
+        usage,
+        len,
+    } = bytes.internal;
+
+    let size_in_bytes = mem::size_of::<T>();
+
+    if len.rem(size_in_bytes) != 0 {
+        Err(CastError)
+    } else {
+        Ok(Buffer {
+            internal: BufferInternal {
+                inner,
+                id,
+                len: len / size_in_bytes,
+                map_context,
+                usage,
+            },
+            _marker: Default::default(),
+        })
+    }
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn slice_from_bytes<T, U>(bytes: Buffer<[u8], U>) -> Buffer<[T], U>
+where
+    T: bytemuck::AnyBitPattern,
+{
+    if let Ok(ok) = try_slice_from_bytes(bytes) {
+        ok
+    } else {
+        panic!(
+            "the length of the byte slice must be a multiple of the target type's size in bytes"
+        );
+    }
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn view_bytes_of<T, U>(view: View<T, U>) -> View<[u8], U>
+where
+    T: bytemuck::NoUninit,
+{
+    let View {
+        buffer,
+        offset_in_bytes,
+        ..
+    } = view;
+
+    let size_in_bytes = mem::size_of::<T>();
+
+    View {
+        buffer,
+        offset_in_bytes,
+        len: size_in_bytes,
+        _marker: Default::default(),
+    }
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn view_bytes_of_slice<T, U>(view: View<[T], U>) -> View<[u8], U>
+where
+    T: bytemuck::NoUninit,
+{
+    let View {
+        buffer,
+        offset_in_bytes,
+        len,
+        ..
+    } = view;
+
+    let size_in_bytes = mem::size_of::<T>() * len;
+
+    View {
+        buffer,
+        offset_in_bytes,
+        len: size_in_bytes,
+        _marker: Default::default(),
+    }
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn try_view_from_bytes<T, U>(view: View<[u8], U>) -> Result<View<T, U>, CastError>
+where
+    T: bytemuck::AnyBitPattern,
+{
+    let View {
+        buffer,
+        offset_in_bytes,
+        len,
+        ..
+    } = view;
+
+    let size_in_bytes = mem::size_of::<T>();
+
+    if len != size_in_bytes {
+        Err(CastError)
+    } else {
+        Ok(View {
+            buffer,
+            offset_in_bytes,
+            len: 1,
+            _marker: Default::default(),
+        })
+    }
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn view_from_bytes<T, U>(view: View<[u8], U>) -> View<T, U>
+where
+    T: bytemuck::AnyBitPattern,
+{
+    if let Ok(ok) = try_view_from_bytes(view) {
+        ok
+    } else {
+        panic!("the length of the byte slice must be equal to the target type's size in bytes");
+    }
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn try_view_slice_from_bytes<T, U>(view: View<[u8], U>) -> Result<View<[T], U>, CastError>
+where
+    T: bytemuck::AnyBitPattern,
+{
+    let View {
+        buffer,
+        offset_in_bytes,
+        len,
+        ..
+    } = view;
+
+    let size_in_bytes = mem::size_of::<T>();
+
+    if len.rem(size_in_bytes) != 0 {
+        Err(CastError)
+    } else {
+        Ok(View {
+            buffer,
+            offset_in_bytes,
+            len: len / size_in_bytes,
+            _marker: Default::default(),
+        })
+    }
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn view_slice_from_bytes<T, U>(view: View<[u8], U>) -> View<[T], U>
+where
+    T: bytemuck::AnyBitPattern,
+{
+    if let Ok(ok) = try_view_slice_from_bytes(view) {
+        ok
+    } else {
+        panic!(
+            "the length of the byte slice must be a multiple of the target type's size in bytes"
+        );
+    }
 }
