@@ -1,5 +1,3 @@
-use zeroable::Zeroable;
-
 pub use empa_macros::Sized;
 use std::mem;
 
@@ -100,9 +98,12 @@ unsafe impl Sized for u32 {
     }];
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Zeroable)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 #[repr(C, align(8))]
 pub struct Vec2<T>(pub T, pub T);
+
+#[cfg(feature = "bytemuck")]
+unsafe impl<T> bytemuck::Zeroable for Vec2<T> where T: bytemuck::Zeroable {}
 
 unsafe impl Sized for Vec2<f32> {
     const LAYOUT: &'static [MemoryUnit] = &[MemoryUnit {
@@ -125,9 +126,12 @@ unsafe impl Sized for Vec2<u32> {
     }];
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Zeroable)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 #[repr(C, align(16))]
 pub struct Vec3<T>(pub T, pub T, pub T);
+
+#[cfg(feature = "bytemuck")]
+unsafe impl<T> bytemuck::Zeroable for Vec3<T> where T: bytemuck::Zeroable {}
 
 unsafe impl Sized for Vec3<f32> {
     const LAYOUT: &'static [MemoryUnit] = &[MemoryUnit {
@@ -150,9 +154,12 @@ unsafe impl Sized for Vec3<u32> {
     }];
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Zeroable)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 #[repr(C, align(16))]
 pub struct Vec4<T>(pub T, pub T, pub T, pub T);
+
+#[cfg(feature = "bytemuck")]
+unsafe impl<T> bytemuck::Zeroable for Vec4<T> where T: bytemuck::Zeroable {}
 
 unsafe impl Sized for Vec4<f32> {
     const LAYOUT: &'static [MemoryUnit] = &[MemoryUnit {
@@ -175,9 +182,12 @@ unsafe impl Sized for Vec4<u32> {
     }];
 }
 
-#[derive(Clone, Copy, PartialEq, Debug, Default, Zeroable)]
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
 #[repr(C)]
 pub struct Mat2x2(pub Vec2<f32>, pub Vec2<f32>);
+
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Zeroable for Mat2x2 {}
 
 unsafe impl Sized for Mat2x2 {
     const LAYOUT: &'static [MemoryUnit] = &[MemoryUnit {
@@ -186,9 +196,12 @@ unsafe impl Sized for Mat2x2 {
     }];
 }
 
-#[derive(Clone, Copy, PartialEq, Debug, Default, Zeroable)]
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
 #[repr(C)]
 pub struct Mat2x3(pub Vec3<f32>, pub Vec3<f32>);
+
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Zeroable for Mat2x3 {}
 
 unsafe impl Sized for Mat2x3 {
     const LAYOUT: &'static [MemoryUnit] = &[MemoryUnit {
@@ -197,9 +210,12 @@ unsafe impl Sized for Mat2x3 {
     }];
 }
 
-#[derive(Clone, Copy, PartialEq, Debug, Default, Zeroable)]
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
 #[repr(C)]
 pub struct Mat2x4(pub Vec4<f32>, pub Vec4<f32>);
+
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Zeroable for Mat2x4 {}
 
 unsafe impl Sized for Mat2x4 {
     const LAYOUT: &'static [MemoryUnit] = &[MemoryUnit {
@@ -208,9 +224,12 @@ unsafe impl Sized for Mat2x4 {
     }];
 }
 
-#[derive(Clone, Copy, PartialEq, Debug, Default, Zeroable)]
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
 #[repr(C)]
 pub struct Mat3x2(pub Vec2<f32>, pub Vec2<f32>, pub Vec2<f32>);
+
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Zeroable for Mat3x2 {}
 
 unsafe impl Sized for Mat3x2 {
     const LAYOUT: &'static [MemoryUnit] = &[MemoryUnit {
@@ -219,9 +238,12 @@ unsafe impl Sized for Mat3x2 {
     }];
 }
 
-#[derive(Clone, Copy, PartialEq, Debug, Default, Zeroable)]
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
 #[repr(C)]
 pub struct Mat3x3(pub Vec3<f32>, pub Vec3<f32>, pub Vec3<f32>);
+
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Zeroable for Mat3x3 {}
 
 unsafe impl Sized for Mat3x3 {
     const LAYOUT: &'static [MemoryUnit] = &[MemoryUnit {
@@ -230,9 +252,12 @@ unsafe impl Sized for Mat3x3 {
     }];
 }
 
-#[derive(Clone, Copy, PartialEq, Debug, Default, Zeroable)]
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
 #[repr(C)]
 pub struct Mat3x4(pub Vec4<f32>, pub Vec4<f32>, pub Vec4<f32>);
+
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Zeroable for Mat3x4 {}
 
 unsafe impl Sized for Mat3x4 {
     const LAYOUT: &'static [MemoryUnit] = &[MemoryUnit {
@@ -241,9 +266,12 @@ unsafe impl Sized for Mat3x4 {
     }];
 }
 
-#[derive(Clone, Copy, PartialEq, Debug, Default, Zeroable)]
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
 #[repr(C)]
 pub struct Mat4x2(pub Vec2<f32>, pub Vec2<f32>, pub Vec2<f32>, pub Vec2<f32>);
+
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Zeroable for Mat4x2 {}
 
 unsafe impl Sized for Mat4x2 {
     const LAYOUT: &'static [MemoryUnit] = &[MemoryUnit {
@@ -252,9 +280,12 @@ unsafe impl Sized for Mat4x2 {
     }];
 }
 
-#[derive(Clone, Copy, PartialEq, Debug, Default, Zeroable)]
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
 #[repr(C)]
 pub struct Mat4x3(pub Vec3<f32>, pub Vec3<f32>, pub Vec3<f32>, pub Vec3<f32>);
+
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Zeroable for Mat4x3 {}
 
 unsafe impl Sized for Mat4x3 {
     const LAYOUT: &'static [MemoryUnit] = &[MemoryUnit {
@@ -263,9 +294,12 @@ unsafe impl Sized for Mat4x3 {
     }];
 }
 
-#[derive(Clone, Copy, PartialEq, Debug, Default, Zeroable)]
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
 #[repr(C)]
 pub struct Mat4x4(pub Vec4<f32>, pub Vec4<f32>, pub Vec4<f32>, pub Vec4<f32>);
+
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Zeroable for Mat4x4 {}
 
 unsafe impl Sized for Mat4x4 {
     const LAYOUT: &'static [MemoryUnit] = &[MemoryUnit {

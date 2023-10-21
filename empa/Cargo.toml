@@ -21,7 +21,6 @@ js-sys = "0.3.58"
 staticvec = "0.11.9"
 wasm-bindgen = "0.2.81"
 wasm-bindgen-futures = "0.4.31"
-zeroable = "0.2.0"
 
 [dependencies.memoffset]
 version = "0.6"

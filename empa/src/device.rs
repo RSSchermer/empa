@@ -32,7 +32,6 @@ use crate::texture::{
 };
 use crate::{buffer, texture};
 use std::{mem, slice};
-use zeroable::Zeroable;
 
 lazy_static! {
     pub(crate) static ref ID_GEN: RelaxedCounter = RelaxedCounter::new(1);
@@ -86,17 +85,19 @@ impl Device {
         Buffer::create_uninit(self, true, usage)
     }
 
+    #[cfg(feature = "bytemuck")]
     pub fn create_buffer_zeroed<T, U>(&self, usage: U) -> Buffer<T, U>
     where
-        T: Zeroable,
+        T: bytemuck::Zeroable,
         U: buffer::ValidUsageFlags,
     {
         unsafe { Buffer::create_uninit(self, false, usage).assume_init() }
     }
 
+    #[cfg(feature = "bytemuck")]
     pub fn create_buffer_zeroed_mapped<T, U>(&self, usage: U) -> Buffer<T, U>
     where
-        T: Zeroable,
+        T: bytemuck::Zeroable,
         U: buffer::ValidUsageFlags,
     {
         unsafe { Buffer::create_uninit(self, true, usage).assume_init() }
@@ -124,17 +125,19 @@ impl Device {
         Buffer::create_slice_uninit(self, len, true, usage)
     }
 
+    #[cfg(feature = "bytemuck")]
     pub fn create_slice_buffer_zeroed<T, U>(&self, len: usize, usage: U) -> Buffer<[T], U>
     where
-        T: Zeroable,
+        T: bytemuck::Zeroable,
         U: buffer::ValidUsageFlags,
     {
         unsafe { Buffer::create_slice_uninit(self, len, false, usage).assume_init() }
     }
 
+    #[cfg(feature = "bytemuck")]
     pub fn create_slice_buffer_zeroed_mapped<T, U>(&self, len: usize, usage: U) -> Buffer<[T], U>
     where
-        T: Zeroable,
+        T: bytemuck::Zeroable,
         U: buffer::ValidUsageFlags,
     {
         unsafe { Buffer::create_slice_uninit(self, len, true, usage).assume_init() }

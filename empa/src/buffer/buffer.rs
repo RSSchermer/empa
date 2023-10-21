@@ -1807,6 +1807,56 @@ where
 }
 
 #[cfg(feature = "bytemuck")]
+pub fn try_cast<A, B, U>(buffer: Buffer<A, U>) -> Result<Buffer<B, U>, CastError>
+where
+    A: bytemuck::NoUninit,
+    B: bytemuck::AnyBitPattern,
+{
+    let bytes = bytes_of(buffer);
+
+    try_from_bytes(bytes)
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn cast<A, B, U>(buffer: Buffer<A, U>) -> Buffer<B, U>
+where
+    A: bytemuck::NoUninit,
+    B: bytemuck::AnyBitPattern,
+{
+    if let Ok(ok) = try_cast(buffer) {
+        ok
+    } else {
+        panic!(
+            "the size in bytes of the target type must match the size in bytes of the sour type"
+        );
+    }
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn try_cast_slice<A, B, U>(buffer: Buffer<[A], U>) -> Result<Buffer<[B], U>, CastError>
+where
+    A: bytemuck::NoUninit,
+    B: bytemuck::AnyBitPattern,
+{
+    let bytes = bytes_of_slice(buffer);
+
+    try_slice_from_bytes(bytes)
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn cast_slice<A, B, U>(buffer: Buffer<[A], U>) -> Buffer<[B], U>
+where
+    A: bytemuck::NoUninit,
+    B: bytemuck::AnyBitPattern,
+{
+    if let Ok(ok) = try_cast_slice(buffer) {
+        ok
+    } else {
+        panic!("the size in bytes of the target type must be a multiple of the size in bytes of the source slice");
+    }
+}
+
+#[cfg(feature = "bytemuck")]
 pub fn view_bytes_of<T, U>(view: View<T, U>) -> View<[u8], U>
 where
     T: bytemuck::NoUninit,
@@ -1924,5 +1974,55 @@ where
         panic!(
             "the length of the byte slice must be a multiple of the target type's size in bytes"
         );
+    }
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn try_cast_view<A, B, U>(view: View<A, U>) -> Result<View<B, U>, CastError>
+where
+    A: bytemuck::NoUninit,
+    B: bytemuck::AnyBitPattern,
+{
+    let bytes = view_bytes_of(view);
+
+    try_view_from_bytes(bytes)
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn cast_view<A, B, U>(view: View<A, U>) -> View<B, U>
+where
+    A: bytemuck::NoUninit,
+    B: bytemuck::AnyBitPattern,
+{
+    if let Ok(ok) = try_cast_view(view) {
+        ok
+    } else {
+        panic!(
+            "the size in bytes of the target type must match the size in bytes of the sour type"
+        );
+    }
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn try_cast_slice_view<A, B, U>(view: View<[A], U>) -> Result<View<[B], U>, CastError>
+where
+    A: bytemuck::NoUninit,
+    B: bytemuck::AnyBitPattern,
+{
+    let bytes = view_bytes_of_slice(view);
+
+    try_view_slice_from_bytes(bytes)
+}
+
+#[cfg(feature = "bytemuck")]
+pub fn cast_slice_view<A, B, U>(view: View<[A], U>) -> View<[B], U>
+where
+    A: bytemuck::NoUninit,
+    B: bytemuck::AnyBitPattern,
+{
+    if let Ok(ok) = try_cast_slice_view(view) {
+        ok
+    } else {
+        panic!("the size in bytes of the target type must be a multiple of the size in bytes of the source slice");
     }
 }
