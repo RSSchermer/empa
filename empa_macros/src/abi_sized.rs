@@ -23,7 +23,7 @@ pub fn expand_derive_sized(input: &DeriveInput) -> Result<TokenStream, String> {
                 .ident
                 .clone()
                 .map(|i| i.into_token_stream())
-                .unwrap_or(position.into_token_stream());
+                .unwrap_or(syn::Index::from(position).into_token_stream());
             let span = field.span();
 
             quote_spanned! {span=>
