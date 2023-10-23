@@ -103,7 +103,18 @@ unsafe impl Sized for u32 {
 pub struct Vec2<T>(pub T, pub T);
 
 #[cfg(feature = "bytemuck")]
-unsafe impl<T> bytemuck::Zeroable for Vec2<T> where T: bytemuck::Zeroable {}
+unsafe impl bytemuck::Zeroable for Vec2<u32> {}
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Zeroable for Vec2<i32> {}
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Zeroable for Vec2<f32> {}
+
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Pod for Vec2<u32> {}
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Pod for Vec2<i32> {}
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Pod for Vec2<f32> {}
 
 unsafe impl Sized for Vec2<f32> {
     const LAYOUT: &'static [MemoryUnit] = &[MemoryUnit {
@@ -131,7 +142,18 @@ unsafe impl Sized for Vec2<u32> {
 pub struct Vec3<T>(pub T, pub T, pub T);
 
 #[cfg(feature = "bytemuck")]
-unsafe impl<T> bytemuck::Zeroable for Vec3<T> where T: bytemuck::Zeroable {}
+unsafe impl bytemuck::Zeroable for Vec3<u32> {}
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Zeroable for Vec3<i32> {}
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Zeroable for Vec3<f32> {}
+
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Pod for Vec3<u32> {}
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Pod for Vec3<i32> {}
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Pod for Vec3<f32> {}
 
 unsafe impl Sized for Vec3<f32> {
     const LAYOUT: &'static [MemoryUnit] = &[MemoryUnit {
@@ -159,7 +181,18 @@ unsafe impl Sized for Vec3<u32> {
 pub struct Vec4<T>(pub T, pub T, pub T, pub T);
 
 #[cfg(feature = "bytemuck")]
-unsafe impl<T> bytemuck::Zeroable for Vec4<T> where T: bytemuck::Zeroable {}
+unsafe impl bytemuck::Zeroable for Vec4<u32> {}
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Zeroable for Vec4<i32> {}
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Zeroable for Vec4<f32> {}
+
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Pod for Vec4<u32> {}
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Pod for Vec4<i32> {}
+#[cfg(feature = "bytemuck")]
+unsafe impl bytemuck::Pod for Vec4<f32> {}
 
 unsafe impl Sized for Vec4<f32> {
     const LAYOUT: &'static [MemoryUnit] = &[MemoryUnit {
