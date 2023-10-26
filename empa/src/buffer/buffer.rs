@@ -396,17 +396,11 @@ impl<T, U> Buffer<T, U> {
         View::from(self).map_write()
     }
 
-    pub fn mapped(&self) -> Mapped<T>
-    where
-        U: MapRead,
-    {
+    pub fn mapped(&self) -> Mapped<T> {
         View::from(self).mapped()
     }
 
-    pub fn mapped_mut(&self) -> MappedMut<T>
-    where
-        U: MapWrite,
-    {
+    pub fn mapped_mut(&self) -> MappedMut<T> {
         View::from(self).mapped_mut()
     }
 
@@ -538,17 +532,11 @@ impl<T, U> Buffer<[T], U> {
         View::from(self).map_write()
     }
 
-    pub fn mapped(&self) -> MappedSlice<T>
-    where
-        U: MapRead,
-    {
+    pub fn mapped(&self) -> MappedSlice<T> {
         View::from(self).mapped()
     }
 
-    pub fn mapped_mut(&self) -> MappedSliceMut<T>
-    where
-        U: MapWrite,
-    {
+    pub fn mapped_mut(&self) -> MappedSliceMut<T> {
         View::from(self).mapped_mut()
     }
 
@@ -755,10 +743,7 @@ impl<'a, T, U> View<'a, T, U> {
         self.map_internal(2)
     }
 
-    pub fn mapped(self) -> Mapped<'a, T>
-    where
-        U: MapRead,
-    {
+    pub fn mapped(self) -> Mapped<'a, T> {
         let start = self.offset_in_bytes as u32;
         let size_in_bytes = mem::size_of::<T>() as u32;
         let end = start + size_in_bytes;
@@ -790,10 +775,7 @@ impl<'a, T, U> View<'a, T, U> {
         }
     }
 
-    pub fn mapped_mut(self) -> MappedMut<'a, T>
-    where
-        U: MapWrite,
-    {
+    pub fn mapped_mut(self) -> MappedMut<'a, T> {
         let start = self.offset_in_bytes as u32;
         let size_in_bytes = mem::size_of::<T>() as u32;
         let end = start + size_in_bytes;
@@ -965,10 +947,7 @@ impl<'a, T, U> View<'a, [T], U> {
         self.map_internal(2)
     }
 
-    pub fn mapped(self) -> MappedSlice<'a, T>
-    where
-        U: MapRead,
-    {
+    pub fn mapped(self) -> MappedSlice<'a, T> {
         let start = self.offset_in_bytes as u32;
         let size_in_bytes = (mem::size_of::<T>() * self.len) as u32;
         let end = start + size_in_bytes;
@@ -1000,10 +979,7 @@ impl<'a, T, U> View<'a, [T], U> {
         }
     }
 
-    pub fn mapped_mut(self) -> MappedSliceMut<'a, T>
-    where
-        U: MapWrite,
-    {
+    pub fn mapped_mut(self) -> MappedSliceMut<'a, T> {
         let start = self.offset_in_bytes as u32;
         let size_in_bytes = (mem::size_of::<T>() * self.len) as u32;
         let end = start + size_in_bytes;
