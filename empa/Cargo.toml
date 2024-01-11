@@ -26,10 +26,6 @@ wasm-bindgen-futures = "0.4.31"
 version = "0.6"
 features = ["unstable_const"]
 
-[dependencies.naga]
-git = "https://github.com/gfx-rs/naga.git"
-features = ["wgsl-in", "span"]
-
 [dependencies.web-sys]
 version = "0.3.60"
 features = [

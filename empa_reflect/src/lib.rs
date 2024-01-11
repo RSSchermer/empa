@@ -4,6 +4,8 @@ use naga::AddressSpace;
 use std::convert::TryFrom;
 use std::ops::Deref;
 
+pub use wgsl::ParseError;
+
 #[derive(Clone, Debug)]
 pub struct ShaderSource {
     source: String,
@@ -13,7 +15,7 @@ pub struct ShaderSource {
 }
 
 impl ShaderSource {
-    pub fn parse(source: String) -> Result<ShaderSource, wgsl::ParseError> {
+    pub fn parse(source: String) -> Result<ShaderSource, ParseError> {
         let module = wgsl::parse_str(&source)?;
 
         let mut resource_bindings = Vec::new();
@@ -489,6 +491,7 @@ impl EntryPoint {
                 location,
                 interpolation,
                 sampling,
+                ..
             }) = binding
             {
                 sink.push(EntryPointBinding::try_from_naga(
@@ -508,6 +511,7 @@ impl EntryPoint {
                         location,
                         interpolation,
                         sampling,
+                        ..
                     } = binding
                     {
                         sink.push(EntryPointBinding::try_from_naga(

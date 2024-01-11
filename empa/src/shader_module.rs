@@ -1,8 +1,10 @@
 use std::sync::Arc;
+use std::{fmt, slice};
 
 use empa_reflect::{
     Constant, ConstantIdentifier, ConstantType, EntryPointBinding as DynamicEntryPointBinding,
-    EntryPointBindingType, ShaderSource as DynamicShaderSource, ShaderStage,
+    EntryPointBindingType, ParseError as DynamicParseError, ShaderSource as DynamicShaderSource,
+    ShaderStage,
 };
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::{GpuShaderModule, GpuShaderModuleDescriptor};
@@ -12,8 +14,6 @@ use crate::pipeline_constants::{PipelineConstantIdentifier, PipelineConstants};
 use crate::resource_binding::BindingType;
 
 pub use empa_macros::shader_source;
-use naga::front::wgsl;
-use std::{fmt, slice};
 
 /// Internal type for `shader_source` macro.
 #[doc(hidden)]
@@ -326,18 +326,18 @@ impl EntryPointBinding<'_> {
 }
 
 pub struct ParseError {
-    inner: wgsl::ParseError,
+    inner: DynamicParseError,
 }
 
 impl fmt::Debug for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        <wgsl::ParseError as fmt::Debug>::fmt(&self.inner, f)
+        <DynamicParseError as fmt::Debug>::fmt(&self.inner, f)
     }
 }
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        <wgsl::ParseError as fmt::Display>::fmt(&self.inner, f)
+        <DynamicParseError as fmt::Display>::fmt(&self.inner, f)
     }
 }
 
@@ -359,7 +359,7 @@ impl ShaderSource {
             .map(|ok| ShaderSource {
                 inner: ShaderSourceInternal::Dynamic(Arc::new(ok)),
             })
-            .map_err(|err| ParseError { inner: err })
+            .map_err(|inner| ParseError { inner })
     }
 }
 
