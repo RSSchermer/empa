@@ -1,19 +1,18 @@
 use std::marker;
 
 use bitflags::bitflags;
-
-use crate::abi::MemoryUnit;
-use crate::device::Device;
-use crate::resource_binding::typed_bind_group_entry::TypedSlotBinding;
-use crate::Untyped;
-
-use crate::texture::format::TextureFormatId;
 use web_sys::{
     GpuBindGroupLayout, GpuBindGroupLayoutDescriptor, GpuBindGroupLayoutEntry,
     GpuBufferBindingLayout, GpuBufferBindingType, GpuSamplerBindingLayout, GpuSamplerBindingType,
     GpuStorageTextureAccess, GpuStorageTextureBindingLayout, GpuTextureBindingLayout,
     GpuTextureSampleType, GpuTextureViewDimension,
 };
+
+use crate::abi::MemoryUnit;
+use crate::device::Device;
+use crate::resource_binding::typed_bind_group_entry::TypedSlotBinding;
+use crate::texture::format::TextureFormatId;
+use crate::Untyped;
 
 pub struct BindGroupLayoutEncoding {
     pub(crate) inner: web_sys::GpuBindGroupLayout,

@@ -1,11 +1,12 @@
+use std::cmp::max;
+use std::collections::HashMap;
+
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::spanned::Spanned;
 use syn::{Attribute, Data, DeriveInput, Field, Ident, Lit, Meta, NestedMeta, Type};
 
 use crate::error_log::ErrorLog;
-use std::cmp::max;
-use std::collections::HashMap;
 
 pub fn expand_derive_resources(input: &DeriveInput) -> Result<TokenStream, String> {
     if let Data::Struct(ref data) = input.data {

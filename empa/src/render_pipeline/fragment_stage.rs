@@ -1,5 +1,6 @@
 use std::marker;
 
+use empa_reflect::ShaderStage;
 use wasm_bindgen::{JsValue, UnwrapThrowExt};
 use web_sys::{
     GpuBlendComponent, GpuBlendFactor, GpuBlendOperation, GpuBlendState, GpuColorTargetState,
@@ -10,7 +11,6 @@ use crate::pipeline_constants::PipelineConstants;
 use crate::render_target::TypedColorLayout;
 use crate::shader_module::{ShaderModule, ShaderSourceInternal};
 use crate::texture::format::{Blendable, ColorRenderable};
-use empa_reflect::ShaderStage;
 
 pub enum BlendFactor {
     Zero,

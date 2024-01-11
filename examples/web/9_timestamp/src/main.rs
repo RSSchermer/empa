@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::ops::Deref;
 
 use arwa::console;
 use arwa::window::window;
@@ -12,7 +13,6 @@ use empa::device::DeviceDescriptor;
 use empa::resource_binding::Resources;
 use empa::shader_module::{shader_source, ShaderSource};
 use futures::FutureExt;
-use std::ops::Deref;
 
 #[derive(empa::resource_binding::Resources)]
 struct MyResources<'a> {

@@ -1,5 +1,6 @@
-pub use empa_macros::Sized;
 use std::mem;
+
+pub use empa_macros::Sized;
 
 pub unsafe trait Sized {
     const LAYOUT: &'static [MemoryUnit];

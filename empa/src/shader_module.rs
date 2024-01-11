@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::{fmt, slice};
 
+pub use empa_macros::shader_source;
 use empa_reflect::{
     Constant, ConstantIdentifier, ConstantType, EntryPointBinding as DynamicEntryPointBinding,
     EntryPointBindingType, ParseError as DynamicParseError, ShaderSource as DynamicShaderSource,
@@ -12,8 +13,6 @@ use web_sys::{GpuShaderModule, GpuShaderModuleDescriptor};
 use crate::device::Device;
 use crate::pipeline_constants::{PipelineConstantIdentifier, PipelineConstants};
 use crate::resource_binding::BindingType;
-
-pub use empa_macros::shader_source;
 
 /// Internal type for `shader_source` macro.
 #[doc(hidden)]

@@ -1,12 +1,11 @@
 use std::borrow::Borrow;
-use std::fmt;
 use std::future::Future;
 use std::mem::MaybeUninit;
 use std::ops::{
     Deref, DerefMut, Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive, Rem,
 };
 use std::sync::{Arc, Mutex};
-use std::{error, marker, mem, slice};
+use std::{error, fmt, marker, mem, slice};
 
 use atomic_counter::AtomicCounter;
 use futures::TryFutureExt;

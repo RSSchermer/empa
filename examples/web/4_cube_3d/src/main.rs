@@ -4,7 +4,6 @@ use std::f32::consts::PI;
 use arwa::dom::{selector, ParentNode};
 use arwa::html::HtmlCanvasElement;
 use arwa::window::window;
-use empa::abi;
 use empa::arwa::{
     AlphaMode, CanvasConfiguration, HtmlCanvasElementExt, NavigatorExt, RequestAdapterOptions,
 };
@@ -25,7 +24,7 @@ use empa::resource_binding::Resources;
 use empa::shader_module::{shader_source, ShaderSource};
 use empa::texture::format::{depth24plus, rgba8unorm};
 use empa::texture::{AttachableImageDescriptor, MipmapLevels, Texture2DDescriptor};
-use empa::{buffer, texture, CompareFunction};
+use empa::{abi, buffer, texture, CompareFunction};
 use empa_glam::ToAbi;
 use futures::FutureExt;
 

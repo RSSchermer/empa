@@ -11,7 +11,6 @@ use web_sys::{
     GpuRenderPassDescriptor, GpuRenderPassEncoder, GpuRenderPassTimestampWrite,
 };
 
-use crate::abi;
 use crate::abi::{MemoryUnit, MemoryUnitLayout};
 use crate::buffer::BufferHandle;
 use crate::command::{
@@ -30,7 +29,7 @@ use crate::resource_binding::BindGroupResource;
 use crate::texture::format::{DepthStencilRenderable, ImageData, TextureFormat};
 use crate::texture::{ImageCopySize3D, TextureHandle};
 use crate::type_flag::{TypeFlag, O, X};
-use crate::{buffer, texture};
+use crate::{abi, buffer, texture};
 
 enum ResourceHandle {
     Buffer(Arc<BufferHandle>),

@@ -1,6 +1,7 @@
 use std::marker;
 
 use atomic_counter::AtomicCounter;
+use empa_reflect::ShaderStage;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{GpuComputePipeline, GpuComputePipelineDescriptor, GpuProgrammableStage};
 
@@ -8,7 +9,6 @@ use crate::device::{Device, ID_GEN};
 use crate::pipeline_constants::PipelineConstants;
 use crate::resource_binding::{PipelineLayout, ShaderStages, TypedPipelineLayout};
 use crate::shader_module::{ShaderModule, ShaderSourceInternal};
-use empa_reflect::ShaderStage;
 
 pub struct ComputePipeline<L> {
     inner: GpuComputePipeline,

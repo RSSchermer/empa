@@ -1,9 +1,9 @@
 use std::fmt;
 
+use empa_reflect::ConstantIdentifier;
 use wasm_bindgen::JsValue;
 
 use crate::shader_module::StaticConstantType;
-use empa_reflect::ConstantIdentifier;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PipelineConstantIdentifier<'a> {

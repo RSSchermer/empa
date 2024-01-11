@@ -8,14 +8,13 @@ mod render_layout;
 pub use self::render_layout::*;
 
 mod render_target;
-pub use self::render_target::*;
-
 use std::error::Error;
 use std::fmt;
 use std::sync::Arc;
 
 use web_sys::{GpuColorDict, GpuLoadOp, GpuStoreOp};
 
+pub use self::render_target::*;
 use crate::texture::TextureHandle;
 
 #[derive(Clone, Copy, PartialEq, Debug)]

@@ -1,3 +1,4 @@
+use std::iter;
 use std::sync::Arc;
 
 use web_sys::GpuBindGroup;
@@ -5,7 +6,6 @@ use web_sys::GpuBindGroup;
 use crate::resource_binding::{
     BindGroup, BindGroupResource, TypedBindGroupLayout, TypedPipelineLayout,
 };
-use std::iter;
 
 pub struct BindGroupEncoding {
     pub(crate) bind_group: GpuBindGroup,

@@ -1,12 +1,12 @@
 use std::marker;
 
+use empa_reflect::ShaderStage;
 use wasm_bindgen::{JsValue, UnwrapThrowExt};
 use web_sys::{GpuVertexBufferLayout, GpuVertexState};
 
 use crate::pipeline_constants::PipelineConstants;
 use crate::render_pipeline::TypedVertexLayout;
 use crate::shader_module::{ShaderModule, ShaderSourceInternal};
-use empa_reflect::ShaderStage;
 
 pub struct VertexStage<V> {
     pub(crate) inner: GpuVertexState,

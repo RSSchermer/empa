@@ -1,9 +1,9 @@
-use naga::front::wgsl;
-use naga::proc::IndexableLength;
-use naga::AddressSpace;
 use std::convert::TryFrom;
 use std::ops::Deref;
 
+use naga::front::wgsl;
+use naga::proc::IndexableLength;
+use naga::AddressSpace;
 pub use wgsl::ParseError;
 
 #[derive(Clone, Debug)]

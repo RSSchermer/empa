@@ -1,4 +1,5 @@
 use std::mem::MaybeUninit;
+use std::{mem, slice};
 
 use atomic_counter::RelaxedCounter;
 use lazy_static::lazy_static;
@@ -31,7 +32,6 @@ use crate::texture::{
     TextureMultisampled2DDescriptor,
 };
 use crate::{buffer, texture};
-use std::{mem, slice};
 
 lazy_static! {
     pub(crate) static ref ID_GEN: RelaxedCounter = RelaxedCounter::new(1);
