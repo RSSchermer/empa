@@ -42,12 +42,14 @@ async fn render() -> Result<(), Box<dyn Error>> {
     let bind_group_layout = device.create_bind_group_layout::<BindGroupLayout>();
     let pipeline_layout = device.create_pipeline_layout(&bind_group_layout);
 
-    let pipeline = device.create_compute_pipeline(
-        &ComputePipelineDescriptorBuilder::begin()
-            .layout(&pipeline_layout)
-            .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
-            .finish(),
-    );
+    let pipeline = device
+        .create_compute_pipeline(
+            &ComputePipelineDescriptorBuilder::begin()
+                .layout(&pipeline_layout)
+                .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
+                .finish(),
+        )
+        .await;
 
     let data: Vec<u32> = vec![0; 64];
 

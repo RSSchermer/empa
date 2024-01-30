@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::mem::MaybeUninit;
 use std::{mem, slice};
 
@@ -182,6 +183,13 @@ impl Device {
     pub fn create_compute_pipeline<R>(
         &self,
         descriptor: &ComputePipelineDescriptor<R>,
+    ) -> impl Future<Output = ComputePipeline<R>> {
+        ComputePipeline::new_async(self, descriptor)
+    }
+
+    pub fn create_compute_pipeline_sync<R>(
+        &self,
+        descriptor: &ComputePipelineDescriptor<R>,
     ) -> ComputePipeline<R> {
         ComputePipeline::new(self, descriptor)
     }
@@ -189,8 +197,15 @@ impl Device {
     pub fn create_render_pipeline<T, V, I, R>(
         &self,
         descriptor: &RenderPipelineDescriptor<T, V, I, R>,
+    ) -> impl Future<Output = RenderPipeline<T, V, I, R>> {
+        RenderPipeline::new_async(self, descriptor)
+    }
+
+    pub fn create_render_pipeline_sync<T, V, I, R>(
+        &self,
+        descriptor: &RenderPipelineDescriptor<T, V, I, R>,
     ) -> RenderPipeline<T, V, I, R> {
-        RenderPipeline::new(self, descriptor)
+        RenderPipeline::new_sync(self, descriptor)
     }
 
     pub fn create_sampler(&self, descriptor: &SamplerDescriptor) -> Sampler {

@@ -61,24 +61,26 @@ async fn render() -> Result<(), Box<dyn Error>> {
 
     let pipeline_layout = device.create_pipeline_layout(());
 
-    let pipeline = device.create_render_pipeline(
-        &RenderPipelineDescriptorBuilder::begin()
-            .layout(&pipeline_layout)
-            .vertex(
-                &VertexStageBuilder::begin(&shader, "vert_main")
-                    .vertex_layout::<MyVertex>()
-                    .finish(),
-            )
-            .fragment(
-                &FragmentStageBuilder::begin(&shader, "frag_main")
-                    .color_outputs(ColorOutput {
-                        format: rgba8unorm,
-                        write_mask: ColorWriteMask::ALL,
-                    })
-                    .finish(),
-            )
-            .finish(),
-    );
+    let pipeline = device
+        .create_render_pipeline(
+            &RenderPipelineDescriptorBuilder::begin()
+                .layout(&pipeline_layout)
+                .vertex(
+                    &VertexStageBuilder::begin(&shader, "vert_main")
+                        .vertex_layout::<MyVertex>()
+                        .finish(),
+                )
+                .fragment(
+                    &FragmentStageBuilder::begin(&shader, "frag_main")
+                        .color_outputs(ColorOutput {
+                            format: rgba8unorm,
+                            write_mask: ColorWriteMask::ALL,
+                        })
+                        .finish(),
+                )
+                .finish(),
+        )
+        .await;
 
     let vertex_data = [
         MyVertex {

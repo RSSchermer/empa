@@ -1,7 +1,11 @@
+use std::future::Future;
 use std::marker;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 use atomic_counter::AtomicCounter;
 use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen_futures::JsFuture;
 use web_sys::{GpuRenderPipeline, GpuRenderPipelineDescriptor};
 
 use crate::device::{Device, ID_GEN};
@@ -19,7 +23,10 @@ pub struct RenderPipeline<O, V, I, R> {
 }
 
 impl<O, V, I, R> RenderPipeline<O, V, I, R> {
-    pub(crate) fn new(device: &Device, descriptor: &RenderPipelineDescriptor<O, V, I, R>) -> Self {
+    pub(crate) fn new_sync(
+        device: &Device,
+        descriptor: &RenderPipelineDescriptor<O, V, I, R>,
+    ) -> Self {
         let id = ID_GEN.get();
         let inner = device.inner.create_render_pipeline(&descriptor.inner);
 
@@ -30,12 +37,47 @@ impl<O, V, I, R> RenderPipeline<O, V, I, R> {
         }
     }
 
+    pub(crate) fn new_async(
+        device: &Device,
+        descriptor: &RenderPipelineDescriptor<O, V, I, R>,
+    ) -> CreateRenderPipelineAsync<O, V, I, R> {
+        CreateRenderPipelineAsync {
+            inner: device
+                .inner
+                .create_render_pipeline_async(&descriptor.inner)
+                .into(),
+            _marker: Default::default(),
+        }
+    }
+
     pub(crate) fn id(&self) -> usize {
         self.id
     }
 
     pub(crate) fn as_web_sys(&self) -> &GpuRenderPipeline {
         &self.inner
+    }
+}
+
+pub(crate) struct CreateRenderPipelineAsync<O, V, I, R> {
+    inner: JsFuture,
+    _marker: marker::PhantomData<(*const O, *const V, *const I, *const R)>,
+}
+
+impl<O, V, I, R> Future for CreateRenderPipelineAsync<O, V, I, R> {
+    type Output = RenderPipeline<O, V, I, R>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut self.get_mut().inner).poll(cx).map(|result| {
+            let inner = result.expect("pipeline creation should not fail");
+            let id = ID_GEN.get();
+
+            RenderPipeline {
+                inner: inner.unchecked_into(),
+                id,
+                _marker: Default::default(),
+            }
+        })
     }
 }
 

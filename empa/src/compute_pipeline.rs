@@ -1,8 +1,12 @@
+use std::future::Future;
 use std::marker;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 use atomic_counter::AtomicCounter;
 use empa_reflect::ShaderStage;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
+use wasm_bindgen_futures::JsFuture;
 use web_sys::{GpuComputePipeline, GpuComputePipelineDescriptor, GpuProgrammableStage};
 
 use crate::device::{Device, ID_GEN};
@@ -13,7 +17,7 @@ use crate::shader_module::{ShaderModule, ShaderSourceInternal};
 pub struct ComputePipeline<L> {
     inner: GpuComputePipeline,
     id: usize,
-    _marker: marker::PhantomData<L>,
+    _marker: marker::PhantomData<*const L>,
 }
 
 impl<L> ComputePipeline<L> {
@@ -28,12 +32,47 @@ impl<L> ComputePipeline<L> {
         }
     }
 
+    pub(crate) fn new_async(
+        device: &Device,
+        descriptor: &ComputePipelineDescriptor<L>,
+    ) -> CreateComputePipelineAsync<L> {
+        CreateComputePipelineAsync {
+            inner: device
+                .inner
+                .create_compute_pipeline_async(&descriptor.inner)
+                .into(),
+            _marker: Default::default(),
+        }
+    }
+
     pub(crate) fn id(&self) -> usize {
         self.id
     }
 
     pub(crate) fn as_web_sys(&self) -> &GpuComputePipeline {
         &self.inner
+    }
+}
+
+pub(crate) struct CreateComputePipelineAsync<L> {
+    inner: JsFuture,
+    _marker: marker::PhantomData<*const L>,
+}
+
+impl<L> Future for CreateComputePipelineAsync<L> {
+    type Output = ComputePipeline<L>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut self.get_mut().inner).poll(cx).map(|result| {
+            let inner = result.expect("pipeline creation should not fail");
+            let id = ID_GEN.get();
+
+            ComputePipeline {
+                inner: inner.unchecked_into(),
+                id,
+                _marker: Default::default(),
+            }
+        })
     }
 }
 

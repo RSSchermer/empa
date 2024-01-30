@@ -52,18 +52,20 @@ struct Evaluator {
 }
 
 impl Evaluator {
-    fn new(device: Device) -> Self {
+    async fn init(device: Device) -> Self {
         let scan_shader = device.create_shader_module(&SCAN_SHADER);
 
         let scan_bind_group_layout = device.create_bind_group_layout::<ScanLayout>();
         let scan_pipeline_layout = device.create_pipeline_layout(&scan_bind_group_layout);
 
-        let scan_pipeline = device.create_compute_pipeline(
-            &ComputePipelineDescriptorBuilder::begin()
-                .layout(&scan_pipeline_layout)
-                .compute(&ComputeStageBuilder::begin(&scan_shader, "main").finish())
-                .finish(),
-        );
+        let scan_pipeline = device
+            .create_compute_pipeline(
+                &ComputePipelineDescriptorBuilder::begin()
+                    .layout(&scan_pipeline_layout)
+                    .compute(&ComputeStageBuilder::begin(&scan_shader, "main").finish())
+                    .finish(),
+            )
+            .await;
 
         let uniform_add_shader = device.create_shader_module(&UNIFORM_ADD_SHADER);
 
@@ -71,12 +73,14 @@ impl Evaluator {
         let uniform_add_pipeline_layout =
             device.create_pipeline_layout(&uniform_add_bind_group_layout);
 
-        let uniform_add_pipeline = device.create_compute_pipeline(
-            &ComputePipelineDescriptorBuilder::begin()
-                .layout(&uniform_add_pipeline_layout)
-                .compute(&ComputeStageBuilder::begin(&uniform_add_shader, "main").finish())
-                .finish(),
-        );
+        let uniform_add_pipeline = device
+            .create_compute_pipeline(
+                &ComputePipelineDescriptorBuilder::begin()
+                    .layout(&uniform_add_pipeline_layout)
+                    .compute(&ComputeStageBuilder::begin(&uniform_add_shader, "main").finish())
+                    .finish(),
+            )
+            .await;
 
         Evaluator {
             device,
@@ -240,7 +244,7 @@ async fn compute() -> Result<(), Box<dyn Error>> {
         .ok_or("adapter not found")?;
     let device = adapter.request_device(&DeviceDescriptor::default()).await?;
 
-    let evaluator = Evaluator::new(device.clone());
+    let evaluator = Evaluator::init(device.clone()).await;
 
     let data: Vec<u32> = vec![1; 1_000_000];
 
