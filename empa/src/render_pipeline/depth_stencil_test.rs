@@ -1,6 +1,6 @@
 use std::marker;
 
-use web_sys::{GpuDepthStencilState, GpuStencilFaceState, GpuStencilOperation};
+use web_sys::{GpuDepthStencilState, GpuStencilFaceState, GpuStencilOperation, GpuCompareFunction};
 
 use crate::render_target::ReadOnly;
 use crate::texture::format::{
@@ -124,9 +124,7 @@ impl DepthStencilTest<()> {
     where
         F: DepthStencilTestFormat,
     {
-        let mut inner = GpuDepthStencilState::new(F::FORMAT_ID.to_web_sys());
-
-        inner.depth_write_enabled(true);
+        let inner = GpuDepthStencilState::new(GpuCompareFunction::Less, true, F::FORMAT_ID.to_web_sys());
 
         DepthStencilTest {
             inner,
@@ -138,9 +136,7 @@ impl DepthStencilTest<()> {
     where
         F: DepthStencilTestFormat,
     {
-        let mut inner = GpuDepthStencilState::new(F::FORMAT_ID.to_web_sys());
-
-        inner.depth_write_enabled(false);
+        let inner = GpuDepthStencilState::new(GpuCompareFunction::Less, false, F::FORMAT_ID.to_web_sys());
 
         DepthStencilTest {
             inner,

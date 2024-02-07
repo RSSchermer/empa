@@ -8,7 +8,7 @@ use wasm_bindgen::JsValue;
 use web_sys::{
     GpuColorDict, GpuCommandBuffer, GpuCommandEncoder, GpuComputePassEncoder, GpuExtent3dDict,
     GpuRenderBundle, GpuRenderBundleEncoder, GpuRenderBundleEncoderDescriptor,
-    GpuRenderPassDescriptor, GpuRenderPassEncoder, GpuRenderPassTimestampWrite,
+    GpuRenderPassDescriptor, GpuRenderPassEncoder,
 };
 
 use crate::abi::{MemoryUnit, MemoryUnitLayout};
@@ -738,7 +738,7 @@ impl<P, R> ResourceBindingCommandEncoder for ComputePassEncoder<P, R> {
             } = encoding;
 
             if current_bind_group_ids[i] != Some(id) {
-                inner.set_bind_group(i as u32, &bind_group);
+                inner.set_bind_group(i as u32, Some(&bind_group));
                 command_encoder
                     ._resource_handles
                     .push(_resource_handles.into());
@@ -1008,11 +1008,6 @@ impl EndRenderPass for OcclusionQueryState<O> {}
 impl end_render_pass_seal::Seal for () {}
 impl EndRenderPass for () {}
 
-struct RenderPassTimestampQuery {
-    inner: GpuRenderPassTimestampWrite,
-    _handle: Arc<QuerySetHandle>,
-}
-
 pub struct RenderPassDescriptor<RenderTarget, OcclusionQueryState> {
     inner: GpuRenderPassDescriptor,
     _texture_handles: Arc<StaticVec<Arc<TextureHandle>, 9>>,
@@ -1146,7 +1141,7 @@ impl<T, P, V, I, R, Q> ResourceBindingCommandEncoder for RenderPassEncoder<T, P,
             } = encoding;
 
             if current_bind_group_ids[i] != Some(id) {
-                inner.set_bind_group(i as u32, &bind_group);
+                inner.set_bind_group(i as u32, Some(&bind_group));
                 command_encoder
                     ._resource_handles
                     .push(_resource_handles.into());
@@ -1230,7 +1225,7 @@ impl<T, P, V, I, R, Q> RenderStateEncoder<T> for RenderPassEncoder<T, P, V, I, R
             let range = CurrentBufferRange { id, offset, size };
 
             if current_vertex_buffers[i] != Some(range) {
-                inner.set_vertex_buffer_with_u32_and_u32(i as u32, &buffer.buffer, offset, size);
+                inner.set_vertex_buffer_with_u32_and_u32(i as u32, Some(&buffer.buffer), offset, size);
                 command_encoder._resource_handles.push(buffer.into());
 
                 current_vertex_buffers[i] = Some(range);
@@ -1775,7 +1770,7 @@ impl<T, P, V, I, R> ResourceBindingCommandEncoder for RenderBundleEncoder<T, P, 
             } = encoding;
 
             if current_bind_group_ids[i] != Some(id) {
-                inner.set_bind_group(i as u32, &bind_group);
+                inner.set_bind_group(i as u32, Some(&bind_group));
                 _resource_handles.push(bind_group_resource_handles.into());
 
                 current_bind_group_ids[i] = Some(id);
@@ -1857,7 +1852,7 @@ impl<T, P, V, I, R> RenderStateEncoder<T> for RenderBundleEncoder<T, P, V, I, R>
             let range = CurrentBufferRange { id, offset, size };
 
             if current_vertex_buffers[i] != Some(range) {
-                inner.set_vertex_buffer_with_u32_and_u32(i as u32, &buffer.buffer, offset, size);
+                inner.set_vertex_buffer_with_u32_and_u32(i as u32, Some(&buffer.buffer), offset, size);
                 _resource_handles.push(buffer.into());
 
                 current_vertex_buffers[i] = Some(range);
