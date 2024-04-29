@@ -1,0 +1,12 @@
+[package]
+name = "empa-driver"
+version = "0.1.0"
+edition = "2021"
+description = "Driver interface description for `empa`."
+authors = ["Roland Schermer <roland0507@gmail.com>"]
+homepage = "https://github.com/RSSchermer/empa"
+repository = "https://github.com/RSSchermer/empa"
+license = "MIT"
+
+[dependencies]
+flagset = "^0.4"

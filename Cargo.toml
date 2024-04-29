@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/empa",
+    "crates/empa_driver",
     "crates/empa_glam",
     "crates/empa_macros",
     "crates/empa_reflect",
