@@ -1,10 +1,10 @@
 [workspace]
 members = [
-    "empa",
-    "empa_glam",
-    "empa_macros",
-    "empa_reflect",
-    "empa_test",
+    "crates/empa",
+    "crates/empa_glam",
+    "crates/empa_macros",
+    "crates/empa_reflect",
+    "crates/empa_test",
     "examples/web/0_triangle",
     "examples/web/1_animated_triangle",
     "examples/web/2_textured_triangle",
