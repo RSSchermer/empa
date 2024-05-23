@@ -14,7 +14,7 @@ use empa::command::{
 };
 use empa::device::DeviceDescriptor;
 use empa::render_pipeline::{
-    ColorOutput, ColorWriteMask, DepthStencilTest, FragmentStageBuilder,
+    ColorOutput, ColorWrite, DepthStencilTest, FragmentStageBuilder,
     RenderPipelineDescriptorBuilder, VertexStageBuilder,
 };
 use empa::render_target::{
@@ -46,7 +46,7 @@ struct Uniforms {
 #[derive(empa::resource_binding::Resources)]
 struct MyResources<'a> {
     #[resource(binding = 0, visibility = "VERTEX")]
-    uniform_buffer: &'a Uniform<Uniforms>,
+    uniform_buffer: Uniform<'a, Uniforms>,
 }
 
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
@@ -90,15 +90,15 @@ async fn render() -> Result<(), Box<dyn Error>> {
             &RenderPipelineDescriptorBuilder::begin()
                 .layout(&pipeline_layout)
                 .vertex(
-                    &VertexStageBuilder::begin(&shader, "vert_main")
+                    VertexStageBuilder::begin(&shader, "vert_main")
                         .vertex_layout::<MyVertex>()
                         .finish(),
                 )
                 .fragment(
-                    &FragmentStageBuilder::begin(&shader, "frag_main")
+                    FragmentStageBuilder::begin(&shader, "frag_main")
                         .color_outputs(ColorOutput {
                             format: rgba8unorm,
-                            write_mask: ColorWriteMask::ALL,
+                            write_mask: ColorWrite::All,
                         })
                         .finish(),
                 )
@@ -181,7 +181,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
     let bind_group = device.create_bind_group(
         &bind_group_layout,
         MyResources {
-            uniform_buffer: &uniform_buffer.uniform(),
+            uniform_buffer: uniform_buffer.uniform(),
         },
     );
 
@@ -232,16 +232,16 @@ async fn render() -> Result<(), Box<dyn Error>> {
 
         let command_buffer = device
             .create_command_encoder()
-            .begin_render_pass(&RenderPassDescriptor::new(&RenderTarget {
+            .begin_render_pass(RenderPassDescriptor::new(&RenderTarget {
                 color: FloatAttachment {
-                    image: &context
+                    image: context
                         .get_current_texture()
                         .attachable_image(&AttachableImageDescriptor::default()),
                     load_op: LoadOp::Clear([0.0; 4]),
                     store_op: StoreOp::Store,
                 },
                 depth_stencil: DepthAttachment {
-                    image: &depth_texture.attachable_image(&AttachableImageDescriptor::default()),
+                    image: depth_texture.attachable_image(&AttachableImageDescriptor::default()),
                     load_op: LoadOp::Clear(DepthValue::ONE),
                     store_op: StoreOp::Store,
                 },

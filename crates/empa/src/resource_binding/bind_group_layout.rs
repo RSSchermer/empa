@@ -1,241 +1,56 @@
 use std::marker;
 
-use bitflags::bitflags;
-use web_sys::{
-    GpuBindGroupLayout, GpuBindGroupLayoutDescriptor, GpuBindGroupLayoutEntry,
-    GpuBufferBindingLayout, GpuBufferBindingType, GpuSamplerBindingLayout, GpuSamplerBindingType,
-    GpuStorageTextureAccess, GpuStorageTextureBindingLayout, GpuTextureBindingLayout,
-    GpuTextureSampleType, GpuTextureViewDimension,
-};
+use flagset::FlagSet;
 
 use crate::abi::MemoryUnit;
 use crate::device::Device;
+use crate::driver::{
+    BufferBindingType, Device as _, Driver, Dvr, SamplerBindingType, ShaderStage,
+    StorageTextureAccess, TextureSampleType, TextureViewDimension,
+};
 use crate::resource_binding::typed_bind_group_entry::TypedSlotBinding;
 use crate::texture::format::TextureFormatId;
-use crate::Untyped;
+use crate::{driver, Untyped};
 
-pub struct BindGroupLayoutEncoding {
-    pub(crate) inner: web_sys::GpuBindGroupLayout,
+pub struct BindGroupLayoutEncoding<'a> {
+    pub(crate) handle: &'a <Dvr as Driver>::BindGroupLayoutHandle,
 }
 
 pub struct BindGroupLayout<T = Untyped> {
-    pub(crate) inner: web_sys::GpuBindGroupLayout,
+    pub(crate) handle: <Dvr as Driver>::BindGroupLayoutHandle,
     _marker: marker::PhantomData<*const T>,
 }
 
 impl<T> BindGroupLayout<T> {
     pub(crate) fn new(device: &Device, layout: &[Option<BindGroupLayoutEntry>]) -> Self {
-        let layout = layout
+        let entries = layout
             .iter()
             .enumerate()
             .filter(|(_, e)| e.is_some())
             .map(|(i, e)| {
                 let e = e.as_ref().unwrap();
 
-                let mut entry = GpuBindGroupLayoutEntry::new(i as u32, e.visibility.bits());
-
-                match &e.binding_type {
-                    BindingType::Texture1D(texel_type) => {
-                        let mut texture = GpuTextureBindingLayout::new();
-
-                        texture.sample_type(texel_type.to_web_sys());
-                        texture.view_dimension(GpuTextureViewDimension::N1d);
-
-                        entry.texture(&texture);
-                    }
-                    BindingType::Texture2D(texel_type) => {
-                        let mut texture = GpuTextureBindingLayout::new();
-
-                        texture.sample_type(texel_type.to_web_sys());
-                        texture.view_dimension(GpuTextureViewDimension::N2d);
-
-                        entry.texture(&texture);
-                    }
-                    BindingType::Texture3D(texel_type) => {
-                        let mut texture = GpuTextureBindingLayout::new();
-
-                        texture.sample_type(texel_type.to_web_sys());
-                        texture.view_dimension(GpuTextureViewDimension::N3d);
-
-                        entry.texture(&texture);
-                    }
-                    BindingType::Texture2DArray(texel_type) => {
-                        let mut texture = GpuTextureBindingLayout::new();
-
-                        texture.sample_type(texel_type.to_web_sys());
-                        texture.view_dimension(GpuTextureViewDimension::N2dArray);
-
-                        entry.texture(&texture);
-                    }
-                    BindingType::TextureCube(texel_type) => {
-                        let mut texture = GpuTextureBindingLayout::new();
-
-                        texture.sample_type(texel_type.to_web_sys());
-                        texture.view_dimension(GpuTextureViewDimension::Cube);
-
-                        entry.texture(&texture);
-                    }
-                    BindingType::TextureCubeArray(texel_type) => {
-                        let mut texture = GpuTextureBindingLayout::new();
-
-                        texture.sample_type(texel_type.to_web_sys());
-                        texture.view_dimension(GpuTextureViewDimension::CubeArray);
-
-                        entry.texture(&texture);
-                    }
-                    BindingType::TextureMultisampled2D(texel_type) => {
-                        let mut texture = GpuTextureBindingLayout::new();
-
-                        texture.multisampled(true);
-                        texture.sample_type(texel_type.to_web_sys());
-                        texture.view_dimension(GpuTextureViewDimension::N2d);
-
-                        entry.texture(&texture);
-                    }
-                    BindingType::TextureDepth2D => {
-                        let mut texture = GpuTextureBindingLayout::new();
-
-                        texture.sample_type(GpuTextureSampleType::Depth);
-                        texture.view_dimension(GpuTextureViewDimension::N2d);
-
-                        entry.texture(&texture);
-                    }
-                    BindingType::TextureDepth2DArray => {
-                        let mut texture = GpuTextureBindingLayout::new();
-
-                        texture.sample_type(GpuTextureSampleType::Depth);
-                        texture.view_dimension(GpuTextureViewDimension::N2dArray);
-
-                        entry.texture(&texture);
-                    }
-                    BindingType::TextureDepthCube => {
-                        let mut texture = GpuTextureBindingLayout::new();
-
-                        texture.sample_type(GpuTextureSampleType::Depth);
-                        texture.view_dimension(GpuTextureViewDimension::Cube);
-
-                        entry.texture(&texture);
-                    }
-                    BindingType::TextureDepthCubeArray => {
-                        let mut texture = GpuTextureBindingLayout::new();
-
-                        texture.sample_type(GpuTextureSampleType::Depth);
-                        texture.view_dimension(GpuTextureViewDimension::CubeArray);
-
-                        entry.texture(&texture);
-                    }
-                    BindingType::TextureDepthMultisampled2D => {
-                        let mut texture = GpuTextureBindingLayout::new();
-
-                        texture.multisampled(true);
-                        texture.sample_type(GpuTextureSampleType::Depth);
-                        texture.view_dimension(GpuTextureViewDimension::N2d);
-
-                        entry.texture(&texture);
-                    }
-                    BindingType::StorageTexture1D(format) => {
-                        let mut storage_texture =
-                            GpuStorageTextureBindingLayout::new(format.to_web_sys());
-
-                        storage_texture.access(GpuStorageTextureAccess::WriteOnly);
-                        storage_texture.view_dimension(GpuTextureViewDimension::N1d);
-
-                        entry.storage_texture(&storage_texture);
-                    }
-                    BindingType::StorageTexture2D(format) => {
-                        let mut storage_texture =
-                            GpuStorageTextureBindingLayout::new(format.to_web_sys());
-
-                        storage_texture.access(GpuStorageTextureAccess::WriteOnly);
-                        storage_texture.view_dimension(GpuTextureViewDimension::N2d);
-
-                        entry.storage_texture(&storage_texture);
-                    }
-                    BindingType::StorageTexture2DArray(format) => {
-                        let mut storage_texture =
-                            GpuStorageTextureBindingLayout::new(format.to_web_sys());
-
-                        storage_texture.access(GpuStorageTextureAccess::WriteOnly);
-                        storage_texture.view_dimension(GpuTextureViewDimension::N2dArray);
-
-                        entry.storage_texture(&storage_texture);
-                    }
-                    BindingType::StorageTexture3D(format) => {
-                        let mut storage_texture =
-                            GpuStorageTextureBindingLayout::new(format.to_web_sys());
-
-                        storage_texture.access(GpuStorageTextureAccess::WriteOnly);
-                        storage_texture.view_dimension(GpuTextureViewDimension::N3d);
-
-                        entry.storage_texture(&storage_texture);
-                    }
-                    BindingType::FilteringSampler => {
-                        let mut sampler = GpuSamplerBindingLayout::new();
-
-                        sampler.type_(GpuSamplerBindingType::Filtering);
-
-                        entry.sampler(&sampler);
-                    }
-                    BindingType::NonFilteringSampler => {
-                        let mut sampler = GpuSamplerBindingLayout::new();
-
-                        sampler.type_(GpuSamplerBindingType::NonFiltering);
-
-                        entry.sampler(&sampler);
-                    }
-                    BindingType::ComparisonSampler => {
-                        let mut sampler = GpuSamplerBindingLayout::new();
-
-                        sampler.type_(GpuSamplerBindingType::Comparison);
-
-                        entry.sampler(&sampler);
-                    }
-                    // TODO: min_binding_size
-                    // TODO: dynamic offsets
-                    BindingType::Uniform(_) => {
-                        let mut buffer = GpuBufferBindingLayout::new();
-
-                        buffer.type_(GpuBufferBindingType::Uniform);
-
-                        entry.buffer(&buffer);
-                    }
-                    BindingType::Storage(_) => {
-                        let mut buffer = GpuBufferBindingLayout::new();
-
-                        buffer.type_(GpuBufferBindingType::Storage);
-
-                        entry.buffer(&buffer);
-                    }
-                    BindingType::ReadOnlyStorage(_) => {
-                        let mut buffer = GpuBufferBindingLayout::new();
-
-                        buffer.type_(GpuBufferBindingType::ReadOnlyStorage);
-
-                        entry.buffer(&buffer);
-                    }
+                driver::BindGroupLayoutEntry {
+                    binding: i as u32,
+                    binding_type: e.binding_type.to_driver(),
+                    visibility: e.visibility,
                 }
+            });
 
-                entry
-            })
-            .collect::<js_sys::Array>();
-
-        let desc = GpuBindGroupLayoutDescriptor::new(&layout);
-        let inner = device.inner.create_bind_group_layout(&desc);
+        let handle = device
+            .handle
+            .create_bind_group_layout(driver::BindGroupLayoutDescriptor { entries });
 
         BindGroupLayout {
-            inner,
+            handle,
             _marker: marker::PhantomData,
         }
     }
 
     pub fn to_encoding(&self) -> BindGroupLayoutEncoding {
         BindGroupLayoutEncoding {
-            inner: self.inner.clone(),
+            handle: &self.handle,
         }
-    }
-
-    pub(crate) fn as_web_sys(&self) -> &GpuBindGroupLayout {
-        &self.inner
     }
 }
 
@@ -349,30 +164,8 @@ impl_typed_bind_group_layout!(
 );
 
 pub struct BindGroupLayoutEntry {
-    pub visibility: ShaderStages,
+    pub visibility: FlagSet<ShaderStage>,
     pub binding_type: BindingType,
-}
-
-// Copied/Modified from `wgpu::ShaderStages`.
-bitflags! {
-    /// Describes the shader stages that a resource will be visible from.
-    ///
-    /// These can be combined so something that is visible from both vertex and fragment shaders can be defined as:
-    ///
-    /// `ShaderStages::VERTEX | ShaderStages::FRAGMENT`
-    #[repr(transparent)]
-    pub struct ShaderStages: u32 {
-        /// Resource is not visible from any shader stage.
-        const NONE = 0;
-        /// Resource is visible from the vertex shader of a render pipeline.
-        const VERTEX = 1 << 0;
-        /// Resource is visible from the fragment shader of a render pipeline.
-        const FRAGMENT = 1 << 1;
-        /// Resource is visible from the compute shader of a compute pipeline.
-        const COMPUTE = 1 << 2;
-        /// Resource is visible from the vertex and fragment shaders of a render pipeline.
-        const VERTEX_FRAGMENT = Self::VERTEX.bits | Self::FRAGMENT.bits;
-    }
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -401,21 +194,124 @@ pub enum BindingType {
     ReadOnlyStorage(UnsizedBufferLayout),
 }
 
+impl BindingType {
+    fn to_driver(&self) -> driver::BindingType {
+        match self {
+            BindingType::Texture1D(texel_type) => driver::BindingType::Texture {
+                sample_type: texel_type.to_driver(),
+                dimension: TextureViewDimension::One,
+                multisampled: false,
+            },
+            BindingType::Texture2D(texel_type) => driver::BindingType::Texture {
+                sample_type: texel_type.to_driver(),
+                dimension: TextureViewDimension::Two,
+                multisampled: false,
+            },
+            BindingType::Texture3D(texel_type) => driver::BindingType::Texture {
+                sample_type: texel_type.to_driver(),
+                dimension: TextureViewDimension::Three,
+                multisampled: false,
+            },
+            BindingType::Texture2DArray(texel_type) => driver::BindingType::Texture {
+                sample_type: texel_type.to_driver(),
+                dimension: TextureViewDimension::TwoArray,
+                multisampled: false,
+            },
+            BindingType::TextureCube(texel_type) => driver::BindingType::Texture {
+                sample_type: texel_type.to_driver(),
+                dimension: TextureViewDimension::Cube,
+                multisampled: false,
+            },
+            BindingType::TextureCubeArray(texel_type) => driver::BindingType::Texture {
+                sample_type: texel_type.to_driver(),
+                dimension: TextureViewDimension::CubeArray,
+                multisampled: false,
+            },
+            BindingType::TextureMultisampled2D(texel_type) => driver::BindingType::Texture {
+                sample_type: texel_type.to_driver(),
+                dimension: TextureViewDimension::Two,
+                multisampled: true,
+            },
+            BindingType::TextureDepth2D => driver::BindingType::Texture {
+                sample_type: TextureSampleType::Depth,
+                dimension: TextureViewDimension::Two,
+                multisampled: false,
+            },
+            BindingType::TextureDepth2DArray => driver::BindingType::Texture {
+                sample_type: TextureSampleType::Depth,
+                dimension: TextureViewDimension::TwoArray,
+                multisampled: false,
+            },
+            BindingType::TextureDepthCube => driver::BindingType::Texture {
+                sample_type: TextureSampleType::Depth,
+                dimension: TextureViewDimension::Cube,
+                multisampled: false,
+            },
+            BindingType::TextureDepthCubeArray => driver::BindingType::Texture {
+                sample_type: TextureSampleType::Depth,
+                dimension: TextureViewDimension::CubeArray,
+                multisampled: false,
+            },
+            BindingType::TextureDepthMultisampled2D => driver::BindingType::Texture {
+                sample_type: TextureSampleType::Depth,
+                dimension: TextureViewDimension::Two,
+                multisampled: true,
+            },
+            BindingType::StorageTexture1D(format) => driver::BindingType::StorageTexture {
+                access: StorageTextureAccess::WriteOnly,
+                dimension: TextureViewDimension::One,
+                format: *format,
+            },
+            BindingType::StorageTexture2D(format) => driver::BindingType::StorageTexture {
+                access: StorageTextureAccess::WriteOnly,
+                dimension: TextureViewDimension::Two,
+                format: *format,
+            },
+            BindingType::StorageTexture2DArray(format) => driver::BindingType::StorageTexture {
+                access: StorageTextureAccess::WriteOnly,
+                dimension: TextureViewDimension::TwoArray,
+                format: *format,
+            },
+            BindingType::StorageTexture3D(format) => driver::BindingType::StorageTexture {
+                access: StorageTextureAccess::WriteOnly,
+                dimension: TextureViewDimension::Three,
+                format: *format,
+            },
+            BindingType::FilteringSampler => {
+                driver::BindingType::Sampler(SamplerBindingType::Filtering)
+            }
+            BindingType::NonFilteringSampler => {
+                driver::BindingType::Sampler(SamplerBindingType::NonFiltering)
+            }
+            BindingType::ComparisonSampler => {
+                driver::BindingType::Sampler(SamplerBindingType::Comparison)
+            }
+            // TODO: min_binding_size
+            // TODO: dynamic offsets
+            BindingType::Uniform(_) => driver::BindingType::Buffer(BufferBindingType::Uniform),
+            BindingType::Storage(_) => driver::BindingType::Buffer(BufferBindingType::Storage),
+            BindingType::ReadOnlyStorage(_) => {
+                driver::BindingType::Buffer(BufferBindingType::ReadonlyStorage)
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum TexelType {
     Float,
     UnfilterableFloat,
-    Integer,
+    SignedInteger,
     UnsignedInteger,
 }
 
 impl TexelType {
-    pub(crate) fn to_web_sys(&self) -> GpuTextureSampleType {
+    pub(crate) fn to_driver(&self) -> driver::TextureSampleType {
         match self {
-            TexelType::Float => GpuTextureSampleType::Float,
-            TexelType::UnfilterableFloat => GpuTextureSampleType::UnfilterableFloat,
-            TexelType::Integer => GpuTextureSampleType::Sint,
-            TexelType::UnsignedInteger => GpuTextureSampleType::Uint,
+            TexelType::Float => driver::TextureSampleType::Float,
+            TexelType::UnfilterableFloat => driver::TextureSampleType::UnfilterableFloat,
+            TexelType::SignedInteger => driver::TextureSampleType::SignedInteger,
+            TexelType::UnsignedInteger => driver::TextureSampleType::UnsignedInteger,
         }
     }
 }
@@ -427,7 +323,7 @@ impl PartialEq for TexelType {
         match (*self, *other) {
             (TexelType::Float, TexelType::Float) => true,
             (TexelType::UnfilterableFloat, TexelType::UnfilterableFloat) => true,
-            (TexelType::Integer, TexelType::Integer) => true,
+            (TexelType::SignedInteger, TexelType::SignedInteger) => true,
             (TexelType::UnsignedInteger, TexelType::UnsignedInteger) => true,
             (TexelType::Float, TexelType::UnfilterableFloat) => true,
             (TexelType::UnfilterableFloat, TexelType::Float) => true,

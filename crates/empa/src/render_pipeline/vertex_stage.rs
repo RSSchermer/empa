@@ -1,31 +1,36 @@
+use std::borrow::Cow;
+use std::collections::HashMap;
 use std::marker;
 
 use empa_reflect::ShaderStage;
-use wasm_bindgen::{JsValue, UnwrapThrowExt};
-use web_sys::{GpuVertexBufferLayout, GpuVertexState};
 
+use crate::driver::{Driver, Dvr};
 use crate::pipeline_constants::PipelineConstants;
-use crate::render_pipeline::TypedVertexLayout;
+use crate::render_pipeline::vertex_attribute::vertex_format_is_compatible;
+use crate::render_pipeline::{TypedVertexLayout, VertexBufferLayout};
 use crate::shader_module::{ShaderModule, ShaderSourceInternal};
 
+pub(crate) struct VertexState {
+    pub(crate) shader_module: <Dvr as Driver>::ShaderModuleHandle,
+    pub(crate) entry_point: String,
+    pub(crate) constants: HashMap<String, f64>,
+    pub(crate) vertex_buffer_layouts: Cow<'static, [VertexBufferLayout<'static>]>,
+}
+
 pub struct VertexStage<V> {
-    pub(crate) inner: GpuVertexState,
+    pub(crate) vertex_state: VertexState,
     pub(crate) shader_meta: ShaderSourceInternal,
     entry_index: usize,
     _marker: marker::PhantomData<*const V>,
 }
 
 pub struct VertexStageBuilder<V> {
-    inner: GpuVertexState,
-    shader_meta: ShaderSourceInternal,
-    entry_index: usize,
+    inner: VertexStage<V>,
     has_constants: bool,
-    _marker: marker::PhantomData<*const V>,
 }
 
 impl VertexStageBuilder<()> {
     pub fn begin(shader_module: &ShaderModule, entry_point: &str) -> Self {
-        let inner = GpuVertexState::new(entry_point, &shader_module.inner);
         let shader_meta = shader_module.meta.clone();
 
         let entry_index = shader_meta
@@ -39,26 +44,29 @@ impl VertexStageBuilder<()> {
         );
 
         VertexStageBuilder {
-            inner,
-            shader_meta,
-            entry_index,
+            inner: VertexStage {
+                vertex_state: VertexState {
+                    shader_module: shader_module.handle.clone(),
+                    entry_point: entry_point.to_string(),
+                    constants: Default::default(),
+                    vertex_buffer_layouts: Cow::Owned(Vec::new()),
+                },
+                shader_meta,
+                entry_index,
+                _marker: Default::default(),
+            },
             has_constants: false,
-            _marker: Default::default(),
         }
     }
 
-    pub fn vertex_layout<V: TypedVertexLayout>(self) -> VertexStageBuilder<V> {
-        let VertexStageBuilder {
-            mut inner,
-            shader_meta,
-            entry_index,
-            has_constants,
-            ..
-        } = self;
-
+    pub fn vertex_layout<V: TypedVertexLayout>(mut self) -> VertexStageBuilder<V> {
         let layout = V::LAYOUT;
 
-        let input_bindings = shader_meta.entry_point_input_bindings(entry_index).unwrap();
+        let input_bindings = self
+            .inner
+            .shader_meta
+            .entry_point_input_bindings(self.inner.entry_index)
+            .unwrap();
 
         // Unclear if this can be optimized by e.g. sorting first. The default limit for attributes
         // is 16, so the upper limit would be roughly 1024 reads and comparisons on a piece of
@@ -66,10 +74,10 @@ impl VertexStageBuilder<()> {
         'outer: for binding in input_bindings {
             let location = binding.location();
 
-            for descriptor in layout {
-                for attribute in descriptor.attribute_descriptors {
+            for buffer_layout in layout {
+                for attribute in buffer_layout.attributes.iter() {
                     if attribute.shader_location == location {
-                        if !attribute.format.is_compatible(binding.binding_type()) {
+                        if !vertex_format_is_compatible(attribute.format, binding.binding_type()) {
                             panic!("attribute for location `{}` is not compatible with the shader type", location);
                         }
 
@@ -81,58 +89,29 @@ impl VertexStageBuilder<()> {
             panic!("no attribute found for location `{}`", location);
         }
 
-        let layout_array = js_sys::Array::new();
-
-        for descriptor in layout {
-            let attributes: js_sys::Array = descriptor
-                .attribute_descriptors
-                .iter()
-                .map(|a| a.to_web_sys())
-                .collect();
-            let mut buffer_layout =
-                GpuVertexBufferLayout::new(descriptor.array_stride as f64, attributes.as_ref());
-
-            buffer_layout.step_mode(descriptor.input_rate.to_web_sys());
-
-            layout_array.push(buffer_layout.as_ref());
-        }
-
-        inner.buffers(layout_array.as_ref());
+        self.inner.vertex_state.vertex_buffer_layouts = Cow::Borrowed(layout);
 
         VertexStageBuilder {
-            inner,
-            shader_meta,
-            entry_index,
-            has_constants,
-            _marker: Default::default(),
+            inner: VertexStage {
+                vertex_state: self.inner.vertex_state,
+                shader_meta: self.inner.shader_meta,
+                entry_index: self.inner.entry_index,
+                _marker: Default::default(),
+            },
+            has_constants: self.has_constants,
         }
     }
 }
 
 impl<V> VertexStageBuilder<V> {
     pub fn pipeline_constants<C: PipelineConstants>(
-        self,
+        mut self,
         pipeline_constants: &C,
     ) -> VertexStageBuilder<V> {
-        let VertexStageBuilder {
-            inner,
-            shader_meta,
-            entry_index,
-            ..
-        } = self;
+        self.inner.vertex_state.constants =
+            self.inner.shader_meta.build_constants(pipeline_constants);
 
-        let record = shader_meta.build_constants(pipeline_constants);
-
-        // TODO: get support for WebIDL record types in wasm bindgen
-        js_sys::Reflect::set(inner.as_ref(), &JsValue::from("constants"), &record).unwrap_throw();
-
-        VertexStageBuilder {
-            inner,
-            shader_meta,
-            entry_index,
-            has_constants: true,
-            _marker: Default::default(),
-        }
+        self
     }
 }
 
@@ -141,23 +120,10 @@ where
     V: TypedVertexLayout,
 {
     pub fn finish(self) -> VertexStage<V> {
-        let VertexStageBuilder {
-            inner,
-            shader_meta,
-            entry_index,
-            has_constants,
-            ..
-        } = self;
-
-        if !has_constants && shader_meta.has_required_constants() {
+        if !self.has_constants && self.inner.shader_meta.has_required_constants() {
             panic!("the shader declares pipeline constants without fallback values, but no pipeline constants were set");
         }
 
-        VertexStage {
-            inner,
-            shader_meta,
-            entry_index,
-            _marker: Default::default(),
-        }
+        self.inner
     }
 }

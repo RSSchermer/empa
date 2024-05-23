@@ -1,16 +1,15 @@
 use std::marker;
-use std::sync::Arc;
-
-use web_sys::{
-    GpuExtent3dDict, GpuTexture, GpuTextureAspect, GpuTextureDescriptor, GpuTextureDimension,
-    GpuTextureView, GpuTextureViewDescriptor, GpuTextureViewDimension,
-};
 
 use crate::device::Device;
+use crate::driver;
+use crate::driver::{
+    Device as _, Driver, Dvr, Texture, TextureAspect, TextureDescriptor, TextureDimensions,
+    TextureViewDescriptor, TextureViewDimension,
+};
 use crate::texture::format::MultisampleFormat;
 use crate::texture::{
     CopyDst, CopySrc, FormatKind, ImageCopyTexture, ImageCopyToTextureDstMultisample,
-    ImageCopyToTextureSrcMultisample, RenderAttachment, TextureHandle, UsageFlags,
+    ImageCopyToTextureSrcMultisample, RenderAttachment, UsageFlags,
 };
 
 pub struct TextureMultisampled2DDescriptor {
@@ -19,17 +18,11 @@ pub struct TextureMultisampled2DDescriptor {
 }
 
 pub struct TextureMultisampled2D<F, Usage, const SAMPLES: u8> {
-    inner: Arc<TextureHandle>,
+    handle: <Dvr as Driver>::TextureHandle,
     width: u32,
     height: u32,
-    format: FormatKind<F>,
+    _format: FormatKind<F>,
     _usage: marker::PhantomData<Usage>,
-}
-
-impl<F, U, const SAMPLES: u8> TextureMultisampled2D<F, U, SAMPLES> {
-    fn as_web_sys(&self) -> &GpuTexture {
-        &self.inner.texture
-    }
 }
 
 impl<F, U, const SAMPLES: u8> TextureMultisampled2D<F, U, SAMPLES>
@@ -48,56 +41,57 @@ where
         assert!(width > 0, "width must be greater than `0`");
         assert!(height > 0, "height must be greater than `0`");
 
-        let mut size = GpuExtent3dDict::new(width);
-
-        size.height(height);
-
-        let mut desc = GpuTextureDescriptor::new(F::FORMAT_ID.to_web_sys(), &size.into(), U::BITS);
-
-        desc.sample_count(SAMPLES as u32);
-        desc.dimension(GpuTextureDimension::N2d);
-
-        let inner = device.inner.create_texture(&desc);
+        let handle = device.handle.create_texture(&TextureDescriptor {
+            size: (width, height, 1),
+            mipmap_levels: 1,
+            sample_count: SAMPLES as u32,
+            dimensions: TextureDimensions::Two,
+            format: F::FORMAT_ID,
+            usage_flags: U::FLAG_SET,
+            view_formats: &[],
+        });
 
         TextureMultisampled2D {
-            inner: Arc::new(TextureHandle::new(inner, false)),
+            handle,
             width,
             height,
-            format: FormatKind::Typed(Default::default()),
+            _format: FormatKind::Typed(Default::default()),
             _usage: Default::default(),
         }
     }
 
     pub fn attachable_image(&self) -> AttachableMultisampledImage<F, SAMPLES> {
-        let mut desc = GpuTextureViewDescriptor::new();
-
-        desc.dimension(GpuTextureViewDimension::N2d);
-        desc.format(F::FORMAT_ID.to_web_sys());
-
-        let inner = self.as_web_sys().create_view_with_descriptor(&desc);
+        let inner = self.handle.texture_view(&TextureViewDescriptor {
+            format: F::FORMAT_ID,
+            dimensions: TextureViewDimension::Two,
+            aspect: TextureAspect::All,
+            mip_levels: 0..1,
+            layers: 0..1,
+        });
 
         AttachableMultisampledImage {
             inner,
             width: self.width,
             height: self.height,
-            _texture_handle: self.inner.clone(),
             _marker: Default::default(),
         }
     }
 
     fn image_copy_internal(&self) -> ImageCopyTexture<F> {
+        let inner = driver::ImageCopyTexture {
+            texture_handle: &self.handle,
+            mip_level: 0,
+            origin: (0, 0, 0),
+            aspect: TextureAspect::All,
+        };
+
         ImageCopyTexture {
-            texture: self.inner.clone(),
-            aspect: GpuTextureAspect::All,
-            mipmap_level: 0,
+            inner,
             width: self.width,
             height: self.height,
             depth_or_layers: 1,
             bytes_per_block: 0,
             block_size: [1, 1],
-            origin_x: 0,
-            origin_y: 0,
-            origin_z: 0,
             _marker: Default::default(),
         }
     }
@@ -121,10 +115,9 @@ where
     }
 }
 
-pub struct AttachableMultisampledImage<F, const SAMPLES: u8> {
-    pub(crate) inner: GpuTextureView,
+pub struct AttachableMultisampledImage<'a, F, const SAMPLES: u8> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
     pub(crate) width: u32,
     pub(crate) height: u32,
-    pub(crate) _texture_handle: Arc<TextureHandle>,
     _marker: marker::PhantomData<*const F>,
 }

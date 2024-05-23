@@ -4,23 +4,27 @@ use std::mem::MaybeUninit;
 use std::ops::{
     Deref, DerefMut, Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive, Rem,
 };
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::{error, fmt, marker, mem, slice};
 
 use atomic_counter::AtomicCounter;
-use futures::TryFutureExt;
-use js_sys::Uint8Array;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::JsFuture;
-use web_sys::{GpuBuffer, GpuBufferDescriptor, GpuImageCopyBuffer};
 
-use crate::abi;
+use crate::access_mode::{AccessMode, Read};
 use crate::buffer::{
     CopyDst, CopySrc, MapRead, MapWrite, StorageBinding, UniformBinding, UsageFlags,
     ValidUsageFlags,
 };
 use crate::device::{Device, ID_GEN};
-use crate::texture::{ImageCopySize3D, ImageDataByteLayout, ImageDataLayout};
+use crate::driver::{
+    Buffer as _, BufferDescriptor, Device as _, Driver, Dvr, ImageCopyBuffer, MapMode,
+};
+use crate::texture::{ImageDataByteLayout, ImageDataLayout};
+use crate::{abi, driver};
+
+type BufferHandle = <Dvr as Driver>::BufferHandle;
+type MappedInternal<'a> = <BufferHandle as driver::Buffer<Dvr>>::Mapped<'a>;
+type MappedMutInternal<'a> = <BufferHandle as driver::Buffer<Dvr>>::MappedMut<'a>;
+type BufferBinding<'a> = <Dvr as Driver>::BufferBinding<'a>;
 
 #[derive(Clone, Copy)]
 pub struct Projection<T, P> {
@@ -92,31 +96,28 @@ where
         let id = ID_GEN.get();
         let size_in_bytes = mem::size_of::<T>();
 
-        let mut desc = GpuBufferDescriptor::new(size_in_bytes as f64, Usage::BITS);
+        let handle = device.handle.create_buffer(&BufferDescriptor {
+            size: size_in_bytes,
+            usage_flags: Usage::FLAG_SET,
+            mapped_at_creation,
+        });
 
-        desc.mapped_at_creation(true);
-
-        let buffer = device.inner.create_buffer(&desc);
-        let view = Uint8Array::new(
-            buffer
-                .get_mapped_range_with_u32_and_u32(0, size_in_bytes as u32)
-                .as_ref(),
-        );
-
+        let mut mapped = handle.mapped_mut(0..size_in_bytes);
         let data_bytes = unsafe { value_to_bytes(self.borrow()) };
 
-        view.copy_from(data_bytes);
+        mapped.as_mut().copy_from_slice(data_bytes);
+        mem::drop(mapped);
 
         let mut map_context = MapContext::new();
 
         if !mapped_at_creation {
-            buffer.unmap();
+            handle.unmap();
         } else {
-            map_context.initial_range = 0..size_in_bytes as u32;
+            map_context.initial_range = 0..size_in_bytes;
         }
 
         let internal = BufferInternal {
-            inner: Arc::new(BufferHandle::new(buffer)),
+            handle,
             id,
             len: 1,
             map_context: Mutex::new(map_context),
@@ -149,32 +150,28 @@ where
         let slice_len = data.len();
         let size_in_bytes = mem::size_of::<T>() * slice_len;
 
-        let mut desc = GpuBufferDescriptor::new(size_in_bytes as f64, Usage::BITS);
+        let handle = device.handle.create_buffer(&BufferDescriptor {
+            size: size_in_bytes,
+            usage_flags: Usage::FLAG_SET,
+            mapped_at_creation,
+        });
 
-        desc.mapped_at_creation(true);
-
-        let buffer = device.inner.create_buffer(&desc);
-
-        let view = Uint8Array::new(
-            buffer
-                .get_mapped_range_with_u32_and_u32(0, size_in_bytes as u32)
-                .as_ref(),
-        );
-
+        let mut mapped = handle.mapped_mut(0..size_in_bytes);
         let data_bytes = unsafe { slice_to_bytes(self.borrow()) };
 
-        view.copy_from(data_bytes);
+        mapped.as_mut().copy_from_slice(data_bytes);
+        mem::drop(mapped);
 
         let mut map_context = MapContext::new();
 
         if !mapped_at_creation {
-            buffer.unmap();
+            handle.unmap();
         } else {
-            map_context.initial_range = 0..size_in_bytes as u32;
+            map_context.initial_range = 0..size_in_bytes;
         }
 
         let internal = BufferInternal {
-            inner: Arc::new(BufferHandle::new(buffer)),
+            handle,
             id,
             len: slice_len,
             map_context: Mutex::new(map_context),
@@ -188,24 +185,8 @@ where
     }
 }
 
-pub(crate) struct BufferHandle {
-    pub(crate) buffer: GpuBuffer,
-}
-
-impl BufferHandle {
-    fn new(buffer: GpuBuffer) -> Self {
-        BufferHandle { buffer }
-    }
-}
-
-impl Drop for BufferHandle {
-    fn drop(&mut self) {
-        self.buffer.destroy();
-    }
-}
-
 pub(crate) struct BufferInternal<U> {
-    pub(crate) inner: Arc<BufferHandle>,
+    pub(crate) handle: BufferHandle,
     id: usize,
     len: usize,
     map_context: Mutex<MapContext>,
@@ -215,34 +196,24 @@ pub(crate) struct BufferInternal<U> {
 impl<U> BufferInternal<U> {
     fn map_async_internal(
         &self,
-        mode: u32,
-        start: u32,
-        size: u32,
+        mode: MapMode,
+        start: usize,
+        size: usize,
     ) -> impl Future<Output = Result<(), MapError>> {
         let end = start + size;
 
         let mut mc = self.map_context.lock().unwrap();
 
-        assert_eq!(
-            mc.initial_range,
-            0..0,
-            "Buffer {:?} is already mapped",
-            &self.inner.buffer
-        );
+        assert_eq!(mc.initial_range, 0..0, "Buffer is already mapped");
 
         mc.initial_range = start..end;
 
-        let promise = self
-            .inner
-            .buffer
-            .map_async_with_u32_and_u32(mode, start, size);
-
-        JsFuture::from(promise).map_ok(|_| ()).map_err(|_| MapError)
+        self.handle.map(mode, start..end)
     }
 
     fn unmap_internal(&self) {
         self.map_context.lock().unwrap().reset();
-        self.inner.buffer.unmap();
+        self.handle.unmap();
     }
 }
 
@@ -284,20 +255,21 @@ where
     pub(crate) fn create_uninit(device: &Device, mapped_at_creation: bool, usage: U) -> Self {
         let id = ID_GEN.get();
         let size_in_bytes = mem::size_of::<T>();
-        let mut desc = GpuBufferDescriptor::new(size_in_bytes as f64, U::BITS);
 
-        desc.mapped_at_creation(mapped_at_creation);
-
-        let buffer = device.inner.create_buffer(&desc);
+        let handle = device.handle.create_buffer(&BufferDescriptor {
+            size: size_in_bytes,
+            usage_flags: U::FLAG_SET,
+            mapped_at_creation,
+        });
 
         let mut map_context = MapContext::new();
 
         if mapped_at_creation {
-            map_context.initial_range = 0..size_in_bytes as u32;
+            map_context.initial_range = 0..size_in_bytes;
         }
 
         let internal = BufferInternal {
-            inner: Arc::new(BufferHandle::new(buffer)),
+            handle,
             id,
             len: 1,
             map_context: Mutex::new(map_context),
@@ -338,20 +310,21 @@ where
     ) -> Self {
         let id = ID_GEN.get();
         let size_in_bytes = mem::size_of::<T>() * len;
-        let mut desc = GpuBufferDescriptor::new(size_in_bytes as f64, U::BITS);
 
-        desc.mapped_at_creation(mapped_at_creation);
-
-        let buffer = device.inner.create_buffer(&desc);
+        let handle = device.handle.create_buffer(&BufferDescriptor {
+            size: size_in_bytes,
+            usage_flags: U::FLAG_SET,
+            mapped_at_creation,
+        });
 
         let mut map_context = MapContext::new();
 
         if mapped_at_creation {
-            map_context.initial_range = 0..size_in_bytes as u32;
+            map_context.initial_range = 0..size_in_bytes;
         }
 
         let internal = BufferInternal {
-            inner: Arc::new(BufferHandle::new(buffer)),
+            handle,
             id,
             len,
             map_context: Mutex::new(map_context),
@@ -421,36 +394,31 @@ impl<T, U> Buffer<T, U> {
         T: abi::Sized,
         U: UniformBinding,
     {
+        if self.size_in_bytes() == 0 {
+            panic!("Cannot use zero-sized buffer as a resource binding");
+        }
+
         Uniform {
-            inner: self.internal.inner.clone(),
-            offset: 0,
-            size: self.size_in_bytes(),
+            inner: self.internal.handle.binding(0, self.size_in_bytes()),
+            _offset: 0,
+            _size: self.size_in_bytes(),
             _marker: Default::default(),
         }
     }
 
-    pub fn storage(&self) -> Storage<T>
+    pub fn storage<A: AccessMode>(&self) -> Storage<T, A>
     where
         T: abi::Unsized,
         U: StorageBinding,
     {
+        if self.size_in_bytes() == 0 {
+            panic!("Cannot use zero-sized buffer as a resource binding");
+        }
+
         Storage {
-            inner: self.internal.inner.clone(),
-            offset: 0,
-            size: self.size_in_bytes(),
-            _marker: Default::default(),
-        }
-    }
-
-    pub fn read_only_storage(&self) -> ReadOnlyStorage<T>
-    where
-        T: abi::Unsized,
-        U: StorageBinding,
-    {
-        ReadOnlyStorage {
-            inner: self.internal.inner.clone(),
-            offset: 0,
-            size: self.size_in_bytes(),
+            inner: self.internal.handle.binding(0, self.size_in_bytes()),
+            _offset: 0,
+            _size: self.size_in_bytes(),
             _marker: Default::default(),
         }
     }
@@ -543,28 +511,19 @@ impl<T, U> Buffer<[T], U> {
         self.into()
     }
 
-    pub fn storage(&self) -> Storage<[T]>
+    pub fn storage<A: AccessMode>(&self) -> Storage<[T], A>
     where
         T: abi::Sized,
         U: StorageBinding,
     {
-        Storage {
-            inner: self.internal.inner.clone(),
-            offset: 0,
-            size: self.size_in_bytes(),
-            _marker: Default::default(),
+        if self.size_in_bytes() == 0 {
+            panic!("Cannot use zero-sized buffer as a resource binding");
         }
-    }
 
-    pub fn read_only_storage(&self) -> ReadOnlyStorage<[T]>
-    where
-        T: abi::Sized,
-        U: StorageBinding,
-    {
-        ReadOnlyStorage {
-            inner: self.internal.inner.clone(),
-            offset: 0,
-            size: self.size_in_bytes(),
+        Storage {
+            inner: self.internal.handle.binding(0, self.size_in_bytes()),
+            _offset: 0,
+            _size: self.size_in_bytes(),
             _marker: Default::default(),
         }
     }
@@ -585,7 +544,7 @@ impl<T, U> Buffer<[T], U> {
 
         ImageCopySrc {
             inner: ImageCopyBuffer {
-                buffer: self.internal.inner.clone(),
+                buffer_handle: &self.internal.handle,
                 offset: 0,
                 size: self.size_in_bytes(),
                 bytes_per_block,
@@ -612,7 +571,7 @@ impl<T, U> Buffer<[T], U> {
 
         ImageCopyDst {
             inner: ImageCopyBuffer {
-                buffer: self.internal.inner.clone(),
+                buffer_handle: &self.internal.handle,
                 offset: 0,
                 size: self.size_in_bytes(),
                 bytes_per_block,
@@ -645,7 +604,7 @@ impl<U> Buffer<[u8], U> {
 
         ImageCopySrcRaw {
             inner: ImageCopyBuffer {
-                buffer: self.internal.inner.clone(),
+                buffer_handle: &self.internal.handle,
                 offset: 0,
                 size: self.size_in_bytes(),
                 bytes_per_block,
@@ -671,7 +630,7 @@ impl<U> Buffer<[u8], U> {
 
         ImageCopyDstRaw {
             inner: ImageCopyBuffer {
-                buffer: self.internal.inner.clone(),
+                buffer_handle: &self.internal.handle,
                 offset: 0,
                 size: self.size_in_bytes(),
                 bytes_per_block,
@@ -704,10 +663,6 @@ where
     pub(crate) fn id(&self) -> usize {
         self.buffer.id
     }
-
-    pub(crate) fn as_web_sys(self) -> &'a GpuBuffer {
-        &self.buffer.inner.buffer
-    }
 }
 
 impl<'a, T, U> View<'a, T, U>
@@ -721,9 +676,9 @@ where
 }
 
 impl<'a, T, U> View<'a, T, U> {
-    fn map_internal(&self, mode: u32) -> impl Future<Output = Result<(), MapError>> {
-        let start = self.offset_in_bytes as u32;
-        let size_in_bytes = mem::size_of::<T>() as u32;
+    fn map_internal(&self, mode: MapMode) -> impl Future<Output = Result<(), MapError>> {
+        let start = self.offset_in_bytes;
+        let size_in_bytes = mem::size_of::<T>();
 
         self.buffer.map_async_internal(mode, start, size_in_bytes)
     }
@@ -732,78 +687,47 @@ impl<'a, T, U> View<'a, T, U> {
     where
         U: MapRead,
     {
-        self.map_internal(1)
+        self.map_internal(MapMode::Read)
     }
 
     pub fn map_write(&self) -> impl Future<Output = Result<(), MapError>>
     where
         U: MapWrite,
     {
-        self.map_internal(2)
+        self.map_internal(MapMode::Write)
     }
 
     pub fn mapped(self) -> Mapped<'a, T> {
-        let start = self.offset_in_bytes as u32;
-        let size_in_bytes = mem::size_of::<T>() as u32;
+        let start = self.offset_in_bytes;
+        let size_in_bytes = mem::size_of::<T>();
         let end = start + size_in_bytes;
 
         self.buffer.map_context.lock().unwrap().add(start..end);
 
-        let mapped_bytes = Uint8Array::new(
-            &self
-                .as_web_sys()
-                .get_mapped_range_with_u32_and_u32(start, size_in_bytes),
-        );
-        let mut buffered = MaybeUninit::<T>::uninit();
-        let ptr = buffered.as_mut_ptr() as *mut ();
-
-        copy_buffer_to_memory(
-            &mapped_bytes,
-            0,
-            size_in_bytes,
-            &wasm_bindgen::memory(),
-            ptr,
-        );
-
-        let buffered = unsafe { buffered.assume_init() };
+        let inner = self.buffer.handle.mapped(start..end);
 
         Mapped {
-            buffered,
+            inner,
             range: start..end,
             map_context: &self.buffer.map_context,
+            _marker: Default::default(),
         }
     }
 
     pub fn mapped_mut(self) -> MappedMut<'a, T> {
-        let start = self.offset_in_bytes as u32;
-        let size_in_bytes = mem::size_of::<T>() as u32;
+        let start = self.offset_in_bytes;
+        let size_in_bytes = mem::size_of::<T>();
         let end = start + size_in_bytes;
 
         self.buffer.map_context.lock().unwrap().add(start..end);
 
-        let mapped_bytes = Uint8Array::new(
-            &self
-                .as_web_sys()
-                .get_mapped_range_with_u32_and_u32(start, size_in_bytes),
-        );
-        let mut buffered = MaybeUninit::<T>::uninit();
-        let ptr = buffered.as_mut_ptr() as *mut ();
-
-        copy_buffer_to_memory(
-            &mapped_bytes,
-            0,
-            size_in_bytes,
-            &wasm_bindgen::memory(),
-            ptr,
-        );
-
-        let buffered = unsafe { buffered.assume_init() };
+        let inner = self.buffer.handle.mapped_mut(start..end);
 
         MappedMut {
-            buffered,
-            mapped_bytes,
+            inner,
             range: start..end,
             map_context: &self.buffer.map_context,
+            _marker: Default::default(),
         }
     }
 
@@ -821,36 +745,37 @@ impl<'a, T, U> View<'a, T, U> {
         T: abi::Sized,
         U: UniformBinding,
     {
+        if self.size_in_bytes() == 0 {
+            panic!("Cannot use zero-sized buffer view as a resource binding");
+        }
+
         Uniform {
-            inner: self.buffer.inner.clone(),
-            offset: self.offset_in_bytes(),
-            size: self.size_in_bytes(),
+            inner: self
+                .buffer
+                .handle
+                .binding(self.offset_in_bytes(), self.size_in_bytes()),
+            _offset: self.offset_in_bytes(),
+            _size: self.size_in_bytes(),
             _marker: Default::default(),
         }
     }
 
-    pub fn storage(&self) -> Storage<T>
+    pub fn storage<A: AccessMode>(&self) -> Storage<T, A>
     where
         T: abi::Unsized,
         U: StorageBinding,
     {
+        if self.size_in_bytes() == 0 {
+            panic!("Cannot use zero-sized buffer view as a resource binding");
+        }
+
         Storage {
-            inner: self.buffer.inner.clone(),
-            offset: self.offset_in_bytes(),
-            size: self.size_in_bytes(),
-            _marker: Default::default(),
-        }
-    }
-
-    pub fn read_only_storage(&self) -> ReadOnlyStorage<T>
-    where
-        T: abi::Unsized,
-        U: StorageBinding,
-    {
-        ReadOnlyStorage {
-            inner: self.buffer.inner.clone(),
-            offset: self.offset_in_bytes(),
-            size: self.size_in_bytes(),
+            inner: self
+                .buffer
+                .handle
+                .binding(self.offset_in_bytes(), self.size_in_bytes()),
+            _offset: self.offset_in_bytes(),
+            _size: self.size_in_bytes(),
             _marker: Default::default(),
         }
     }
@@ -925,9 +850,9 @@ impl<'a, T, U> View<'a, [T], U> {
         index.get_unchecked(self)
     }
 
-    fn map_internal(&self, mode: u32) -> impl Future<Output = Result<(), MapError>> {
-        let start = self.offset_in_bytes as u32;
-        let size_in_bytes = (mem::size_of::<T>() * self.len) as u32;
+    fn map_internal(&self, mode: MapMode) -> impl Future<Output = Result<(), MapError>> {
+        let start = self.offset_in_bytes;
+        let size_in_bytes = mem::size_of::<T>() * self.len;
 
         self.buffer.map_async_internal(mode, start, size_in_bytes)
     }
@@ -936,103 +861,66 @@ impl<'a, T, U> View<'a, [T], U> {
     where
         U: MapRead,
     {
-        self.map_internal(1)
+        self.map_internal(MapMode::Read)
     }
 
     pub fn map_write(&self) -> impl Future<Output = Result<(), MapError>>
     where
         U: MapWrite,
     {
-        self.map_internal(2)
+        self.map_internal(MapMode::Write)
     }
 
     pub fn mapped(self) -> MappedSlice<'a, T> {
-        let start = self.offset_in_bytes as u32;
-        let size_in_bytes = (mem::size_of::<T>() * self.len) as u32;
+        let start = self.offset_in_bytes;
+        let size_in_bytes = mem::size_of::<T>() * self.len;
         let end = start + size_in_bytes;
 
         self.buffer.map_context.lock().unwrap().add(start..end);
 
-        let mapped_bytes = Uint8Array::new(
-            self.as_web_sys()
-                .get_mapped_range_with_u32_and_u32(start, size_in_bytes)
-                .as_ref(),
-        );
-        let mut buffered = Box::<[T]>::new_uninit_slice(self.len);
-        let ptr = buffered.as_mut_ptr() as *mut ();
-
-        copy_buffer_to_memory(
-            &mapped_bytes,
-            0,
-            size_in_bytes,
-            &wasm_bindgen::memory(),
-            ptr,
-        );
-
-        let buffered = unsafe { buffered.assume_init() };
+        let inner = self.buffer.handle.mapped(start..end);
 
         MappedSlice {
-            buffered,
+            inner,
             range: start..end,
             map_context: &self.buffer.map_context,
-        }
-    }
-
-    pub fn mapped_mut(self) -> MappedSliceMut<'a, T> {
-        let start = self.offset_in_bytes as u32;
-        let size_in_bytes = (mem::size_of::<T>() * self.len) as u32;
-        let end = start + size_in_bytes;
-
-        self.buffer.map_context.lock().unwrap().add(start..end);
-
-        let mapped_bytes = Uint8Array::new(
-            &self
-                .as_web_sys()
-                .get_mapped_range_with_u32_and_u32(start, size_in_bytes),
-        );
-        let mut buffered = Box::<[T]>::new_uninit_slice(self.len);
-        let ptr = buffered.as_mut_ptr() as *mut ();
-
-        copy_buffer_to_memory(
-            &mapped_bytes,
-            0,
-            size_in_bytes,
-            &wasm_bindgen::memory(),
-            ptr,
-        );
-
-        let buffered = unsafe { buffered.assume_init() };
-
-        MappedSliceMut {
-            buffered,
-            mapped_bytes,
-            range: start..end,
-            map_context: &self.buffer.map_context,
-        }
-    }
-
-    pub fn storage(&self) -> Storage<[T]>
-    where
-        T: abi::Sized,
-        U: StorageBinding,
-    {
-        Storage {
-            inner: self.buffer.inner.clone(),
-            offset: self.offset_in_bytes(),
-            size: self.size_in_bytes(),
             _marker: Default::default(),
         }
     }
 
-    pub fn read_only_storage(&self) -> ReadOnlyStorage<[T]>
+    pub fn mapped_mut(self) -> MappedSliceMut<'a, T> {
+        let start = self.offset_in_bytes;
+        let size_in_bytes = mem::size_of::<T>() * self.len;
+        let end = start + size_in_bytes;
+
+        self.buffer.map_context.lock().unwrap().add(start..end);
+
+        let inner = self.buffer.handle.mapped_mut(start..end);
+
+        MappedSliceMut {
+            inner,
+            range: start..end,
+            map_context: &self.buffer.map_context,
+            _marker: Default::default(),
+        }
+    }
+
+    pub fn storage<A: AccessMode>(&self) -> Storage<[T], A>
     where
         T: abi::Sized,
         U: StorageBinding,
     {
-        ReadOnlyStorage {
-            inner: self.buffer.inner.clone(),
-            offset: self.offset_in_bytes(),
-            size: self.size_in_bytes(),
+        if self.size_in_bytes() == 0 {
+            panic!("Cannot use zero-sized buffer view as a resource binding");
+        }
+
+        Storage {
+            inner: self
+                .buffer
+                .handle
+                .binding(self.offset_in_bytes(), self.size_in_bytes()),
+            _offset: self.offset_in_bytes(),
+            _size: self.size_in_bytes(),
             _marker: Default::default(),
         }
     }
@@ -1053,7 +941,7 @@ impl<'a, T, U> View<'a, [T], U> {
 
         ImageCopySrc {
             inner: ImageCopyBuffer {
-                buffer: self.buffer.inner.clone(),
+                buffer_handle: &self.buffer.handle,
                 offset: self.offset_in_bytes(),
                 size: self.size_in_bytes(),
                 bytes_per_block,
@@ -1080,7 +968,7 @@ impl<'a, T, U> View<'a, [T], U> {
 
         ImageCopyDst {
             inner: ImageCopyBuffer {
-                buffer: self.buffer.inner.clone(),
+                buffer_handle: &self.buffer.handle,
                 offset: self.offset_in_bytes(),
                 size: self.size_in_bytes(),
                 bytes_per_block,
@@ -1117,7 +1005,7 @@ impl<'a, U> View<'a, [u8], U> {
 
         ImageCopySrcRaw {
             inner: ImageCopyBuffer {
-                buffer: self.buffer.inner.clone(),
+                buffer_handle: &self.buffer.handle,
                 offset: self.offset_in_bytes(),
                 size: self.size_in_bytes(),
                 bytes_per_block,
@@ -1143,7 +1031,7 @@ impl<'a, U> View<'a, [u8], U> {
 
         ImageCopyDstRaw {
             inner: ImageCopyBuffer {
-                buffer: self.buffer.inner.clone(),
+                buffer_handle: &self.buffer.handle,
                 offset: self.offset_in_bytes(),
                 size: self.size_in_bytes(),
                 bytes_per_block,
@@ -1190,16 +1078,21 @@ where
 // exclusive; a type cannot be both).
 
 pub struct Mapped<'a, T> {
-    buffered: T,
-    range: Range<u32>,
+    inner: MappedInternal<'a>,
+    range: Range<usize>,
     map_context: &'a Mutex<MapContext>,
+    _marker: marker::PhantomData<T>,
 }
 
 impl<'a, T> Deref for Mapped<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &self.buffered
+        let bytes_ptr = self.inner.as_ref().as_ptr();
+
+        // SAFETY: empa's buffer invariants ensure that the `bytes_ptr` is properly aligned for
+        // a value of type `T` and the bytes slice is correctly sized for a value of type `T`.
+        unsafe { &*(bytes_ptr as *const T) }
     }
 }
 
@@ -1210,16 +1103,23 @@ impl<'a, T> Drop for Mapped<'a, T> {
 }
 
 pub struct MappedSlice<'a, T> {
-    buffered: Box<[T]>,
-    range: Range<u32>,
+    inner: MappedInternal<'a>,
+    range: Range<usize>,
     map_context: &'a Mutex<MapContext>,
+    _marker: marker::PhantomData<T>,
 }
 
 impl<'a, T> Deref for MappedSlice<'a, T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
-        &self.buffered
+        let bytes_ptr = self.inner.as_ref().as_ptr();
+        let len = self.range.len() as usize;
+
+        // SAFETY: empa's buffer invariants ensure that the `bytes_ptr` is properly aligned for
+        // a value of type `T` and the bytes slice is correctly sized for a slice of `len` values of
+        // type `T`.
+        unsafe { slice::from_raw_parts(bytes_ptr as *const T, len) }
     }
 }
 
@@ -1230,62 +1130,74 @@ impl<'a, T> Drop for MappedSlice<'a, T> {
 }
 
 pub struct MappedMut<'a, T> {
-    buffered: T,
-    mapped_bytes: Uint8Array,
-    range: Range<u32>,
+    inner: MappedMutInternal<'a>,
+    range: Range<usize>,
     map_context: &'a Mutex<MapContext>,
+    _marker: marker::PhantomData<T>,
 }
 
 impl<'a, T> Deref for MappedMut<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &self.buffered
+        let bytes_ptr = self.inner.as_ref().as_ptr();
+
+        // SAFETY: empa's buffer invariants ensure that the `bytes_ptr` is properly aligned for
+        // a value of type `T` and the bytes slice is correctly sized for a value of type `T`.
+        unsafe { &*(bytes_ptr as *const T) }
     }
 }
 
 impl<'a, T> DerefMut for MappedMut<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.buffered
+        let bytes_ptr = self.inner.as_mut().as_mut_ptr();
+
+        // SAFETY: empa's buffer invariants ensure that the `bytes_ptr` is properly aligned for
+        // a value of type `T` and the bytes slice is correctly sized for a value of type `T`.
+        unsafe { &mut *(bytes_ptr as *mut T) }
     }
 }
 
 impl<'a, T> Drop for MappedMut<'a, T> {
     fn drop(&mut self) {
-        let data_bytes = unsafe { value_to_bytes(&self.buffered) };
-
-        self.mapped_bytes.copy_from(data_bytes);
-
         self.map_context.lock().unwrap().remove(self.range.clone());
     }
 }
 
 pub struct MappedSliceMut<'a, T> {
-    buffered: Box<[T]>,
-    mapped_bytes: Uint8Array,
-    range: Range<u32>,
+    inner: MappedMutInternal<'a>,
+    range: Range<usize>,
     map_context: &'a Mutex<MapContext>,
+    _marker: marker::PhantomData<T>,
 }
 
 impl<'a, T> Deref for MappedSliceMut<'a, T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
-        &self.buffered
+        let bytes_ptr = self.inner.as_ref().as_ptr();
+        let len = self.range.len() as usize;
+
+        // SAFETY: empa's buffer invariants ensure that the `bytes_ptr` is properly aligned for
+        // a value of type `T` and the bytes slice is correctly sized for a slice of `len` values of
+        // type `T`.
+        unsafe { slice::from_raw_parts(bytes_ptr as *const T, len) }
     }
 }
 impl<'a, T> DerefMut for MappedSliceMut<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.buffered
+        let bytes_ptr = self.inner.as_mut().as_mut_ptr();
+        let len = self.range.len() as usize;
+
+        // SAFETY: empa's buffer invariants ensure that the `bytes_ptr` is properly aligned for
+        // a value of type `T` and the bytes slice is correctly sized for a slice of `len` values of
+        // type `T`.
+        unsafe { slice::from_raw_parts_mut(bytes_ptr as *mut T, len) }
     }
 }
 
 impl<'a, T> Drop for MappedSliceMut<'a, T> {
     fn drop(&mut self) {
-        let data_bytes = unsafe { slice_to_bytes(&self.buffered) };
-
-        self.mapped_bytes.copy_from(data_bytes);
-
         self.map_context.lock().unwrap().remove(self.range.clone());
     }
 }
@@ -1449,126 +1361,90 @@ unsafe fn slice_to_bytes<T>(slice: &[T]) -> &[u8] {
 }
 
 #[derive(Clone)]
-pub struct Uniform<T>
+pub struct Uniform<'a, T>
 where
     T: ?Sized,
 {
-    pub(crate) inner: Arc<BufferHandle>,
-    pub(crate) offset: usize,
-    pub(crate) size: usize,
+    pub(crate) inner: BufferBinding<'a>,
+    pub(crate) _offset: usize,
+    pub(crate) _size: usize,
     _marker: marker::PhantomData<*const T>,
 }
 
 #[derive(Clone)]
-pub struct Storage<T>
+pub struct Storage<'a, T, A = Read>
 where
     T: ?Sized,
 {
-    pub(crate) inner: Arc<BufferHandle>,
-    pub(crate) offset: usize,
-    pub(crate) size: usize,
+    pub(crate) inner: BufferBinding<'a>,
+    pub(crate) _offset: usize,
+    pub(crate) _size: usize,
+    _marker: marker::PhantomData<(*const T, A)>,
+}
+
+pub(crate) fn image_copy_buffer_validate(
+    image_copy_buffer: &ImageCopyBuffer<Dvr>,
+    size: (u32, u32, u32),
+    block_size: [u32; 2],
+) {
+    let (width, height, depth_or_layers) = size;
+
+    let [block_width, block_height] = block_size;
+
+    let width_in_blocks = width / block_width;
+
+    assert!(
+        image_copy_buffer.blocks_per_row >= width_in_blocks,
+        "blocks per row must be at least the copy width in blocks (`{}`)",
+        width_in_blocks
+    );
+
+    let height_in_blocks = height / block_height;
+
+    assert!(
+        image_copy_buffer.rows_per_image >= height_in_blocks,
+        "rows per image must be at least the copy height in blocks (`{}`)",
+        height_in_blocks
+    );
+
+    let min_size =
+        image_copy_buffer.blocks_per_row * image_copy_buffer.rows_per_image * depth_or_layers;
+
+    assert!(
+        image_copy_buffer.size >= min_size as usize,
+        "buffer view must contains enough elements for the copy size (`{}` blocks)",
+        min_size
+    );
+}
+
+#[derive(Clone)]
+pub struct ImageCopySrc<'a, T> {
+    pub(crate) inner: ImageCopyBuffer<'a, Dvr>,
     _marker: marker::PhantomData<*const T>,
 }
 
 #[derive(Clone)]
-pub struct ReadOnlyStorage<T>
-where
-    T: ?Sized,
-{
-    pub(crate) inner: Arc<BufferHandle>,
-    pub(crate) offset: usize,
-    pub(crate) size: usize,
+pub struct ImageCopySrcRaw<'a> {
+    pub(crate) inner: ImageCopyBuffer<'a, Dvr>,
+}
+
+#[derive(Clone)]
+pub struct ImageCopyDst<'a, T> {
+    pub(crate) inner: ImageCopyBuffer<'a, Dvr>,
     _marker: marker::PhantomData<*const T>,
 }
 
 #[derive(Clone)]
-pub(crate) struct ImageCopyBuffer {
-    pub(crate) buffer: Arc<BufferHandle>,
-    pub(crate) offset: usize,
-    pub(crate) size: usize,
-    pub(crate) bytes_per_block: u32,
-    pub(crate) blocks_per_row: u32,
-    pub(crate) rows_per_image: u32,
-}
-
-impl ImageCopyBuffer {
-    pub(crate) fn validate_with_size_and_block_size(
-        &self,
-        size: ImageCopySize3D,
-        block_size: [u32; 2],
-    ) {
-        let ImageCopySize3D {
-            width,
-            height,
-            depth_or_layers,
-        } = size;
-
-        let [block_width, block_height] = block_size;
-
-        let width_in_blocks = width / block_width;
-
-        assert!(
-            self.blocks_per_row >= width_in_blocks,
-            "blocks per row must be at least the copy width in blocks (`{}`)",
-            width_in_blocks
-        );
-
-        let height_in_blocks = height / block_height;
-
-        assert!(
-            self.rows_per_image >= height_in_blocks,
-            "rows per image must be at least the copy height in blocks (`{}`)",
-            height_in_blocks
-        );
-
-        let min_size = self.blocks_per_row * self.rows_per_image * depth_or_layers;
-
-        assert!(
-            self.size >= min_size as usize,
-            "buffer view must contains enough elements for the copy size (`{}` blocks)",
-            min_size
-        );
-    }
-
-    pub(crate) fn to_web_sys(&self) -> GpuImageCopyBuffer {
-        let mut copy_buffer = GpuImageCopyBuffer::new(&self.buffer.buffer);
-
-        copy_buffer.offset(self.offset as f64);
-        copy_buffer.bytes_per_row(self.bytes_per_block * self.blocks_per_row);
-        copy_buffer.rows_per_image(self.rows_per_image);
-
-        copy_buffer
-    }
-}
-
-#[derive(Clone)]
-pub struct ImageCopySrc<T> {
-    pub(crate) inner: ImageCopyBuffer,
-    _marker: marker::PhantomData<*const T>,
-}
-
-#[derive(Clone)]
-pub struct ImageCopySrcRaw {
-    pub(crate) inner: ImageCopyBuffer,
-}
-
-#[derive(Clone)]
-pub struct ImageCopyDst<T> {
-    pub(crate) inner: ImageCopyBuffer,
-    _marker: marker::PhantomData<*const T>,
-}
-
-#[derive(Clone)]
-pub struct ImageCopyDstRaw {
-    pub(crate) inner: ImageCopyBuffer,
+pub struct ImageCopyDstRaw<'a> {
+    pub(crate) inner: ImageCopyBuffer<'a, Dvr>,
 }
 
 // Struct modified from https://github.com/gfx-rs/wgpu
 
 #[derive(Debug)]
 struct MapContext {
-    initial_range: Range<u32>,
-    sub_ranges: Vec<Range<u32>>,
+    initial_range: Range<usize>,
+    sub_ranges: Vec<Range<usize>>,
 }
 
 impl MapContext {
@@ -1588,7 +1464,7 @@ impl MapContext {
         );
     }
 
-    fn add(&mut self, range: Range<u32>) {
+    fn add(&mut self, range: Range<usize>) {
         assert!(self.initial_range.start <= range.start && range.end <= self.initial_range.end);
 
         for sub in self.sub_ranges.iter() {
@@ -1602,7 +1478,7 @@ impl MapContext {
         self.sub_ranges.push(range);
     }
 
-    fn remove(&mut self, range: Range<u32>) {
+    fn remove(&mut self, range: Range<usize>) {
         let index = self
             .sub_ranges
             .iter()
@@ -1611,18 +1487,6 @@ impl MapContext {
 
         self.sub_ranges.swap_remove(index);
     }
-}
-
-#[wasm_bindgen(module = "/src/js_support.js")]
-extern "C" {
-    #[wasm_bindgen(js_name = __empa_js_copy_buffer_to_memory)]
-    fn copy_buffer_to_memory(
-        buffer: &Uint8Array,
-        offset: u32,
-        size: u32,
-        wasm_memory: &JsValue,
-        pointer: *mut (),
-    );
 }
 
 #[cfg(feature = "bytemuck")]
@@ -1645,7 +1509,7 @@ where
     T: bytemuck::NoUninit,
 {
     let BufferInternal {
-        inner,
+        handle: inner,
         id,
         map_context,
         usage,
@@ -1656,7 +1520,7 @@ where
 
     Buffer {
         internal: BufferInternal {
-            inner,
+            handle: inner,
             id,
             len: size_in_bytes,
             map_context,
@@ -1672,7 +1536,7 @@ where
     T: bytemuck::NoUninit,
 {
     let BufferInternal {
-        inner,
+        handle: inner,
         id,
         map_context,
         usage,
@@ -1683,7 +1547,7 @@ where
 
     Buffer {
         internal: BufferInternal {
-            inner,
+            handle: inner,
             id,
             len: size_in_bytes,
             map_context,
@@ -1699,7 +1563,7 @@ where
     T: bytemuck::AnyBitPattern,
 {
     let BufferInternal {
-        inner,
+        handle: inner,
         id,
         map_context,
         usage,
@@ -1713,7 +1577,7 @@ where
     } else {
         Ok(Buffer {
             internal: BufferInternal {
-                inner,
+                handle: inner,
                 id,
                 len: 1,
                 map_context,
@@ -1742,7 +1606,7 @@ where
     T: bytemuck::AnyBitPattern,
 {
     let BufferInternal {
-        inner,
+        handle: inner,
         id,
         map_context,
         usage,
@@ -1756,7 +1620,7 @@ where
     } else {
         Ok(Buffer {
             internal: BufferInternal {
-                inner,
+                handle: inner,
                 id,
                 len: len / size_in_bytes,
                 map_context,

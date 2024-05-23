@@ -1,48 +1,62 @@
-use web_sys::{GpuVertexAttribute, GpuVertexStepMode};
-
-use crate::render_pipeline::vertex_attribute::VertexAttributeFormatId;
+use std::borrow::Cow;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum VertexInputRate {
-    PerVertex,
-    PerInstance,
-}
-
-impl VertexInputRate {
-    pub(crate) fn to_web_sys(&self) -> GpuVertexStepMode {
-        match self {
-            VertexInputRate::PerVertex => GpuVertexStepMode::Vertex,
-            VertexInputRate::PerInstance => GpuVertexStepMode::Instance,
-        }
-    }
+#[allow(non_camel_case_types)]
+pub enum VertexFormat {
+    uint8x2,
+    uint8x4,
+    sint8x2,
+    sint8x4,
+    unorm8x2,
+    unorm8x4,
+    snorm8x2,
+    snorm8x4,
+    uint16x2,
+    uint16x4,
+    sint16x2,
+    sint16x4,
+    unorm16x2,
+    unorm16x4,
+    snorm16x2,
+    snorm16x4,
+    float16x2,
+    float16x4,
+    float32,
+    float32x2,
+    float32x3,
+    float32x4,
+    uint32,
+    uint32x2,
+    uint32x3,
+    uint32x4,
+    sint32,
+    sint32x2,
+    sint32x3,
+    sint32x4,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct VertexAttributeDescriptor {
-    pub format: VertexAttributeFormatId,
-    pub offset: u32,
+pub enum VertexStepMode {
+    Vertex,
+    Instance,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct VertexAttribute {
+    pub format: VertexFormat,
+    pub offset: usize,
     pub shader_location: u32,
 }
 
-impl VertexAttributeDescriptor {
-    pub(crate) fn to_web_sys(&self) -> GpuVertexAttribute {
-        GpuVertexAttribute::new(
-            self.format.to_web_sys(),
-            self.offset as f64,
-            self.shader_location,
-        )
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct VertexDescriptor<'a> {
-    pub array_stride: u32,
-    pub attribute_descriptors: &'a [VertexAttributeDescriptor],
-    pub input_rate: VertexInputRate,
+#[derive(Clone)]
+pub struct VertexBufferLayout<'a> {
+    pub array_stride: usize,
+    pub step_mode: VertexStepMode,
+    pub attributes: Cow<'a, [VertexAttribute]>,
 }
 
 pub unsafe trait Vertex: Sized {
-    const DESCRIPTOR: VertexDescriptor<'static>;
+    const LAYOUT: VertexBufferLayout<'static>;
 }
 
 mod typed_vertex_layout_seal {
@@ -50,13 +64,13 @@ mod typed_vertex_layout_seal {
 }
 
 pub trait TypedVertexLayout: typed_vertex_layout_seal::Seal {
-    const LAYOUT: &'static [VertexDescriptor<'static>];
+    const LAYOUT: &'static [VertexBufferLayout<'static>];
 }
 
 impl typed_vertex_layout_seal::Seal for () {}
 
 impl TypedVertexLayout for () {
-    const LAYOUT: &'static [VertexDescriptor<'static>] = &[];
+    const LAYOUT: &'static [VertexBufferLayout<'static>] = &[];
 }
 
 macro_rules! impl_typed_vertex_layout {
@@ -66,8 +80,8 @@ macro_rules! impl_typed_vertex_layout {
 
         #[allow(unused_parens)]
         impl<$($vertex),*> TypedVertexLayout for ($($vertex),*) where $($vertex: Vertex),* {
-            const LAYOUT: &'static [VertexDescriptor<'static>] = &[
-                $($vertex::DESCRIPTOR),*
+            const LAYOUT: &'static [VertexBufferLayout<'static>] = &[
+                $($vertex::LAYOUT),*
             ];
         }
     }

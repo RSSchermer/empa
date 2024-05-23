@@ -26,32 +26,11 @@ use std::fmt;
 use std::ops::Rem;
 
 use staticvec::StaticVec;
-use web_sys::{GpuExtent3dDict, GpuImageDataLayout};
 
+use crate::driver;
 use crate::texture::format::TextureFormatId;
 
-pub(crate) struct TextureHandle {
-    texture: web_sys::GpuTexture,
-    is_swap_chain: bool,
-}
-
-impl TextureHandle {
-    fn new(texture: web_sys::GpuTexture, is_swap_chain: bool) -> Self {
-        TextureHandle {
-            texture,
-            is_swap_chain,
-        }
-    }
-}
-
-impl Drop for TextureHandle {
-    fn drop(&mut self) {
-        if !self.is_swap_chain {
-            self.texture.destroy();
-        }
-    }
-}
-
+#[allow(unused)]
 enum FormatKind<F> {
     Dynamic(F),
     Typed(std::marker::PhantomData<F>),
@@ -65,16 +44,20 @@ pub struct UnsupportedViewFormat {
 
 impl fmt::Display for UnsupportedViewFormat {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "`{}` is not one of the supported formats: ", self.format)?;
+        write!(
+            f,
+            "`{:?}` is not one of the supported formats: ",
+            self.format
+        )?;
 
         let mut supported_formats = self.supported_formats.iter();
 
         if let Some(format) = supported_formats.next() {
-            write!(f, "`{}`", format)?;
+            write!(f, "`{:?}`", format)?;
         }
 
         for format in supported_formats {
-            write!(f, ", `{}`", format)?;
+            write!(f, ", `{:?}`", format)?;
         }
 
         Ok(())
@@ -112,15 +95,14 @@ pub struct ImageDataByteLayout {
 }
 
 impl ImageDataByteLayout {
-    pub(crate) fn to_web_sys(&self) -> GpuImageDataLayout {
+    pub(crate) fn to_driver(&self) -> driver::ImageDataLayout {
         let bytes_per_row = self.blocks_per_row * self.bytes_per_block;
 
-        let mut layout = GpuImageDataLayout::new();
-
-        layout.bytes_per_row(bytes_per_row);
-        layout.rows_per_image(self.rows_per_image);
-
-        layout
+        driver::ImageDataLayout {
+            offset: 0,
+            bytes_per_row,
+            rows_per_image: self.rows_per_image,
+        }
     }
 }
 
@@ -128,18 +110,6 @@ impl ImageDataByteLayout {
 pub struct ImageCopySize2D {
     pub width: u32,
     pub height: u32,
-}
-
-impl ImageCopySize2D {
-    pub(crate) fn to_web_sys(&self) -> GpuExtent3dDict {
-        let ImageCopySize2D { width, height } = *self;
-
-        let mut extent = GpuExtent3dDict::new(width);
-
-        extent.height(height);
-
-        extent
-    }
 }
 
 impl Default for ImageCopySize2D {
@@ -195,20 +165,5 @@ impl ImageCopySize3D {
             "copy height must be a multiple of the block height (`{}`)",
             block_height
         );
-    }
-
-    pub(crate) fn to_web_sys(&self) -> GpuExtent3dDict {
-        let ImageCopySize3D {
-            width,
-            height,
-            depth_or_layers,
-        } = *self;
-
-        let mut extent = GpuExtent3dDict::new(width);
-
-        extent.height(height);
-        extent.depth_or_array_layers(depth_or_layers);
-
-        extent
     }
 }

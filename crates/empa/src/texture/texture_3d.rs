@@ -1,14 +1,14 @@
 use std::cmp::max;
 use std::marker;
-use std::sync::Arc;
 
 use staticvec::StaticVec;
-use web_sys::{
-    GpuExtent3dDict, GpuTexture, GpuTextureAspect, GpuTextureDescriptor, GpuTextureDimension,
-    GpuTextureFormat, GpuTextureView, GpuTextureViewDescriptor, GpuTextureViewDimension,
-};
 
 use crate::device::Device;
+use crate::driver;
+use crate::driver::{
+    Device as _, Driver, Dvr, Texture, TextureAspect, TextureDescriptor, TextureDimensions,
+    TextureViewDescriptor, TextureViewDimension,
+};
 use crate::texture::format::{
     FloatSamplable, ImageCopyFromBufferFormat, ImageCopyTextureFormat, ImageCopyToBufferFormat,
     SignedIntegerSamplable, Storable, SubImageCopyFormat, Texture3DFormat, TextureFormatId,
@@ -18,7 +18,7 @@ use crate::texture::{
     CopyDst, CopySrc, FormatKind, ImageCopyDst, ImageCopyFromTextureDst, ImageCopySrc,
     ImageCopyTexture, ImageCopyToTextureSrc, MipmapLevels, StorageBinding, SubImageCopyDst,
     SubImageCopyFromTextureDst, SubImageCopySrc, SubImageCopyToTextureSrc, TextureBinding,
-    TextureHandle, UnsupportedViewFormat, UsageFlags,
+    UnsupportedViewFormat, UsageFlags,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -61,14 +61,14 @@ pub struct SubImageCopy3DDescriptor {
 }
 
 pub struct Texture3D<F, Usage> {
-    inner: Arc<TextureHandle>,
+    handle: <Dvr as Driver>::TextureHandle,
     mip_level_count: u8,
-    format: FormatKind<F>,
     width: u32,
     height: u32,
     depth: u32,
     view_formats: StaticVec<TextureFormatId, 8>,
     usage: Usage,
+    _format: FormatKind<F>,
 }
 
 impl<F, U> Texture3D<F, U>
@@ -94,29 +94,28 @@ where
         assert!(*height > 0, "height must be greater than `0`");
         assert!(*depth > 0, "depth must be greater than `0`");
 
-        let mip_level_count = mipmap_levels.to_u32(max(max(*width, *height), *depth));
-        let mut size = GpuExtent3dDict::new(*width);
+        let mipmap_levels = mipmap_levels.to_u32(max(max(*width, *height), *depth));
+        let view_formats = view_formats.formats().collect::<StaticVec<_, 8>>();
 
-        size.height(*height);
-        size.depth_or_array_layers(*depth);
-
-        let mut desc = GpuTextureDescriptor::new(F::FORMAT_ID.to_web_sys(), &size.into(), U::BITS);
-
-        desc.dimension(GpuTextureDimension::N3d);
-        desc.mip_level_count(mip_level_count);
-
-        let inner = device.inner.create_texture(&desc);
-        let view_formats = view_formats.formats().collect();
+        let handle = device.handle.create_texture(&TextureDescriptor {
+            size: (*width, *height, *depth),
+            mipmap_levels,
+            sample_count: 1,
+            dimensions: TextureDimensions::Three,
+            format: F::FORMAT_ID,
+            usage_flags: U::FLAG_SET,
+            view_formats: view_formats.as_slice(),
+        });
 
         Texture3D {
-            inner: Arc::new(TextureHandle::new(inner, false)),
-            format: FormatKind::Typed(Default::default()),
+            handle,
             width: *width,
             height: *height,
             depth: *depth,
-            mip_level_count: mip_level_count as u8,
+            mip_level_count: mipmap_levels as u8,
             view_formats,
             usage: *usage,
+            _format: FormatKind::Typed(Default::default()),
         }
     }
 }
@@ -131,10 +130,6 @@ where
 }
 
 impl<F, U> Texture3D<F, U> {
-    fn as_web_sys(&self) -> &GpuTexture {
-        &self.inner.texture
-    }
-
     pub fn width(&self) -> u32 {
         self.width
     }
@@ -151,11 +146,11 @@ impl<F, U> Texture3D<F, U> {
         self.mip_level_count
     }
 
-    fn view_internal(
-        &self,
-        format: GpuTextureFormat,
+    fn view_internal<'a>(
+        &'a self,
+        format: TextureFormatId,
         descriptor: &View3DDescriptor,
-    ) -> GpuTextureView {
+    ) -> <Dvr as Driver>::TextureView<'a> {
         let View3DDescriptor {
             base_mipmap_level,
             mipmap_level_count,
@@ -178,14 +173,15 @@ impl<F, U> Texture3D<F, U> {
             self.mip_level_count - base_mipmap_level
         };
 
-        let mut desc = GpuTextureViewDescriptor::new();
+        let end_mipmap_level = base_mipmap_level + mipmap_level_count;
 
-        desc.dimension(GpuTextureViewDimension::N3d);
-        desc.format(format);
-        desc.base_mip_level(base_mipmap_level as u32);
-        desc.mip_level_count(mipmap_level_count as u32);
-
-        self.as_web_sys().create_view_with_descriptor(&desc)
+        self.handle.texture_view(&TextureViewDescriptor {
+            format,
+            dimensions: TextureViewDimension::Three,
+            aspect: TextureAspect::All,
+            mip_levels: base_mipmap_level as u32..end_mipmap_level as u32,
+            layers: 0..1,
+        })
     }
 
     pub fn sampled_float(&self, descriptor: &View3DDescriptor) -> Sampled3DFloat
@@ -194,8 +190,7 @@ impl<F, U> Texture3D<F, U> {
         U: TextureBinding,
     {
         Sampled3DFloat {
-            inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -209,8 +204,7 @@ impl<F, U> Texture3D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled3DFloat {
-                inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -229,8 +223,7 @@ impl<F, U> Texture3D<F, U> {
         U: TextureBinding,
     {
         Sampled3DUnfilteredFloat {
-            inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -244,8 +237,7 @@ impl<F, U> Texture3D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled3DUnfilteredFloat {
-                inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -261,8 +253,7 @@ impl<F, U> Texture3D<F, U> {
         U: TextureBinding,
     {
         Sampled3DSignedInteger {
-            inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -276,8 +267,7 @@ impl<F, U> Texture3D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled3DSignedInteger {
-                inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -296,8 +286,7 @@ impl<F, U> Texture3D<F, U> {
         U: TextureBinding,
     {
         Sampled3DUnsignedInteger {
-            inner: self.view_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -311,8 +300,7 @@ impl<F, U> Texture3D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled3DUnsignedInteger {
-                inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -322,20 +310,26 @@ impl<F, U> Texture3D<F, U> {
         }
     }
 
-    fn storage_internal(&self, format: GpuTextureFormat, mipmap_level: u8) -> GpuTextureView {
+    fn storage_internal<'a>(
+        &'a self,
+        format: TextureFormatId,
+        mipmap_level: u8,
+    ) -> <Dvr as Driver>::TextureView<'a> {
         assert!(
             mipmap_level < self.mip_level_count,
             "`mipmap_level` must not exceed the texture's mipmap level count"
         );
 
-        let mut desc = GpuTextureViewDescriptor::new();
+        let start_mipmap_level = mipmap_level as u32;
+        let end_mipmap_level = start_mipmap_level + 1;
 
-        desc.dimension(GpuTextureViewDimension::N3d);
-        desc.format(format);
-        desc.base_mip_level(mipmap_level as u32);
-        desc.mip_level_count(1);
-
-        self.as_web_sys().create_view_with_descriptor(&desc)
+        self.handle.texture_view(&TextureViewDescriptor {
+            format,
+            dimensions: TextureViewDimension::Three,
+            aspect: TextureAspect::All,
+            mip_levels: start_mipmap_level as u32..end_mipmap_level as u32,
+            layers: 0..1,
+        })
     }
 
     pub fn storage(&self, mipmap_level: u8) -> Storage3D<F>
@@ -344,8 +338,7 @@ impl<F, U> Texture3D<F, U> {
         U: StorageBinding,
     {
         Storage3D {
-            inner: self.storage_internal(F::FORMAT_ID.to_web_sys(), mipmap_level),
-            texture_handle: self.inner.clone(),
+            inner: self.storage_internal(F::FORMAT_ID, mipmap_level),
             _marker: Default::default(),
         }
     }
@@ -360,8 +353,7 @@ impl<F, U> Texture3D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Storage3D {
-                inner: self.storage_internal(ViewedFormat::FORMAT_ID.to_web_sys(), mipmap_level),
-                texture_handle: self.inner.clone(),
+                inner: self.storage_internal(ViewedFormat::FORMAT_ID, mipmap_level),
                 _marker: Default::default(),
             })
         } else {
@@ -383,18 +375,20 @@ impl<F, U> Texture3D<F, U> {
             "mipmap level out of bounds"
         );
 
+        let inner = driver::ImageCopyTexture {
+            texture_handle: &self.handle,
+            mip_level: mipmap_level as u32,
+            origin: (0, 0, 0),
+            aspect: TextureAspect::All,
+        };
+
         ImageCopyTexture {
-            texture: self.inner.clone(),
-            aspect: GpuTextureAspect::All,
-            mipmap_level,
+            inner,
             width: self.width,
             height: self.height,
             depth_or_layers: self.depth,
             bytes_per_block,
             block_size,
-            origin_x: 0,
-            origin_y: 0,
-            origin_z: 0,
             _marker: Default::default(),
         }
     }
@@ -420,18 +414,20 @@ impl<F, U> Texture3D<F, U> {
         assert!(origin_y < self.height, "`y` origin out of bounds");
         assert!(origin_z < self.depth, "layer origin out of bounds");
 
+        let inner = driver::ImageCopyTexture {
+            texture_handle: &self.handle,
+            mip_level: mipmap_level as u32,
+            origin: (origin_x, origin_y, origin_z),
+            aspect: TextureAspect::All,
+        };
+
         ImageCopyTexture {
-            texture: self.inner.clone(),
-            aspect: GpuTextureAspect::All,
-            mipmap_level,
+            inner,
             width: self.width,
             height: self.height,
             depth_or_layers: self.depth,
             bytes_per_block,
             block_size,
-            origin_x,
-            origin_y,
-            origin_z,
             _marker: Default::default(),
         }
     }
@@ -531,39 +527,34 @@ impl<F, U> Texture3D<F, U> {
 
 /// View on a 3D texture that can be bound to a pipeline as a float sampled texture resource.
 #[derive(Clone)]
-pub struct Sampled3DFloat {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled3DFloat<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 /// View on a 3D texture that can be bound to a pipeline as a unfiltered float sampled texture
 /// resource.
 #[derive(Clone)]
-pub struct Sampled3DUnfilteredFloat {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled3DUnfilteredFloat<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 /// View on a 3D texture that can be bound to a pipeline as a signed integer sampled texture
 /// resource.
 #[derive(Clone)]
-pub struct Sampled3DSignedInteger {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled3DSignedInteger<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 /// View on a 3D texture that can be bound to a pipeline as a unsigned integer sampled texture
 /// resource.
 #[derive(Clone)]
-pub struct Sampled3DUnsignedInteger {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled3DUnsignedInteger<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 /// View on a 3D texture that can be bound to a pipeline as a texture storage resource.
 #[derive(Clone)]
-pub struct Storage3D<F> {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Storage3D<'a, F> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
     _marker: marker::PhantomData<*const F>,
 }

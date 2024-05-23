@@ -1,14 +1,13 @@
-use std::{iter, marker};
-
-use web_sys::{GpuPipelineLayout, GpuPipelineLayoutDescriptor};
+use std::marker;
 
 use crate::device::Device;
+use crate::driver::{Device as _, Driver, Dvr, PipelineLayoutDescriptor};
 use crate::resource_binding::{
     BindGroupLayout, BindGroupLayoutEncoding, BindGroupLayoutEntry, TypedBindGroupLayout,
 };
 
 pub struct PipelineLayout<T> {
-    pub(crate) inner: GpuPipelineLayout,
+    pub(crate) handle: <Dvr as Driver>::PipelineLayoutHandle,
     _marker: marker::PhantomData<*const T>,
 }
 
@@ -20,16 +19,14 @@ where
     where
         B: BindGroupLayouts<PipelineLayout = T>,
     {
-        let bind_group_layouts = bind_group_layouts
-            .encodings()
-            .map(|l| l.inner)
-            .collect::<js_sys::Array>();
+        let bind_group_layouts = bind_group_layouts.encodings().into_iter().map(|l| l.handle);
 
-        let desc = GpuPipelineLayoutDescriptor::new(bind_group_layouts.as_ref());
-        let inner = device.inner.create_pipeline_layout(&desc);
+        let handle = device
+            .handle
+            .create_pipeline_layout(PipelineLayoutDescriptor { bind_group_layouts });
 
         PipelineLayout {
-            inner,
+            handle,
             _marker: Default::default(),
         }
     }
@@ -71,18 +68,20 @@ mod bind_group_layouts_seal {
 pub trait BindGroupLayouts: bind_group_layouts_seal::Seal {
     type PipelineLayout: TypedPipelineLayout;
 
-    type Encodings: Iterator<Item = BindGroupLayoutEncoding>;
+    type Encodings<'a>: IntoIterator<Item = BindGroupLayoutEncoding<'a>>
+    where
+        Self: 'a;
 
-    fn encodings(&self) -> Self::Encodings;
+    fn encodings<'a>(&'a self) -> Self::Encodings<'a>;
 }
 
 impl bind_group_layouts_seal::Seal for () {}
 impl BindGroupLayouts for () {
     type PipelineLayout = ();
-    type Encodings = iter::Empty<BindGroupLayoutEncoding>;
+    type Encodings<'a> = [BindGroupLayoutEncoding<'a>; 0];
 
-    fn encodings(&self) -> Self::Encodings {
-        iter::empty()
+    fn encodings<'a>(&'a self) -> Self::Encodings<'a> {
+        []
     }
 }
 
@@ -95,13 +94,13 @@ macro_rules! impl_bind_group_layouts {
         impl<$($B),*> BindGroupLayouts for ($(&'_ BindGroupLayout<$B>),*) where $($B: TypedBindGroupLayout),* {
             type PipelineLayout = ($($B,)*);
 
-            type Encodings = <[BindGroupLayoutEncoding; $n] as IntoIterator>::IntoIter;
+            type Encodings<'a> = [BindGroupLayoutEncoding<'a>; $n] where Self: 'a;
 
-            fn encodings(&self) -> Self::Encodings {
+            fn encodings<'a>(&'a self) -> Self::Encodings<'a> {
                 #[allow(unused_parens, non_snake_case)]
                 let ($($B),*) = self;
 
-                [$($B.to_encoding()),*].into_iter()
+                [$($B.to_encoding()),*]
             }
         }
     }

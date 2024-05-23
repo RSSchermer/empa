@@ -14,3 +14,11 @@ export function __empa_js_copy_buffer_to_memory(
     // Copy the source range to WASM memory at the pointer location
     memory_bytes.set(range_view, pointer);
 }
+
+export function __empa_write_time_stamp(
+    command_encoder,
+    query_set_handle,
+    index,
+) {
+    command_encoder.writeTimestamp(query_set_handle, index);
+}

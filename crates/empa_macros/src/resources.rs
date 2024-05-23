@@ -76,21 +76,22 @@ pub fn expand_derive_resources(input: &DeriveInput) -> Result<TokenStream, Strin
             };
 
             bindings.push(tokens);
+        }
 
-            let tokens = if let Some(field) = resource_fields.get(&i) {
-                let ty = &field.ty;
-                let field_name = field
-                    .ident
-                    .clone()
-                    .map(|i| i.into_token_stream())
-                    .unwrap_or(field.position.into_token_stream());
-                let span = field.span;
+        for (binding, field) in resource_fields.iter() {
+            let ty = &field.ty;
+            let field_name = field
+                .ident
+                .clone()
+                .map(|i| i.into_token_stream())
+                .unwrap_or(field.position.into_token_stream());
+            let span = field.span;
 
-                quote_spanned! {span=>
-                    Some(<#ty as #mod_path::Resource>::to_entry(&self.#field_name))
+            let tokens = quote_spanned! {span=>
+                #mod_path::BindGroupEntry {
+                    binding: #binding as u32,
+                    resource: <#ty as #mod_path::Resource>::to_encoding(&self.#field_name)
                 }
-            } else {
-                quote!(None)
             };
 
             entries.push(tokens);
@@ -104,10 +105,10 @@ pub fn expand_derive_resources(input: &DeriveInput) -> Result<TokenStream, Strin
             unsafe impl #impl_generics #mod_path::Resources for #struct_name #ty_generics #where_clause {
                 type Layout = (#(#bindings,)*);
 
-                type ToEntries = <[Option<#mod_path::BindGroupEntry>; #iter_len] as IntoIterator>::IntoIter;
+                type ToEntries<'__a> = [#mod_path::BindGroupEntry<'__a>; #iter_len] where Self: '__a;
 
-                fn to_entries(&self) -> Self::ToEntries {
-                    [#(#entries,)*].into_iter()
+                fn to_entries<'__a>(&'__a self) -> Self::ToEntries<'__a> {
+                    [#(#entries,)*]
                 }
             }
         };
@@ -124,8 +125,6 @@ pub fn expand_derive_resources(input: &DeriveInput) -> Result<TokenStream, Strin
                 #[allow(unknown_lints)]
                 #[cfg_attr(feature = "cargo-clippy", allow(useless_attribute))]
                 #[allow(rust_2018_idioms)]
-
-                use #mod_path::Resource;
 
                 #impl_block
             };

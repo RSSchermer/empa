@@ -1,5 +1,3 @@
-use staticvec::StaticVec;
-
 use crate::render_target::multisample_attachment::{
     MultisampleColorTargets, MultisampleDepthStencilTarget,
 };
@@ -15,12 +13,13 @@ mod valid_render_target_seal {
 pub trait ValidRenderTarget: valid_render_target_seal::Seal {
     type RenderLayout: TypedRenderLayout;
 
-    fn encoding(&self) -> RenderTargetEncoding;
-}
+    type ColorTargetEncodings<'a>: IntoIterator<Item = ColorTargetEncoding<'a>>
+    where
+        Self: 'a;
 
-pub struct RenderTargetEncoding {
-    pub(crate) color_attachments: StaticVec<ColorTargetEncoding, 8>,
-    pub(crate) depth_stencil_attachment: Option<DepthStencilTargetEncoding>,
+    fn color_target_encodings<'a>(&'a self) -> Self::ColorTargetEncodings<'a>;
+
+    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding;
 }
 
 pub struct RenderTarget<C, Ds> {
@@ -41,16 +40,14 @@ where
 {
     type RenderLayout = RenderLayout<C::Layout, Ds::Format>;
 
-    fn encoding(&self) -> RenderTargetEncoding {
-        let RenderTarget {
-            color,
-            depth_stencil,
-        } = self;
+    type ColorTargetEncodings<'a> = C::Encodings<'a> where Self: 'a;
 
-        RenderTargetEncoding {
-            color_attachments: color.encodings().collect(),
-            depth_stencil_attachment: Some(depth_stencil.to_encoding()),
-        }
+    fn color_target_encodings<'a>(&'a self) -> Self::ColorTargetEncodings<'a> {
+        self.color.encodings()
+    }
+
+    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding {
+        self.depth_stencil.to_encoding()
     }
 }
 
@@ -61,10 +58,17 @@ where
 {
     type RenderLayout = RenderLayout<C::Layout, ()>;
 
-    fn encoding(&self) -> RenderTargetEncoding {
-        RenderTargetEncoding {
-            color_attachments: self.color.encodings().collect(),
-            depth_stencil_attachment: None,
+    type ColorTargetEncodings<'a> = C::Encodings<'a> where C: 'a;
+
+    fn color_target_encodings<'a>(&'a self) -> Self::ColorTargetEncodings<'a> {
+        self.color.encodings()
+    }
+
+    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding {
+        DepthStencilTargetEncoding {
+            inner: None,
+            width: 0,
+            height: 0,
         }
     }
 }
@@ -76,11 +80,14 @@ where
 {
     type RenderLayout = RenderLayout<(), Ds::Format>;
 
-    fn encoding(&self) -> RenderTargetEncoding {
-        RenderTargetEncoding {
-            color_attachments: StaticVec::new(),
-            depth_stencil_attachment: Some(self.depth_stencil.to_encoding()),
-        }
+    type ColorTargetEncodings<'a> = [ColorTargetEncoding<'a>; 0] where Ds: 'a;
+
+    fn color_target_encodings<'a>(&'a self) -> Self::ColorTargetEncodings<'a> {
+        []
+    }
+
+    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding {
+        self.depth_stencil.to_encoding()
     }
 }
 
@@ -103,16 +110,14 @@ where
 {
     type RenderLayout = MultisampleRenderLayout<C::Layout, Ds::Format, SAMPLES>;
 
-    fn encoding(&self) -> RenderTargetEncoding {
-        let MultisampleRenderTarget {
-            color,
-            depth_stencil,
-        } = self;
+    type ColorTargetEncodings<'a> = C::Encodings<'a> where Self: 'a;
 
-        RenderTargetEncoding {
-            color_attachments: color.encodings().collect(),
-            depth_stencil_attachment: Some(depth_stencil.to_encoding()),
-        }
+    fn color_target_encodings<'a>(&'a self) -> Self::ColorTargetEncodings<'a> {
+        self.color.encodings()
+    }
+
+    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding {
+        self.depth_stencil.to_encoding()
     }
 }
 
@@ -128,10 +133,17 @@ where
 {
     type RenderLayout = MultisampleRenderLayout<C::Layout, (), SAMPLES>;
 
-    fn encoding(&self) -> RenderTargetEncoding {
-        RenderTargetEncoding {
-            color_attachments: self.color.encodings().collect(),
-            depth_stencil_attachment: None,
+    type ColorTargetEncodings<'a> = C::Encodings<'a> where C: 'a;
+
+    fn color_target_encodings<'a>(&'a self) -> Self::ColorTargetEncodings<'a> {
+        self.color.encodings()
+    }
+
+    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding {
+        DepthStencilTargetEncoding {
+            inner: None,
+            width: 0,
+            height: 0,
         }
     }
 }
@@ -148,10 +160,13 @@ where
 {
     type RenderLayout = MultisampleRenderLayout<(), Ds::Format, SAMPLES>;
 
-    fn encoding(&self) -> RenderTargetEncoding {
-        RenderTargetEncoding {
-            color_attachments: StaticVec::new(),
-            depth_stencil_attachment: Some(self.depth_stencil.to_encoding()),
-        }
+    type ColorTargetEncodings<'a> = [ColorTargetEncoding<'a>; 0] where Ds: 'a;
+
+    fn color_target_encodings<'a>(&'a self) -> Self::ColorTargetEncodings<'a> {
+        []
+    }
+
+    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding {
+        self.depth_stencil.to_encoding()
     }
 }

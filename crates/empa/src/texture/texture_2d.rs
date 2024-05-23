@@ -1,15 +1,15 @@
 use std::cmp::max;
 use std::marker;
 use std::ops::Rem;
-use std::sync::Arc;
 
 use staticvec::StaticVec;
-use web_sys::{
-    GpuExtent3dDict, GpuTexture, GpuTextureAspect, GpuTextureDescriptor, GpuTextureDimension,
-    GpuTextureFormat, GpuTextureView, GpuTextureViewDescriptor, GpuTextureViewDimension,
-};
 
 use crate::device::Device;
+use crate::driver;
+use crate::driver::{
+    Device as _, Driver, Dvr, Texture, TextureAspect, TextureDescriptor, TextureDimensions,
+    TextureViewDescriptor, TextureViewDimension,
+};
 use crate::texture::format::{
     DepthSamplable, DepthStencilFormat, FloatSamplable, ImageBufferDataFormat,
     ImageCopyFromBufferFormat, ImageCopyTextureFormat, ImageCopyToBufferFormat, Renderable,
@@ -20,7 +20,7 @@ use crate::texture::{
     CopyDst, CopySrc, FormatKind, ImageCopyDst, ImageCopyFromTextureDst, ImageCopySrc,
     ImageCopyTexture, ImageCopyToTextureSrc, MipmapLevels, RenderAttachment, StorageBinding,
     SubImageCopyDst, SubImageCopyFromTextureDst, SubImageCopySrc, SubImageCopyToTextureSrc,
-    TextureBinding, TextureHandle, UnsupportedViewFormat, UsageFlags,
+    TextureBinding, UnsupportedViewFormat, UsageFlags,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -148,14 +148,14 @@ pub struct SubImageCopy2DDescriptor {
 }
 
 pub struct Texture2D<F, Usage> {
-    pub(crate) inner: Arc<TextureHandle>,
+    pub(crate) handle: <Dvr as Driver>::TextureHandle,
     pub(crate) width: u32,
     pub(crate) height: u32,
     pub(crate) layers: u32,
     pub(crate) mip_level_count: u8,
-    format: FormatKind<F>,
     view_formats: StaticVec<TextureFormatId, 8>,
     usage: Usage,
+    _format: FormatKind<F>,
 }
 
 impl<F, U> Texture2D<F, U>
@@ -164,7 +164,7 @@ where
     U: UsageFlags,
 {
     pub(crate) fn from_swap_chain_texture(
-        web_sys: GpuTexture,
+        handle: <Dvr as Driver>::TextureHandle,
         width: u32,
         height: u32,
         view_formats: &[TextureFormatId],
@@ -173,14 +173,14 @@ where
         let view_formats = StaticVec::from(view_formats);
 
         Texture2D {
-            inner: Arc::new(TextureHandle::new(web_sys, true)),
+            handle,
             width,
             height,
             layers: 1,
             mip_level_count: 1,
-            format: FormatKind::Typed(Default::default()),
             view_formats,
             usage,
+            _format: FormatKind::Typed(Default::default()),
         }
     }
 }
@@ -222,28 +222,27 @@ where
         );
 
         let mip_level_count = mipmap_levels.to_u32(max(*width, *height));
-        let mut size = GpuExtent3dDict::new(*width);
+        let view_formats = view_formats.formats().collect::<StaticVec<_, 8>>();
 
-        size.height(*height);
-        size.depth_or_array_layers(*layers);
-
-        let mut desc = GpuTextureDescriptor::new(F::FORMAT_ID.to_web_sys(), &size.into(), U::BITS);
-
-        desc.dimension(GpuTextureDimension::N2d);
-        desc.mip_level_count(mip_level_count);
-
-        let inner = device.inner.create_texture(&desc);
-        let view_formats = view_formats.formats().collect();
+        let handle = device.handle.create_texture(&TextureDescriptor {
+            size: (*width, *height, *layers),
+            mipmap_levels: mip_level_count,
+            sample_count: 1,
+            dimensions: TextureDimensions::Two,
+            format: F::FORMAT_ID,
+            usage_flags: U::FLAG_SET,
+            view_formats: view_formats.as_slice(),
+        });
 
         Texture2D {
-            inner: Arc::new(TextureHandle::new(inner, false)),
+            handle,
             width: *width,
             height: *height,
             layers: *layers,
             mip_level_count: mip_level_count as u8,
-            format: FormatKind::Typed(Default::default()),
             view_formats,
             usage: *usage,
+            _format: FormatKind::Typed(Default::default()),
         }
     }
 }
@@ -258,10 +257,6 @@ where
 }
 
 impl<F, U> Texture2D<F, U> {
-    pub(crate) fn as_web_sys(&self) -> &GpuTexture {
-        &self.inner.texture
-    }
-
     pub fn width(&self) -> u32 {
         self.width
     }
@@ -278,11 +273,11 @@ impl<F, U> Texture2D<F, U> {
         self.mip_level_count
     }
 
-    fn view_2d_internal(
-        &self,
-        format: GpuTextureFormat,
+    fn view_2d_internal<'a>(
+        &'a self,
+        format: TextureFormatId,
         descriptor: &View2DDescriptor,
-    ) -> GpuTextureView {
+    ) -> <Dvr as Driver>::TextureView<'a> {
         let View2DDescriptor {
             layer,
             base_mipmap_level,
@@ -307,15 +302,19 @@ impl<F, U> Texture2D<F, U> {
             self.mip_level_count - base_mipmap_level
         };
 
-        let mut desc = GpuTextureViewDescriptor::new();
+        let layers_start = layer;
+        let layers_end = layers_start + 1;
 
-        desc.base_array_layer(layer);
-        desc.dimension(GpuTextureViewDimension::N2d);
-        desc.format(format);
-        desc.base_mip_level(base_mipmap_level as u32);
-        desc.mip_level_count(mipmap_level_count as u32);
+        let mip_levels_start = base_mipmap_level as u32;
+        let mip_levels_end = mip_levels_start + mipmap_level_count as u32;
 
-        self.as_web_sys().create_view_with_descriptor(&desc)
+        self.handle.texture_view(&TextureViewDescriptor {
+            format,
+            dimensions: TextureViewDimension::Two,
+            aspect: TextureAspect::All,
+            mip_levels: mip_levels_start..mip_levels_end,
+            layers: layers_start..layers_end,
+        })
     }
 
     pub fn sampled_float(&self, descriptor: &View2DDescriptor) -> Sampled2DFloat
@@ -324,8 +323,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         Sampled2DFloat {
-            inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_2d_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -339,8 +337,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DFloat {
-                inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_2d_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -359,8 +356,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         Sampled2DUnfilteredFloat {
-            inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_2d_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -374,8 +370,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DUnfilteredFloat {
-                inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_2d_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -391,8 +386,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         Sampled2DSignedInteger {
-            inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_2d_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -406,8 +400,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DSignedInteger {
-                inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_2d_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -426,8 +419,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         Sampled2DUnsignedInteger {
-            inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_2d_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -441,8 +433,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DUnsignedInteger {
-                inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_2d_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -458,8 +449,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         Sampled2DDepth {
-            inner: self.view_2d_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_2d_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -473,8 +463,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DDepth {
-                inner: self.view_2d_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_2d_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -490,16 +479,15 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         Sampled2DDepth {
-            inner: self.view_2d_internal(F::DepthAspect::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_2d_internal(F::DepthAspect::FORMAT_ID, descriptor),
         }
     }
 
-    fn view_2d_array_internal(
-        &self,
-        format: GpuTextureFormat,
+    fn view_2d_array_internal<'a>(
+        &'a self,
+        format: TextureFormatId,
         descriptor: &View2DArrayDescriptor,
-    ) -> GpuTextureView {
+    ) -> <Dvr as Driver>::TextureView<'a> {
         let View2DArrayDescriptor {
             base_layer,
             layer_count,
@@ -535,16 +523,19 @@ impl<F, U> Texture2D<F, U> {
             self.mip_level_count - base_mipmap_level
         };
 
-        let mut desc = GpuTextureViewDescriptor::new();
+        let layers_start = base_layer as u32;
+        let layers_end = base_layer + layer_count as u32;
 
-        desc.base_array_layer(base_layer);
-        desc.array_layer_count(layer_count);
-        desc.dimension(GpuTextureViewDimension::N2dArray);
-        desc.format(format);
-        desc.base_mip_level(base_mipmap_level as u32);
-        desc.mip_level_count(mipmap_level_count as u32);
+        let mip_levels_start = base_mipmap_level as u32;
+        let mip_levels_end = mip_levels_start + mipmap_level_count as u32;
 
-        self.as_web_sys().create_view_with_descriptor(&desc)
+        self.handle.texture_view(&TextureViewDescriptor {
+            format,
+            dimensions: TextureViewDimension::TwoArray,
+            aspect: TextureAspect::All,
+            mip_levels: mip_levels_start..mip_levels_end,
+            layers: layers_start..layers_end,
+        })
     }
 
     pub fn sampled_array_float(&self, descriptor: &View2DArrayDescriptor) -> Sampled2DArrayFloat
@@ -553,8 +544,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         Sampled2DArrayFloat {
-            inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_2d_array_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -568,9 +558,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DArrayFloat {
-                inner: self
-                    .view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_2d_array_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -589,8 +577,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         Sampled2DArrayUnfilteredFloat {
-            inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_2d_array_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -604,9 +591,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DArrayUnfilteredFloat {
-                inner: self
-                    .view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_2d_array_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -625,8 +610,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         Sampled2DArraySignedInteger {
-            inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_2d_array_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -640,9 +624,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DArraySignedInteger {
-                inner: self
-                    .view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_2d_array_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -661,8 +643,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         Sampled2DArrayUnsignedInteger {
-            inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_2d_array_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -676,9 +657,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DArrayUnsignedInteger {
-                inner: self
-                    .view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_2d_array_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -694,8 +673,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         Sampled2DArrayDepth {
-            inner: self.view_2d_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_2d_array_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -709,9 +687,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DArrayDepth {
-                inner: self
-                    .view_2d_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_2d_array_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -730,16 +706,15 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         Sampled2DArrayDepth {
-            inner: self.view_2d_array_internal(F::DepthAspect::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_2d_array_internal(F::DepthAspect::FORMAT_ID, descriptor),
         }
     }
 
-    fn view_cube_internal(
-        &self,
-        format: GpuTextureFormat,
+    fn view_cube_internal<'a>(
+        &'a self,
+        format: TextureFormatId,
         descriptor: &ViewCubeDescriptor,
-    ) -> GpuTextureView {
+    ) -> <Dvr as Driver>::TextureView<'a> {
         let ViewCubeDescriptor {
             base_layer,
             base_mipmap_level,
@@ -768,16 +743,19 @@ impl<F, U> Texture2D<F, U> {
             self.mip_level_count - base_mipmap_level
         };
 
-        let mut desc = GpuTextureViewDescriptor::new();
+        let layers_start = base_layer as u32;
+        let layers_end = base_layer + 6;
 
-        desc.base_array_layer(base_layer);
-        desc.array_layer_count(6);
-        desc.dimension(GpuTextureViewDimension::Cube);
-        desc.format(format);
-        desc.base_mip_level(base_mipmap_level as u32);
-        desc.mip_level_count(mipmap_level_count as u32);
+        let mip_levels_start = base_mipmap_level as u32;
+        let mip_levels_end = mip_levels_start + mipmap_level_count as u32;
 
-        self.as_web_sys().create_view_with_descriptor(&desc)
+        self.handle.texture_view(&TextureViewDescriptor {
+            format,
+            dimensions: TextureViewDimension::Cube,
+            aspect: TextureAspect::All,
+            mip_levels: mip_levels_start..mip_levels_end,
+            layers: layers_start..layers_end,
+        })
     }
 
     pub fn sampled_cube_float(&self, descriptor: &ViewCubeDescriptor) -> SampledCubeFloat
@@ -786,8 +764,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         SampledCubeFloat {
-            inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_cube_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -801,8 +778,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeFloat {
-                inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_cube_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -821,8 +797,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         SampledCubeUnfilteredFloat {
-            inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_cube_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -836,8 +811,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeUnfilteredFloat {
-                inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_cube_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -856,8 +830,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         SampledCubeSignedInteger {
-            inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_cube_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -871,8 +844,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeSignedInteger {
-                inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_cube_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -891,8 +863,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         SampledCubeUnsignedInteger {
-            inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_cube_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -906,8 +877,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeUnsignedInteger {
-                inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_cube_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -923,8 +893,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         SampledCubeDepth {
-            inner: self.view_cube_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_cube_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -938,8 +907,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeDepth {
-                inner: self.view_cube_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_cube_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -955,16 +923,15 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         SampledCubeDepth {
-            inner: self.view_cube_internal(F::DepthAspect::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_cube_internal(F::DepthAspect::FORMAT_ID, descriptor),
         }
     }
 
-    fn view_cube_array_internal(
-        &self,
-        format: GpuTextureFormat,
+    fn view_cube_array_internal<'a>(
+        &'a self,
+        format: TextureFormatId,
         descriptor: &ViewCubeArrayDescriptor,
-    ) -> GpuTextureView {
+    ) -> <Dvr as Driver>::TextureView<'a> {
         let ViewCubeArrayDescriptor {
             base_layer,
             cube_count,
@@ -1005,16 +972,19 @@ impl<F, U> Texture2D<F, U> {
             self.mip_level_count - base_mipmap_level
         };
 
-        let mut desc = GpuTextureViewDescriptor::new();
+        let layers_start = base_layer as u32;
+        let layers_end = base_layer + layer_count;
 
-        desc.base_array_layer(base_layer);
-        desc.array_layer_count(layer_count);
-        desc.dimension(GpuTextureViewDimension::CubeArray);
-        desc.format(format);
-        desc.base_mip_level(base_mipmap_level as u32);
-        desc.mip_level_count(mipmap_level_count as u32);
+        let mip_levels_start = base_mipmap_level as u32;
+        let mip_levels_end = mip_levels_start + mipmap_level_count as u32;
 
-        self.as_web_sys().create_view_with_descriptor(&desc)
+        self.handle.texture_view(&TextureViewDescriptor {
+            format,
+            dimensions: TextureViewDimension::CubeArray,
+            aspect: TextureAspect::All,
+            mip_levels: mip_levels_start..mip_levels_end,
+            layers: layers_start..layers_end,
+        })
     }
 
     pub fn sampled_cube_array_float(
@@ -1026,8 +996,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         SampledCubeArrayFloat {
-            inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_cube_array_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -1041,9 +1010,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeArrayFloat {
-                inner: self
-                    .view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_cube_array_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -1062,8 +1029,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         SampledCubeArrayUnfilteredFloat {
-            inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_cube_array_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -1077,9 +1043,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeArrayUnfilteredFloat {
-                inner: self
-                    .view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_cube_array_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -1098,8 +1062,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         SampledCubeArraySignedInteger {
-            inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_cube_array_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -1113,9 +1076,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeArraySignedInteger {
-                inner: self
-                    .view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_cube_array_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -1134,8 +1095,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         SampledCubeArrayUnsignedInteger {
-            inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_cube_array_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -1149,9 +1109,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeArrayUnsignedInteger {
-                inner: self
-                    .view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_cube_array_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -1170,8 +1128,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         SampledCubeArrayDepth {
-            inner: self.view_cube_array_internal(F::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_cube_array_internal(F::FORMAT_ID, descriptor),
         }
     }
 
@@ -1185,9 +1142,7 @@ impl<F, U> Texture2D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeArrayDepth {
-                inner: self
-                    .view_cube_array_internal(ViewedFormat::FORMAT_ID.to_web_sys(), descriptor),
-                texture_handle: self.inner.clone(),
+                inner: self.view_cube_array_internal(ViewedFormat::FORMAT_ID, descriptor),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -1206,9 +1161,7 @@ impl<F, U> Texture2D<F, U> {
         U: TextureBinding,
     {
         SampledCubeArrayDepth {
-            inner: self
-                .view_cube_array_internal(F::DepthAspect::FORMAT_ID.to_web_sys(), descriptor),
-            texture_handle: self.inner.clone(),
+            inner: self.view_cube_array_internal(F::DepthAspect::FORMAT_ID, descriptor),
         }
     }
 
@@ -1231,20 +1184,24 @@ impl<F, U> Texture2D<F, U> {
             "`base_mipmap_level` must not exceed the texture's mipmap level count"
         );
 
-        let mut desc = GpuTextureViewDescriptor::new();
+        let mip_levels_start = mipmap_level as u32;
+        let mip_levels_end = mip_levels_start + 1;
 
-        desc.base_array_layer(layer);
-        desc.dimension(GpuTextureViewDimension::N2d);
-        desc.format(ViewedFormat::FORMAT_ID.to_web_sys());
-        desc.base_mip_level(mipmap_level as u32);
+        let layers_start = layer;
+        let layers_end = layers_start + 1;
 
-        let inner = self.as_web_sys().create_view_with_descriptor(&desc);
+        let inner = self.handle.texture_view(&TextureViewDescriptor {
+            format: ViewedFormat::FORMAT_ID,
+            dimensions: TextureViewDimension::Two,
+            aspect: TextureAspect::All,
+            mip_levels: mip_levels_start..mip_levels_end,
+            layers: layers_start..layers_end,
+        });
 
         AttachableImage {
             inner,
             width: self.width,
             height: self.height,
-            texture_handle: self.inner.clone(),
             _marker: Default::default(),
         }
     }
@@ -1294,19 +1251,22 @@ impl<F, U> Texture2D<F, U> {
             "`mipmap_level` must not exceed the texture's mipmap level count"
         );
 
-        let mut desc = GpuTextureViewDescriptor::new();
+        let mip_levels_start = mipmap_level as u32;
+        let mip_levels_end = mip_levels_start + 1;
 
-        desc.base_array_layer(layer);
-        desc.dimension(GpuTextureViewDimension::N2d);
-        desc.format(ViewedFormat::FORMAT_ID.to_web_sys());
-        desc.base_mip_level(mipmap_level as u32);
-        desc.mip_level_count(1);
+        let layers_start = layer;
+        let layers_end = layers_start + 1;
 
-        let inner = self.as_web_sys().create_view_with_descriptor(&desc);
+        let inner = self.handle.texture_view(&TextureViewDescriptor {
+            format: ViewedFormat::FORMAT_ID,
+            dimensions: TextureViewDimension::Two,
+            aspect: TextureAspect::All,
+            mip_levels: mip_levels_start..mip_levels_end,
+            layers: layers_start..layers_end,
+        });
 
         Storage2D {
             inner,
-            texture_handle: self.inner.clone(),
             _marker: Default::default(),
         }
     }
@@ -1361,19 +1321,22 @@ impl<F, U> Texture2D<F, U> {
             "`mipmap_level` must not exceed the texture's mipmap level count"
         );
 
-        let mut desc = GpuTextureViewDescriptor::new();
+        let mip_levels_start = mipmap_level as u32;
+        let mip_levels_end = mip_levels_start + 1;
 
-        desc.base_array_layer(base_layer);
-        desc.array_layer_count(layer_count);
-        desc.dimension(GpuTextureViewDimension::N2dArray);
-        desc.format(ViewedFormat::FORMAT_ID.to_web_sys());
-        desc.base_mip_level(mipmap_level as u32);
+        let layers_start = base_layer;
+        let layers_end = layers_start + layer_count;
 
-        let inner = self.as_web_sys().create_view_with_descriptor(&desc);
+        let inner = self.handle.texture_view(&TextureViewDescriptor {
+            format: ViewedFormat::FORMAT_ID,
+            dimensions: TextureViewDimension::TwoArray,
+            aspect: TextureAspect::All,
+            mip_levels: mip_levels_start..mip_levels_end,
+            layers: layers_start..layers_end,
+        });
 
         Storage2DArray {
             inner,
-            texture_handle: self.inner.clone(),
             _marker: Default::default(),
         }
     }
@@ -1409,25 +1372,27 @@ impl<F, U> Texture2D<F, U> {
         mipmap_level: u8,
         bytes_per_block: u32,
         block_size: [u32; 2],
-        aspect: GpuTextureAspect,
+        aspect: TextureAspect,
     ) -> ImageCopyTexture<F> {
         assert!(
             mipmap_level < self.mip_level_count,
             "mipmap level out of bounds"
         );
 
-        ImageCopyTexture {
-            texture: self.inner.clone(),
+        let inner = driver::ImageCopyTexture {
+            texture_handle: &self.handle,
+            mip_level: mipmap_level as u32,
+            origin: (0, 0, 0),
             aspect,
-            mipmap_level,
+        };
+
+        ImageCopyTexture {
+            inner,
             width: self.width,
             height: self.height,
             depth_or_layers: self.layers,
             bytes_per_block,
             block_size,
-            origin_x: 0,
-            origin_y: 0,
-            origin_z: 0,
             _marker: Default::default(),
         }
     }
@@ -1466,18 +1431,20 @@ impl<F, U> Texture2D<F, U> {
             block_height
         );
 
+        let inner = driver::ImageCopyTexture {
+            texture_handle: &self.handle,
+            mip_level: mipmap_level as u32,
+            origin: (origin_x, origin_y, origin_layer),
+            aspect: TextureAspect::All,
+        };
+
         ImageCopyTexture {
-            texture: self.inner.clone(),
-            aspect: GpuTextureAspect::All,
-            mipmap_level,
+            inner,
             width: self.width,
             height: self.height,
             depth_or_layers: self.layers,
             bytes_per_block,
             block_size,
-            origin_x,
-            origin_y,
-            origin_z: origin_layer,
             _marker: Default::default(),
         }
     }
@@ -1492,7 +1459,7 @@ impl<F, U> Texture2D<F, U> {
                 mipmap_level,
                 F::BYTES_PER_BLOCK,
                 F::BLOCK_SIZE,
-                GpuTextureAspect::All,
+                TextureAspect::All,
             ),
         }
     }
@@ -1508,7 +1475,7 @@ impl<F, U> Texture2D<F, U> {
                 mipmap_level,
                 F::DepthAspect::BYTES_PER_BLOCK,
                 F::DepthAspect::BLOCK_SIZE,
-                GpuTextureAspect::DepthOnly,
+                TextureAspect::DepthOnly,
             ),
         }
     }
@@ -1524,7 +1491,7 @@ impl<F, U> Texture2D<F, U> {
                 mipmap_level,
                 F::StencilAspect::BYTES_PER_BLOCK,
                 F::StencilAspect::BLOCK_SIZE,
-                GpuTextureAspect::StencilOnly,
+                TextureAspect::StencilOnly,
             ),
         }
     }
@@ -1539,7 +1506,7 @@ impl<F, U> Texture2D<F, U> {
                 mipmap_level,
                 F::BYTES_PER_BLOCK,
                 F::BLOCK_SIZE,
-                GpuTextureAspect::All,
+                TextureAspect::All,
             ),
         }
     }
@@ -1557,7 +1524,7 @@ impl<F, U> Texture2D<F, U> {
                 mipmap_level,
                 F::DepthAspect::BYTES_PER_BLOCK,
                 F::DepthAspect::BLOCK_SIZE,
-                GpuTextureAspect::DepthOnly,
+                TextureAspect::DepthOnly,
             ),
         }
     }
@@ -1573,7 +1540,7 @@ impl<F, U> Texture2D<F, U> {
                 mipmap_level,
                 F::StencilAspect::BYTES_PER_BLOCK,
                 F::StencilAspect::BLOCK_SIZE,
-                GpuTextureAspect::StencilOnly,
+                TextureAspect::StencilOnly,
             ),
         }
     }
@@ -1584,7 +1551,7 @@ impl<F, U> Texture2D<F, U> {
         U: CopySrc,
     {
         ImageCopyToTextureSrc {
-            inner: self.image_copy_internal(mipmap_level, 0, F::BLOCK_SIZE, GpuTextureAspect::All),
+            inner: self.image_copy_internal(mipmap_level, 0, F::BLOCK_SIZE, TextureAspect::All),
         }
     }
 
@@ -1594,7 +1561,7 @@ impl<F, U> Texture2D<F, U> {
         U: CopyDst,
     {
         ImageCopyFromTextureDst {
-            inner: self.image_copy_internal(mipmap_level, 0, F::BLOCK_SIZE, GpuTextureAspect::All),
+            inner: self.image_copy_internal(mipmap_level, 0, F::BLOCK_SIZE, TextureAspect::All),
         }
     }
 
@@ -1652,144 +1619,121 @@ impl<F, U> Texture2D<F, U> {
 }
 
 #[derive(Clone)]
-pub struct Sampled2DFloat {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled2DFloat<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct Sampled2DUnfilteredFloat {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled2DUnfilteredFloat<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct Sampled2DSignedInteger {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled2DSignedInteger<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct Sampled2DUnsignedInteger {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled2DUnsignedInteger<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct Sampled2DDepth {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled2DDepth<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct Sampled2DArrayFloat {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled2DArrayFloat<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct Sampled2DArrayUnfilteredFloat {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled2DArrayUnfilteredFloat<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct Sampled2DArraySignedInteger {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled2DArraySignedInteger<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct Sampled2DArrayUnsignedInteger {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled2DArrayUnsignedInteger<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct Sampled2DArrayDepth {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled2DArrayDepth<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct SampledCubeFloat {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct SampledCubeFloat<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct SampledCubeUnfilteredFloat {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct SampledCubeUnfilteredFloat<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct SampledCubeSignedInteger {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct SampledCubeSignedInteger<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct SampledCubeUnsignedInteger {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct SampledCubeUnsignedInteger<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct SampledCubeDepth {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct SampledCubeDepth<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct SampledCubeArrayFloat {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct SampledCubeArrayFloat<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct SampledCubeArrayUnfilteredFloat {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct SampledCubeArrayUnfilteredFloat<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct SampledCubeArraySignedInteger {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct SampledCubeArraySignedInteger<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct SampledCubeArrayUnsignedInteger {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct SampledCubeArrayUnsignedInteger<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct SampledCubeArrayDepth {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct SampledCubeArrayDepth<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 #[derive(Clone)]
-pub struct Storage2D<F> {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Storage2D<'a, F> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
     _marker: marker::PhantomData<*const F>,
 }
 
 #[derive(Clone)]
-pub struct Storage2DArray<F> {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Storage2DArray<'a, F> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
     _marker: marker::PhantomData<*const F>,
 }
 
 #[derive(Clone)]
-pub struct AttachableImage<F> {
-    pub(crate) inner: GpuTextureView,
+pub struct AttachableImage<'a, F> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
     pub(crate) width: u32,
     pub(crate) height: u32,
-    pub(crate) texture_handle: Arc<TextureHandle>,
     _marker: marker::PhantomData<*const F>,
 }

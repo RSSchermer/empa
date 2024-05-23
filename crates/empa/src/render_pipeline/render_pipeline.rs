@@ -1,23 +1,22 @@
+use std::borrow::Borrow;
 use std::future::Future;
 use std::marker;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
 use atomic_counter::AtomicCounter;
-use wasm_bindgen::{JsCast, JsValue};
-use wasm_bindgen_futures::JsFuture;
-use web_sys::{GpuRenderPipeline, GpuRenderPipelineDescriptor};
+use futures::FutureExt;
 
 use crate::device::{Device, ID_GEN};
+use crate::driver;
+use crate::driver::{Device as _, Driver, Dvr, ShaderStage};
 use crate::render_pipeline::{
-    DepthStencilTest, FragmentStage, IndexAny, MultisampleState, PipelineIndexFormat,
-    PrimitiveAssembly, TypedVertexLayout, VertexStage,
+    DepthStencilTest, FragmentStage, FragmentState, IndexAny, MultisampleState,
+    PipelineIndexFormat, PrimitiveAssembly, TypedVertexLayout, VertexStage, VertexState,
 };
 use crate::render_target::{MultisampleRenderLayout, RenderLayout, TypedMultisampleColorLayout};
-use crate::resource_binding::{PipelineLayout, ShaderStages, TypedPipelineLayout};
+use crate::resource_binding::{PipelineLayout, TypedPipelineLayout};
 
 pub struct RenderPipeline<O, V, I, R> {
-    inner: GpuRenderPipeline,
+    pub(crate) handle: <Dvr as Driver>::RenderPipelineHandle,
     id: usize,
     _marker: marker::PhantomData<(*const O, *const V, *const I, *const R)>,
 }
@@ -28,10 +27,12 @@ impl<O, V, I, R> RenderPipeline<O, V, I, R> {
         descriptor: &RenderPipelineDescriptor<O, V, I, R>,
     ) -> Self {
         let id = ID_GEN.get();
-        let inner = device.inner.create_render_pipeline(&descriptor.inner);
+        let handle = device
+            .handle
+            .create_render_pipeline(&descriptor.to_driver());
 
         RenderPipeline {
-            inner,
+            handle,
             id,
             _marker: Default::default(),
         }
@@ -40,50 +41,57 @@ impl<O, V, I, R> RenderPipeline<O, V, I, R> {
     pub(crate) fn new_async(
         device: &Device,
         descriptor: &RenderPipelineDescriptor<O, V, I, R>,
-    ) -> CreateRenderPipelineAsync<O, V, I, R> {
-        CreateRenderPipelineAsync {
-            inner: device
-                .inner
-                .create_render_pipeline_async(&descriptor.inner)
-                .into(),
-            _marker: Default::default(),
-        }
+    ) -> impl Future<Output = Self> {
+        device
+            .handle
+            .create_render_pipeline_async(&descriptor.to_driver())
+            .map(|handle| {
+                let id = ID_GEN.get();
+
+                RenderPipeline {
+                    handle,
+                    id,
+                    _marker: Default::default(),
+                }
+            })
     }
 
     pub(crate) fn id(&self) -> usize {
         self.id
     }
-
-    pub(crate) fn as_web_sys(&self) -> &GpuRenderPipeline {
-        &self.inner
-    }
-}
-
-pub(crate) struct CreateRenderPipelineAsync<O, V, I, R> {
-    inner: JsFuture,
-    _marker: marker::PhantomData<(*const O, *const V, *const I, *const R)>,
-}
-
-impl<O, V, I, R> Future for CreateRenderPipelineAsync<O, V, I, R> {
-    type Output = RenderPipeline<O, V, I, R>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Pin::new(&mut self.get_mut().inner).poll(cx).map(|result| {
-            let inner = result.expect("pipeline creation should not fail");
-            let id = ID_GEN.get();
-
-            RenderPipeline {
-                inner: inner.unchecked_into(),
-                id,
-                _marker: Default::default(),
-            }
-        })
-    }
 }
 
 pub struct RenderPipelineDescriptor<O, V, I, R> {
-    inner: GpuRenderPipelineDescriptor,
+    vertex_state: VertexState,
+    layout: <Dvr as Driver>::PipelineLayoutHandle,
+    primitive_state: driver::PrimitiveState,
+    fragment_state: Option<FragmentState>,
+    depth_stencil_state: Option<driver::DepthStencilState>,
+    multisample_state: Option<driver::MultisampleState>,
     _marker: marker::PhantomData<(*const O, *const V, *const I, *const R)>,
+}
+
+impl<O, V, I, R> RenderPipelineDescriptor<O, V, I, R> {
+    fn to_driver(&self) -> driver::RenderPipelineDescriptor<Dvr> {
+        driver::RenderPipelineDescriptor {
+            layout: &self.layout,
+            primitive_state: &self.primitive_state,
+            vertex_state: driver::VertexState {
+                shader_module: &self.vertex_state.shader_module,
+                entry_point: &self.vertex_state.entry_point,
+                constants: &self.vertex_state.constants,
+                vertex_buffer_layouts: self.vertex_state.vertex_buffer_layouts.borrow(),
+            },
+            depth_stencil_state: self.depth_stencil_state.as_ref(),
+            fragment_state: self.fragment_state.as_ref().map(|f| driver::FragmentState {
+                shader_module: &f.shader_module,
+                entry_point: &f.entry_point,
+                constants: &f.constants,
+                targets: &f.targets,
+            }),
+            multisample_state: self.multisample_state.as_ref(),
+        }
+    }
 }
 
 pub struct RenderPipelineDescriptorBuilder<
@@ -94,7 +102,12 @@ pub struct RenderPipelineDescriptorBuilder<
     DepthStencil,
     Primitives,
 > {
-    inner: GpuRenderPipelineDescriptor,
+    vertex_state: Option<VertexState>,
+    fragment_state: Option<FragmentState>,
+    layout: Option<<Dvr as Driver>::PipelineLayoutHandle>,
+    primitive_state: Option<driver::PrimitiveState>,
+    depth_stencil_state: Option<driver::DepthStencilState>,
+    multisample_state: Option<driver::MultisampleState>,
     _marker: marker::PhantomData<(
         Multisample,
         Layout,
@@ -116,13 +129,13 @@ impl
     >
 {
     pub fn begin() -> Self {
-        let inner = GpuRenderPipelineDescriptor::new(
-            JsValue::null().unchecked_ref(),
-            JsValue::null().unchecked_ref(),
-        );
-
         RenderPipelineDescriptorBuilder {
-            inner,
+            vertex_state: None,
+            fragment_state: None,
+            layout: None,
+            primitive_state: None,
+            depth_stencil_state: None,
+            multisample_state: None,
             _marker: Default::default(),
         }
     }
@@ -130,28 +143,34 @@ impl
 
 impl<M, L, V, F, D, P> RenderPipelineDescriptorBuilder<M, L, V, F, D, P> {
     pub fn depth_stencil_test<Format>(
-        mut self,
+        self,
         depth_stencil_test: DepthStencilTest<Format>,
     ) -> RenderPipelineDescriptorBuilder<M, L, V, F, DepthStencilTest<Format>, P> {
-        self.inner.depth_stencil(&depth_stencil_test.inner);
-
         RenderPipelineDescriptorBuilder {
-            inner: self.inner,
+            vertex_state: self.vertex_state,
+            fragment_state: self.fragment_state,
+            layout: self.layout,
+            primitive_state: self.primitive_state,
+            depth_stencil_state: Some(depth_stencil_test.inner),
+            multisample_state: self.multisample_state,
             _marker: Default::default(),
         }
     }
 
     pub fn primitive_assembly<Format>(
-        mut self,
+        self,
         primitive_assembly: PrimitiveAssembly<Format>,
     ) -> RenderPipelineDescriptorBuilder<M, L, V, F, D, PrimitiveAssembly<Format>>
     where
         Format: PipelineIndexFormat,
     {
-        self.inner.primitive(&primitive_assembly.inner);
-
         RenderPipelineDescriptorBuilder {
-            inner: self.inner,
+            vertex_state: self.vertex_state,
+            fragment_state: self.fragment_state,
+            layout: self.layout,
+            primitive_state: Some(primitive_assembly.inner),
+            depth_stencil_state: self.depth_stencil_state,
+            multisample_state: self.multisample_state,
             _marker: Default::default(),
         }
     }
@@ -159,13 +178,16 @@ impl<M, L, V, F, D, P> RenderPipelineDescriptorBuilder<M, L, V, F, D, P> {
 
 impl<M, D, P> RenderPipelineDescriptorBuilder<M, (), (), (), D, P> {
     pub fn layout<Layout>(
-        mut self,
+        self,
         layout: &PipelineLayout<Layout>,
     ) -> RenderPipelineDescriptorBuilder<M, PipelineLayout<Layout>, (), (), D, P> {
-        self.inner.layout(&layout.inner);
-
         RenderPipelineDescriptorBuilder {
-            inner: self.inner,
+            vertex_state: self.vertex_state,
+            fragment_state: self.fragment_state,
+            layout: Some(layout.handle.clone()),
+            primitive_state: self.primitive_state,
+            depth_stencil_state: self.depth_stencil_state,
+            multisample_state: self.multisample_state,
             _marker: Default::default(),
         }
     }
@@ -173,13 +195,16 @@ impl<M, D, P> RenderPipelineDescriptorBuilder<M, (), (), (), D, P> {
 
 impl<L, V, D, P> RenderPipelineDescriptorBuilder<(), L, V, (), D, P> {
     pub fn multisample<const SAMPLES: u8>(
-        mut self,
+        self,
         multisample_state: MultisampleState<SAMPLES>,
     ) -> RenderPipelineDescriptorBuilder<MultisampleState<SAMPLES>, L, V, (), D, P> {
-        self.inner.multisample(&multisample_state.inner);
-
         RenderPipelineDescriptorBuilder {
-            inner: self.inner,
+            vertex_state: self.vertex_state,
+            fragment_state: self.fragment_state,
+            layout: self.layout,
+            primitive_state: self.primitive_state,
+            depth_stencil_state: self.depth_stencil_state,
+            multisample_state: Some(multisample_state.inner),
             _marker: Default::default(),
         }
     }
@@ -190,8 +215,8 @@ where
     Layout: TypedPipelineLayout,
 {
     pub fn vertex<VertexLayout: TypedVertexLayout>(
-        mut self,
-        vertex_stage: &VertexStage<VertexLayout>,
+        self,
+        vertex_stage: VertexStage<VertexLayout>,
     ) -> RenderPipelineDescriptorBuilder<
         M,
         PipelineLayout<Layout>,
@@ -218,7 +243,7 @@ where
                 );
             };
 
-            if !entry.visibility.intersects(ShaderStages::VERTEX) {
+            if !entry.visibility.contains(ShaderStage::Vertex) {
                 panic!(
                     "binding `{}` in group `{}` is not visible to the vertex stage",
                     resource_binding.binding, resource_binding.group
@@ -237,10 +262,13 @@ where
             }
         }
 
-        self.inner.vertex(&vertex_stage.inner);
-
         RenderPipelineDescriptorBuilder {
-            inner: self.inner,
+            vertex_state: Some(vertex_stage.vertex_state),
+            fragment_state: self.fragment_state,
+            layout: self.layout,
+            primitive_state: self.primitive_state,
+            depth_stencil_state: self.depth_stencil_state,
+            multisample_state: self.multisample_state,
             _marker: Default::default(),
         }
     }
@@ -251,8 +279,8 @@ where
     Layout: TypedPipelineLayout,
 {
     fn fragment_internal<ColorLayout>(
-        mut self,
-        fragment_stage: &FragmentStage<ColorLayout>,
+        self,
+        fragment_stage: FragmentStage<ColorLayout>,
     ) -> RenderPipelineDescriptorBuilder<
         M,
         PipelineLayout<Layout>,
@@ -279,7 +307,7 @@ where
                 );
             };
 
-            if !entry.visibility.intersects(ShaderStages::VERTEX) {
+            if !entry.visibility.contains(ShaderStage::Fragment) {
                 panic!(
                     "binding `{}` in group `{}` is not visible to the fragment stage",
                     resource_binding.binding, resource_binding.group
@@ -291,10 +319,13 @@ where
             }
         }
 
-        self.inner.fragment(&fragment_stage.inner);
-
         RenderPipelineDescriptorBuilder {
-            inner: self.inner,
+            vertex_state: self.vertex_state,
+            fragment_state: Some(fragment_stage.fragment_state),
+            layout: self.layout,
+            primitive_state: self.primitive_state,
+            depth_stencil_state: self.depth_stencil_state,
+            multisample_state: self.multisample_state,
             _marker: Default::default(),
         }
     }
@@ -306,7 +337,7 @@ where
 {
     pub fn fragment<ColorLayout>(
         self,
-        fragment_stage: &FragmentStage<ColorLayout>,
+        fragment_stage: FragmentStage<ColorLayout>,
     ) -> RenderPipelineDescriptorBuilder<
         (),
         PipelineLayout<Layout>,
@@ -326,7 +357,7 @@ where
 {
     pub fn fragment<ColorLayout: TypedMultisampleColorLayout>(
         self,
-        fragment_stage: &FragmentStage<ColorLayout>,
+        fragment_stage: FragmentStage<ColorLayout>,
     ) -> RenderPipelineDescriptorBuilder<
         MultisampleState<SAMPLES>,
         PipelineLayout<Layout>,
@@ -353,7 +384,12 @@ impl<Layout, Vertex, Color, DepthStencil, Index>
         self,
     ) -> RenderPipelineDescriptor<RenderLayout<Color, DepthStencil>, Vertex, Index, Layout> {
         RenderPipelineDescriptor {
-            inner: self.inner,
+            vertex_state: self.vertex_state.unwrap(),
+            layout: self.layout.unwrap(),
+            primitive_state: self.primitive_state.unwrap(),
+            fragment_state: self.fragment_state,
+            depth_stencil_state: self.depth_stencil_state,
+            multisample_state: self.multisample_state,
             _marker: Default::default(),
         }
     }
@@ -378,7 +414,12 @@ impl<Layout, Vertex, Color, DepthStencil, Index, const SAMPLES: u8>
         Layout,
     > {
         RenderPipelineDescriptor {
-            inner: self.inner,
+            vertex_state: self.vertex_state.unwrap(),
+            layout: self.layout.unwrap(),
+            primitive_state: self.primitive_state.unwrap(),
+            fragment_state: self.fragment_state,
+            depth_stencil_state: self.depth_stencil_state,
+            multisample_state: self.multisample_state,
             _marker: Default::default(),
         }
     }

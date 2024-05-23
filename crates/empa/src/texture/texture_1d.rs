@@ -1,13 +1,14 @@
 use std::marker;
-use std::sync::Arc;
 
 use staticvec::StaticVec;
-use web_sys::{
-    GpuExtent3dDict, GpuTexture, GpuTextureAspect, GpuTextureDescriptor, GpuTextureDimension,
-    GpuTextureFormat, GpuTextureView, GpuTextureViewDescriptor, GpuTextureViewDimension,
-};
 
+use crate::access_mode::{AccessMode, Read};
 use crate::device::Device;
+use crate::driver;
+use crate::driver::{
+    Device as _, Driver, Dvr, Texture, TextureAspect, TextureDescriptor, TextureDimensions,
+    TextureViewDescriptor, TextureViewDimension,
+};
 use crate::texture::format::{
     FloatSamplable, ImageCopyFromBufferFormat, ImageCopyTextureFormat, ImageCopyToBufferFormat,
     SignedIntegerSamplable, Storable, SubImageCopyFormat, Texture1DFormat, TextureFormatId,
@@ -17,7 +18,7 @@ use crate::texture::{
     CopyDst, CopySrc, FormatKind, ImageCopyDst, ImageCopyFromTextureDst, ImageCopySrc,
     ImageCopyTexture, ImageCopyToTextureSrc, StorageBinding, SubImageCopyDst,
     SubImageCopyFromTextureDst, SubImageCopySrc, SubImageCopyToTextureSrc, TextureBinding,
-    TextureHandle, UnsupportedViewFormat, UsageFlags,
+    UnsupportedViewFormat, UsageFlags,
 };
 
 pub struct Texture1DDescriptor<F, U, V>
@@ -33,11 +34,11 @@ where
 }
 
 pub struct Texture1D<F, Usage> {
-    inner: Arc<TextureHandle>,
-    format: FormatKind<F>,
+    handle: <Dvr as Driver>::TextureHandle,
     size: u32,
     view_formats: StaticVec<TextureFormatId, 8>,
     usage: Usage,
+    _format: FormatKind<F>,
 }
 
 impl<F, U> Texture1D<F, U>
@@ -58,21 +59,24 @@ where
 
         assert!(*size > 0, "size must be greater than `0`");
 
-        let extent = GpuExtent3dDict::new(*size);
-        let mut desc =
-            GpuTextureDescriptor::new(F::FORMAT_ID.to_web_sys(), &extent.into(), U::BITS);
+        let view_formats = view_formats.formats().collect::<StaticVec<_, 8>>();
 
-        desc.dimension(GpuTextureDimension::N1d);
-
-        let inner = device.inner.create_texture(&desc);
-        let view_formats = view_formats.formats().collect();
+        let handle = device.handle.create_texture(&TextureDescriptor {
+            size: (*size, 0, 0),
+            mipmap_levels: 1,
+            sample_count: 1,
+            dimensions: TextureDimensions::One,
+            format: F::FORMAT_ID,
+            usage_flags: U::FLAG_SET,
+            view_formats: view_formats.as_slice(),
+        });
 
         Texture1D {
-            inner: Arc::new(TextureHandle::new(inner, false)),
-            format: FormatKind::Typed(Default::default()),
+            handle,
             size: *size,
             view_formats,
             usage: *usage,
+            _format: FormatKind::Typed(Default::default()),
         }
     }
 }
@@ -87,21 +91,18 @@ where
 }
 
 impl<F, U> Texture1D<F, U> {
-    fn as_web_sys(&self) -> &GpuTexture {
-        &self.inner.texture
-    }
-
     pub fn size(&self) -> u32 {
         self.size
     }
 
-    fn view_internal(&self, format: GpuTextureFormat) -> GpuTextureView {
-        let mut desc = GpuTextureViewDescriptor::new();
-
-        desc.dimension(GpuTextureViewDimension::N1d);
-        desc.format(format);
-
-        self.as_web_sys().create_view_with_descriptor(&desc)
+    fn view_internal<'a>(&'a self, format: TextureFormatId) -> <Dvr as Driver>::TextureView<'a> {
+        self.handle.texture_view(&TextureViewDescriptor {
+            format,
+            dimensions: TextureViewDimension::One,
+            aspect: TextureAspect::All,
+            mip_levels: 0..1,
+            layers: 0..1,
+        })
     }
 
     pub fn sampled_float(&self) -> Sampled1DFloat
@@ -110,8 +111,7 @@ impl<F, U> Texture1D<F, U> {
         U: TextureBinding,
     {
         Sampled1DFloat {
-            inner: self.view_internal(F::FORMAT_ID.to_web_sys()),
-            texture_handle: self.inner.clone(),
+            inner: self.view_internal(F::FORMAT_ID),
         }
     }
 
@@ -124,8 +124,7 @@ impl<F, U> Texture1D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled1DFloat {
-                inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys()),
-                texture_handle: self.inner.clone(),
+                inner: self.view_internal(ViewedFormat::FORMAT_ID),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -141,8 +140,7 @@ impl<F, U> Texture1D<F, U> {
         U: TextureBinding,
     {
         Sampled1DUnfilteredFloat {
-            inner: self.view_internal(F::FORMAT_ID.to_web_sys()),
-            texture_handle: self.inner.clone(),
+            inner: self.view_internal(F::FORMAT_ID),
         }
     }
 
@@ -155,8 +153,7 @@ impl<F, U> Texture1D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled1DUnfilteredFloat {
-                inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys()),
-                texture_handle: self.inner.clone(),
+                inner: self.view_internal(ViewedFormat::FORMAT_ID),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -172,8 +169,7 @@ impl<F, U> Texture1D<F, U> {
         U: TextureBinding,
     {
         Sampled1DSignedInteger {
-            inner: self.view_internal(F::FORMAT_ID.to_web_sys()),
-            texture_handle: self.inner.clone(),
+            inner: self.view_internal(F::FORMAT_ID),
         }
     }
 
@@ -186,8 +182,7 @@ impl<F, U> Texture1D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled1DSignedInteger {
-                inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys()),
-                texture_handle: self.inner.clone(),
+                inner: self.view_internal(ViewedFormat::FORMAT_ID),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -203,8 +198,7 @@ impl<F, U> Texture1D<F, U> {
         U: TextureBinding,
     {
         Sampled1DUnsignedInteger {
-            inner: self.view_internal(F::FORMAT_ID.to_web_sys()),
-            texture_handle: self.inner.clone(),
+            inner: self.view_internal(F::FORMAT_ID),
         }
     }
 
@@ -217,8 +211,7 @@ impl<F, U> Texture1D<F, U> {
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled1DUnsignedInteger {
-                inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys()),
-                texture_handle: self.inner.clone(),
+                inner: self.view_internal(ViewedFormat::FORMAT_ID),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -228,29 +221,27 @@ impl<F, U> Texture1D<F, U> {
         }
     }
 
-    pub fn storage(&self) -> Storage1D<F>
+    pub fn storage<A: AccessMode>(&self) -> Storage1D<F, A>
     where
         F: Storable,
         U: StorageBinding,
     {
         Storage1D {
-            inner: self.view_internal(F::FORMAT_ID.to_web_sys()),
-            texture_handle: self.inner.clone(),
+            inner: self.view_internal(F::FORMAT_ID),
             _marker: Default::default(),
         }
     }
 
-    pub fn try_as_storage<ViewedFormat>(
+    pub fn try_as_storage<ViewedFormat, A: AccessMode>(
         &self,
-    ) -> Result<Storage1D<ViewedFormat>, UnsupportedViewFormat>
+    ) -> Result<Storage1D<ViewedFormat, A>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + Storable,
         U: StorageBinding,
     {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Storage1D {
-                inner: self.view_internal(ViewedFormat::FORMAT_ID.to_web_sys()),
-                texture_handle: self.inner.clone(),
+                inner: self.view_internal(ViewedFormat::FORMAT_ID),
                 _marker: Default::default(),
             })
         } else {
@@ -269,18 +260,20 @@ impl<F, U> Texture1D<F, U> {
     ) -> ImageCopyTexture<F> {
         assert!(origin < self.size, "origin out of bounds");
 
+        let inner = driver::ImageCopyTexture {
+            texture_handle: &self.handle,
+            mip_level: 0,
+            origin: (origin, 0, 0),
+            aspect: TextureAspect::All,
+        };
+
         ImageCopyTexture {
-            texture: self.inner.clone(),
-            aspect: GpuTextureAspect::All,
-            mipmap_level: 0,
+            inner,
             width: self.size,
             height: 1,
             depth_or_layers: 1,
             bytes_per_block,
             block_size,
-            origin_x: origin,
-            origin_y: 0,
-            origin_z: 0,
             _marker: Default::default(),
         }
     }
@@ -368,39 +361,34 @@ impl<F, U> Texture1D<F, U> {
 
 /// View on a 1D texture that can be bound to a pipeline as a float sampled texture resource.
 #[derive(Clone)]
-pub struct Sampled1DFloat {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled1DFloat<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 /// View on a 1D texture that can be bound to a pipeline as a unfiltered float sampled texture
 /// resource.
 #[derive(Clone)]
-pub struct Sampled1DUnfilteredFloat {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled1DUnfilteredFloat<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 /// View on a 1D texture that can be bound to a pipeline as a signed integer sampled texture
 /// resource.
 #[derive(Clone)]
-pub struct Sampled1DSignedInteger {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled1DSignedInteger<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 /// View on a 1D texture that can be bound to a pipeline as a unsigned integer sampled texture
 /// resource.
 #[derive(Clone)]
-pub struct Sampled1DUnsignedInteger {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
+pub struct Sampled1DUnsignedInteger<'a> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
 }
 
 /// View on a 1D texture that can be bound to a pipeline as a texture storage resource.
 #[derive(Clone)]
-pub struct Storage1D<F> {
-    pub(crate) inner: GpuTextureView,
-    pub(crate) texture_handle: Arc<TextureHandle>,
-    _marker: marker::PhantomData<*const F>,
+pub struct Storage1D<'a, F, A = Read> {
+    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    _marker: marker::PhantomData<(*const F, A)>,
 }

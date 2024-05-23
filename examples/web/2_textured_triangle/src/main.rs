@@ -15,12 +15,12 @@ use empa::command::{
 };
 use empa::device::DeviceDescriptor;
 use empa::render_pipeline::{
-    ColorOutput, ColorWriteMask, FragmentStageBuilder, RenderPipelineDescriptorBuilder,
+    ColorOutput, ColorWrite, FragmentStageBuilder, RenderPipelineDescriptorBuilder,
     VertexStageBuilder,
 };
 use empa::render_target::{FloatAttachment, LoadOp, RenderTarget, StoreOp};
 use empa::resource_binding::Resources;
-use empa::sampler::{FilterMode, MipmapFilterMode, Sampler, SamplerDescriptor};
+use empa::sampler::{FilterMode, Sampler, SamplerDescriptor};
 use empa::shader_module::{shader_source, ShaderSource};
 use empa::texture::format::{rgba8unorm, rgba8unorm_srgb};
 use empa::texture::{
@@ -40,7 +40,7 @@ struct MyVertex {
 #[derive(empa::resource_binding::Resources)]
 struct MyResources<'a> {
     #[resource(binding = 0, visibility = "VERTEX | FRAGMENT")]
-    texture: &'a Sampled2DFloat,
+    texture: Sampled2DFloat<'a>,
     #[resource(binding = 1, visibility = "VERTEX | FRAGMENT")]
     sampler: &'a Sampler,
 }
@@ -86,15 +86,15 @@ async fn render() -> Result<(), Box<dyn Error>> {
             &RenderPipelineDescriptorBuilder::begin()
                 .layout(&pipeline_layout)
                 .vertex(
-                    &VertexStageBuilder::begin(&shader, "vert_main")
+                    VertexStageBuilder::begin(&shader, "vert_main")
                         .vertex_layout::<MyVertex>()
                         .finish(),
                 )
                 .fragment(
-                    &FragmentStageBuilder::begin(&shader, "frag_main")
+                    FragmentStageBuilder::begin(&shader, "frag_main")
                         .color_outputs(ColorOutput {
                             format: rgba8unorm,
-                            write_mask: ColorWriteMask::ALL,
+                            write_mask: ColorWrite::All,
                         })
                         .finish(),
                 )
@@ -149,14 +149,14 @@ async fn render() -> Result<(), Box<dyn Error>> {
     let sampler = device.create_sampler(&SamplerDescriptor {
         magnification_filter: FilterMode::Linear,
         minification_filter: FilterMode::Linear,
-        mipmap_filter: MipmapFilterMode::Nearest,
+        mipmap_filter: FilterMode::Nearest,
         ..Default::default()
     });
 
     let bind_group = device.create_bind_group(
         &bind_group_layout,
         MyResources {
-            texture: &texture.sampled_float(&Default::default()),
+            texture: texture.sampled_float(&Default::default()),
             sampler: &sampler,
         },
     );
@@ -177,9 +177,9 @@ async fn render() -> Result<(), Box<dyn Error>> {
 
     let command_buffer = device
         .create_command_encoder()
-        .begin_render_pass(&RenderPassDescriptor::new(&RenderTarget {
+        .begin_render_pass(RenderPassDescriptor::new(&RenderTarget {
             color: FloatAttachment {
-                image: &context
+                image: context
                     .get_current_texture()
                     .attachable_image(&AttachableImageDescriptor::default()),
                 load_op: LoadOp::Clear([0.0; 4]),

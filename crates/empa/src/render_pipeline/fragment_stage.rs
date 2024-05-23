@@ -1,17 +1,27 @@
+use std::collections::HashMap;
 use std::marker;
 
 use empa_reflect::ShaderStage;
-use wasm_bindgen::{JsValue, UnwrapThrowExt};
-use web_sys::{
-    GpuBlendComponent, GpuBlendFactor, GpuBlendOperation, GpuBlendState, GpuColorTargetState,
-    GpuFragmentState,
-};
+use flagset::flags;
 
+use crate::driver::{ColorTargetState, Driver, Dvr};
 use crate::pipeline_constants::PipelineConstants;
 use crate::render_target::TypedColorLayout;
 use crate::shader_module::{ShaderModule, ShaderSourceInternal};
 use crate::texture::format::{Blendable, ColorRenderable};
 
+flags! {
+    pub enum ColorWrite: u32 {
+        Red   = 0x0001,
+        Green = 0x0002,
+        Blue  = 0x0004,
+        Alpha = 0x0008,
+        Color = (ColorWrite::Red | ColorWrite::Green | ColorWrite::Blue).bits(),
+        All   = (ColorWrite::Color | ColorWrite::Alpha).bits(),
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum BlendFactor {
     Zero,
     One,
@@ -28,26 +38,7 @@ pub enum BlendFactor {
     OneMinusConstant,
 }
 
-impl BlendFactor {
-    pub(crate) fn to_web_sys(&self) -> GpuBlendFactor {
-        match self {
-            BlendFactor::Zero => GpuBlendFactor::Zero,
-            BlendFactor::One => GpuBlendFactor::One,
-            BlendFactor::Src => GpuBlendFactor::Src,
-            BlendFactor::OneMinusSrc => GpuBlendFactor::OneMinusSrc,
-            BlendFactor::SrcAlpha => GpuBlendFactor::SrcAlpha,
-            BlendFactor::OneMinusSrcAlpha => GpuBlendFactor::OneMinusSrcAlpha,
-            BlendFactor::Dst => GpuBlendFactor::Dst,
-            BlendFactor::OneMinusDst => GpuBlendFactor::OneMinusDst,
-            BlendFactor::DstAlpha => GpuBlendFactor::DstAlpha,
-            BlendFactor::OneMinusDstAlpha => GpuBlendFactor::OneMinusDstAlpha,
-            BlendFactor::SrcAlphaSaturated => GpuBlendFactor::SrcAlphaSaturated,
-            BlendFactor::Constant => GpuBlendFactor::Constant,
-            BlendFactor::OneMinusConstant => GpuBlendFactor::OneMinusConstant,
-        }
-    }
-}
-
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum BlendComponent {
     Add {
         src_factor: BlendFactor,
@@ -65,51 +56,6 @@ pub enum BlendComponent {
     Max,
 }
 
-impl BlendComponent {
-    pub(crate) fn to_web_sys(&self) -> GpuBlendComponent {
-        let mut blend = GpuBlendComponent::new();
-
-        match self {
-            BlendComponent::Add {
-                src_factor,
-                dst_factor,
-            } => {
-                blend.operation(GpuBlendOperation::Add);
-                blend.src_factor(src_factor.to_web_sys());
-                blend.dst_factor(dst_factor.to_web_sys());
-            }
-            BlendComponent::Subtract {
-                src_factor,
-                dst_factor,
-            } => {
-                blend.operation(GpuBlendOperation::Subtract);
-                blend.src_factor(src_factor.to_web_sys());
-                blend.dst_factor(dst_factor.to_web_sys());
-            }
-            BlendComponent::ReverseSubtract {
-                src_factor,
-                dst_factor,
-            } => {
-                blend.operation(GpuBlendOperation::ReverseSubtract);
-                blend.src_factor(src_factor.to_web_sys());
-                blend.dst_factor(dst_factor.to_web_sys());
-            }
-            BlendComponent::Min => {
-                blend.operation(GpuBlendOperation::Min);
-                blend.src_factor(GpuBlendFactor::One);
-                blend.dst_factor(GpuBlendFactor::One);
-            }
-            BlendComponent::Max => {
-                blend.operation(GpuBlendOperation::Max);
-                blend.src_factor(GpuBlendFactor::One);
-                blend.dst_factor(GpuBlendFactor::One);
-            }
-        }
-
-        blend
-    }
-}
-
 impl Default for BlendComponent {
     fn default() -> Self {
         BlendComponent::Add {
@@ -119,37 +65,10 @@ impl Default for BlendComponent {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct BlendState {
     pub color: BlendComponent,
     pub alpha: BlendComponent,
-}
-
-impl BlendState {
-    pub(crate) fn to_web_sys(&self) -> GpuBlendState {
-        GpuBlendState::new(&self.alpha.to_web_sys(), &self.color.to_web_sys())
-    }
-}
-
-// Modified from wgpu::ColorWrites
-bitflags::bitflags! {
-    /// Color write mask.
-    ///
-    /// Disabled color channels will not be written to.
-    #[repr(transparent)]
-    pub struct ColorWriteMask: u32 {
-        /// Enable red channel writes
-        const RED = 1 << 0;
-        /// Enable green channel writes
-        const GREEN = 1 << 1;
-        /// Enable blue channel writes
-        const BLUE = 1 << 2;
-        /// Enable alpha channel writes
-        const ALPHA = 1 << 3;
-        /// Enable red, green, and blue channel writes
-        const COLOR = Self::RED.bits | Self::GREEN.bits | Self::BLUE.bits;
-        /// Enable writes to all channels.
-        const ALL = Self::RED.bits | Self::GREEN.bits | Self::BLUE.bits | Self::ALPHA.bits;
-    }
 }
 
 pub struct ColorOutput<F>
@@ -157,7 +76,7 @@ where
     F: ColorRenderable,
 {
     pub format: F,
-    pub write_mask: ColorWriteMask,
+    pub write_mask: ColorWrite,
 }
 
 pub struct BlendedColorOutput<F>
@@ -166,11 +85,7 @@ where
 {
     pub format: F,
     pub blend_state: BlendState,
-    pub write_mask: ColorWriteMask,
-}
-
-pub struct ColorOutputEncoding {
-    inner: GpuColorTargetState,
+    pub write_mask: ColorWrite,
 }
 
 mod typed_color_output_seal {
@@ -180,7 +95,7 @@ mod typed_color_output_seal {
 pub trait TypedColorOutput: typed_color_output_seal::Seal {
     type Format: ColorRenderable;
 
-    fn to_encoding(&self) -> ColorOutputEncoding;
+    fn to_color_target_state(&self) -> ColorTargetState;
 }
 
 impl<F> typed_color_output_seal::Seal for ColorOutput<F> where F: ColorRenderable {}
@@ -190,12 +105,12 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> ColorOutputEncoding {
-        let mut inner = GpuColorTargetState::new(F::FORMAT_ID.to_web_sys());
-
-        inner.write_mask(self.write_mask.bits());
-
-        ColorOutputEncoding { inner }
+    fn to_color_target_state(&self) -> ColorTargetState {
+        ColorTargetState {
+            format: F::FORMAT_ID,
+            blend: None,
+            write_mask: self.write_mask,
+        }
     }
 }
 
@@ -206,13 +121,12 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> ColorOutputEncoding {
-        let mut inner = GpuColorTargetState::new(F::FORMAT_ID.to_web_sys());
-
-        inner.blend(&self.blend_state.to_web_sys());
-        inner.write_mask(self.write_mask.bits());
-
-        ColorOutputEncoding { inner }
+    fn to_color_target_state(&self) -> ColorTargetState {
+        ColorTargetState {
+            format: F::FORMAT_ID,
+            blend: Some(self.blend_state),
+            write_mask: self.write_mask,
+        }
     }
 }
 
@@ -223,9 +137,9 @@ mod typed_color_outputs_seal {
 pub trait TypedColorOutputs: typed_color_outputs_seal::Seal {
     type Layout: TypedColorLayout;
 
-    type Encodings: Iterator<Item = ColorOutputEncoding>;
+    type Targets: Iterator<Item = ColorTargetState>;
 
-    fn encodings(&self) -> Self::Encodings;
+    fn targets(&self) -> Self::Targets;
 }
 
 macro_rules! impl_typed_color_outputs {
@@ -237,13 +151,13 @@ macro_rules! impl_typed_color_outputs {
         impl<$($color),*> TypedColorOutputs for ($($color),*) where $($color: TypedColorOutput),* {
             type Layout = ($($color::Format),*);
 
-            type Encodings = <[ColorOutputEncoding; $n] as IntoIterator>::IntoIter;
+            type Targets = <[ColorTargetState; $n] as IntoIterator>::IntoIter;
 
-            fn encodings(&self) -> Self::Encodings {
+            fn targets(&self) -> Self::Targets {
                 #[allow(non_snake_case)]
                 let ($($color),*) = self;
 
-                [$($color.to_encoding()),*].into_iter()
+                [$($color.to_color_target_state()),*].into_iter()
             }
         }
     }
@@ -258,24 +172,27 @@ impl_typed_color_outputs!(6, C0, C1, C2, C3, C4, C5);
 impl_typed_color_outputs!(7, C0, C1, C2, C3, C4, C5, C6);
 impl_typed_color_outputs!(8, C0, C1, C2, C3, C4, C5, C6, C7);
 
+pub(crate) struct FragmentState {
+    pub(crate) shader_module: <Dvr as Driver>::ShaderModuleHandle,
+    pub(crate) entry_point: String,
+    pub(crate) constants: HashMap<String, f64>,
+    pub(crate) targets: Vec<ColorTargetState>,
+}
+
 pub struct FragmentStage<O> {
-    pub(crate) inner: GpuFragmentState,
+    pub(crate) fragment_state: FragmentState,
     pub(crate) shader_meta: ShaderSourceInternal,
     entry_index: usize,
     _marker: marker::PhantomData<*const O>,
 }
 
 pub struct FragmentStageBuilder<O> {
-    inner: GpuFragmentState,
-    shader_meta: ShaderSourceInternal,
-    entry_index: usize,
+    inner: FragmentStage<O>,
     has_constants: bool,
-    _marker: marker::PhantomData<*const O>,
 }
 
 impl FragmentStageBuilder<()> {
     pub fn begin(shader_module: &ShaderModule, entry_point: &str) -> Self {
-        let inner = GpuFragmentState::new(entry_point, &shader_module.inner, &JsValue::null());
         let shader_meta = shader_module.meta.clone();
 
         let entry_index = shader_meta
@@ -289,30 +206,31 @@ impl FragmentStageBuilder<()> {
         );
 
         FragmentStageBuilder {
-            inner,
-            shader_meta,
-            entry_index,
+            inner: FragmentStage {
+                fragment_state: FragmentState {
+                    shader_module: shader_module.handle.clone(),
+                    entry_point: entry_point.to_string(),
+                    constants: Default::default(),
+                    targets: vec![],
+                },
+                shader_meta,
+                entry_index,
+                _marker: Default::default(),
+            },
             has_constants: false,
-            _marker: Default::default(),
         }
     }
 
     pub fn color_outputs<O: TypedColorOutputs>(
-        self,
+        mut self,
         color_outputs: O,
     ) -> FragmentStageBuilder<O::Layout> {
-        let FragmentStageBuilder {
-            mut inner,
-            shader_meta,
-            entry_index,
-            has_constants,
-            ..
-        } = self;
-
         let layout = O::Layout::COLOR_FORMATS;
 
-        let output_bindings = shader_meta
-            .entry_point_output_bindings(entry_index)
+        let output_bindings = self
+            .inner
+            .shader_meta
+            .entry_point_output_bindings(self.inner.entry_index)
             .unwrap();
 
         for binding in output_bindings {
@@ -359,48 +277,31 @@ impl FragmentStageBuilder<()> {
             }
         }
 
-        let js_array: js_sys::Array = js_sys::Array::new();
-
-        for encoding in color_outputs.encodings() {
-            js_array.push(encoding.inner.as_ref());
-        }
-
-        inner.targets(js_array.as_ref());
+        self.inner.fragment_state.targets = color_outputs.targets().collect();
 
         FragmentStageBuilder {
-            inner,
-            shader_meta,
-            entry_index,
-            has_constants,
-            _marker: Default::default(),
+            inner: FragmentStage {
+                fragment_state: self.inner.fragment_state,
+                shader_meta: self.inner.shader_meta,
+                entry_index: self.inner.entry_index,
+                _marker: Default::default(),
+            },
+            has_constants: self.has_constants,
         }
     }
 }
 
 impl<O> FragmentStageBuilder<O> {
     pub fn pipeline_constants<C: PipelineConstants>(
-        self,
+        mut self,
         pipeline_constants: &C,
     ) -> FragmentStageBuilder<O> {
-        let FragmentStageBuilder {
-            inner,
-            shader_meta,
-            entry_index,
-            ..
-        } = self;
+        self.inner.fragment_state.constants =
+            self.inner.shader_meta.build_constants(pipeline_constants);
 
-        let record = shader_meta.build_constants(pipeline_constants);
+        self.has_constants = true;
 
-        // TODO: get support for WebIDL record types in wasm bindgen
-        js_sys::Reflect::set(inner.as_ref(), &JsValue::from("constants"), &record).unwrap_throw();
-
-        FragmentStageBuilder {
-            inner,
-            shader_meta,
-            entry_index,
-            has_constants: true,
-            _marker: Default::default(),
-        }
+        self
     }
 }
 
@@ -409,23 +310,10 @@ where
     O: TypedColorLayout,
 {
     pub fn finish(self) -> FragmentStage<O> {
-        let FragmentStageBuilder {
-            inner,
-            shader_meta,
-            entry_index,
-            has_constants,
-            ..
-        } = self;
-
-        if !has_constants && shader_meta.has_required_constants() {
+        if !self.has_constants && self.inner.shader_meta.has_required_constants() {
             panic!("the shader declares pipeline constants without fallback values, but no pipeline constants were set");
         }
 
-        FragmentStage {
-            inner,
-            shader_meta,
-            entry_index,
-            _marker: Default::default(),
-        }
+        self.inner
     }
 }

@@ -1,16 +1,16 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::{fmt, slice};
 
 pub use empa_macros::shader_source;
 use empa_reflect::{
-    Constant, ConstantIdentifier, ConstantType, EntryPointBinding as DynamicEntryPointBinding,
+    ConstantIdentifier, ConstantType, EntryPointBinding as DynamicEntryPointBinding,
     EntryPointBindingType, ParseError as DynamicParseError, ShaderSource as DynamicShaderSource,
     ShaderStage,
 };
-use wasm_bindgen::UnwrapThrowExt;
-use web_sys::{GpuShaderModule, GpuShaderModuleDescriptor};
 
 use crate::device::Device;
+use crate::driver::{Device as _, Driver, Dvr};
 use crate::pipeline_constants::{PipelineConstantIdentifier, PipelineConstants};
 use crate::resource_binding::BindingType;
 
@@ -234,23 +234,18 @@ impl ShaderSourceInternal {
     pub(crate) fn build_constants<C: PipelineConstants>(
         &self,
         pipeline_constants: &C,
-    ) -> js_sys::Object {
-        let record = js_sys::Object::new();
+    ) -> HashMap<String, f64> {
+        let mut map = HashMap::new();
 
-        let add_constant = |identifier: PipelineConstantIdentifier,
-                            tpe: ConstantType,
-                            required: bool| {
+        let mut add_constant = |identifier: PipelineConstantIdentifier,
+                                tpe: ConstantType,
+                                required: bool| {
             if let Some(supplied_value) = pipeline_constants.lookup(identifier) {
                 if supplied_value.constant_type() != tpe {
                     panic!("supplied value for pipeline constant `{}` does not match the type expected by the shader", identifier)
                 }
 
-                js_sys::Reflect::set(
-                    record.as_ref(),
-                    &identifier.to_js_value(),
-                    &supplied_value.to_js_value(),
-                )
-                .unwrap_throw();
+                map.insert(identifier.to_string(), supplied_value.to_f64());
             } else {
                 if required {
                     panic!(
@@ -283,7 +278,7 @@ impl ShaderSourceInternal {
             }
         }
 
-        record
+        map
     }
 }
 
@@ -363,18 +358,16 @@ impl ShaderSource {
 }
 
 pub struct ShaderModule {
-    pub(crate) inner: GpuShaderModule,
+    pub(crate) handle: <Dvr as Driver>::ShaderModuleHandle,
     pub(crate) meta: ShaderSourceInternal,
 }
 
 impl ShaderModule {
     pub(crate) fn new(device: &Device, source: &ShaderSource) -> Self {
-        let desc = GpuShaderModuleDescriptor::new(source.inner.source());
-
-        let inner = device.inner.create_shader_module(&desc);
+        let handle = device.handle.create_shader_module(source.inner.source());
 
         ShaderModule {
-            inner,
+            handle,
             meta: source.inner.clone(),
         }
     }

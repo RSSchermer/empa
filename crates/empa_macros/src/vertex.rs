@@ -23,10 +23,10 @@ pub fn expand_derive_vertex(input: &DeriveInput) -> Result<TokenStream, String> 
             }
         }
 
-        let input_rate = if per_instance {
-            quote!(#mod_path::VertexInputRate::PerInstance)
+        let step_mode = if per_instance {
+            quote!(#mod_path::VertexStepMode::Instance)
         } else {
-            quote!(#mod_path::VertexInputRate::PerVertex)
+            quote!(#mod_path::VertexStepMode::Vertex)
         };
 
         let mut position = 0;
@@ -56,16 +56,16 @@ pub fn expand_derive_vertex(input: &DeriveInput) -> Result<TokenStream, String> 
                     {
                         assert_format_compatible::<#ty, #ident>();
 
-                        <#ident as VertexAttributeFormat>::FORMAT_ID
+                        <#ident as VertexAttributeFormat>::FORMAT
                     }
                 })
             };
 
             quote! {
-                #mod_path::VertexAttributeDescriptor {
+                #mod_path::VertexAttribute {
                     shader_location: #location,
                     format: #format_kind,
-                    offset: empa::offset_of!(#struct_name, #field_name) as u32
+                    offset: empa::offset_of!(#struct_name, #field_name)
                 }
             }
         });
@@ -73,15 +73,16 @@ pub fn expand_derive_vertex(input: &DeriveInput) -> Result<TokenStream, String> 
         let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
         let impl_block = quote! {
+            const ATTRIBUTES: &'static [#mod_path::VertexAttribute] = &[
+                #(#recurse),*
+            ];
 
             #[automatically_derived]
             unsafe impl #impl_generics #mod_path::Vertex for #struct_name #ty_generics #where_clause {
-                const DESCRIPTOR: #mod_path::VertexDescriptor<'static> = #mod_path::VertexDescriptor {
-                    array_stride: std::mem::size_of::<#struct_name #ty_generics>() as u32,
-                    input_rate: #input_rate,
-                    attribute_descriptors: &[
-                        #(#recurse),*
-                    ]
+                const LAYOUT: #mod_path::VertexBufferLayout<'static> = #mod_path::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<#struct_name #ty_generics>(),
+                    step_mode: #step_mode,
+                    attributes: std::borrow::Cow::Borrowed(ATTRIBUTES)
                 };
             }
         };

@@ -1,17 +1,15 @@
-use std::sync::Arc;
-
-use web_sys::GpuIndexFormat;
+use std::ops::Range;
 
 use crate::buffer;
-use crate::buffer::{Buffer, BufferHandle};
-use crate::render_pipeline::IndexData;
+use crate::buffer::Buffer;
+use crate::driver::{Driver, Dvr};
+use crate::render_pipeline::{IndexData, IndexFormat};
 
 pub struct IndexBufferEncoding {
-    pub(crate) buffer: Arc<BufferHandle>,
+    pub(crate) buffer: <Dvr as Driver>::BufferHandle,
     pub(crate) id: usize,
-    pub(crate) format: GpuIndexFormat,
-    pub(crate) offset: u32,
-    pub(crate) size: u32,
+    pub(crate) format: IndexFormat,
+    pub(crate) range: Range<usize>,
 }
 
 mod index_buffer_seal {
@@ -39,11 +37,10 @@ where
 
     fn to_encoding(&self) -> IndexBufferEncoding {
         IndexBufferEncoding {
-            buffer: self.internal.inner.clone(),
+            buffer: self.internal.handle.clone(),
             id: self.id(),
-            format: I::FORMAT_ID.inner,
-            offset: 0,
-            size: self.size_in_bytes() as u32,
+            format: I::FORMAT,
+            range: 0..self.size_in_bytes(),
         }
     }
 }
@@ -62,12 +59,14 @@ where
     type IndexData = I;
 
     fn to_encoding(&self) -> IndexBufferEncoding {
+        let start = self.offset_in_bytes();
+        let end = start + self.size_in_bytes();
+
         IndexBufferEncoding {
-            buffer: self.buffer.inner.clone(),
+            buffer: self.buffer.handle.clone(),
             id: self.id(),
-            format: I::FORMAT_ID.inner,
-            offset: 0,
-            size: self.size_in_bytes() as u32,
+            format: I::FORMAT,
+            range: start..end,
         }
     }
 }

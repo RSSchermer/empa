@@ -1,17 +1,24 @@
 use std::marker;
 
+use flagset::FlagSet;
+
 use crate::abi;
+use crate::access_mode::{Read, ReadWrite};
+use crate::driver::ShaderStage;
 use crate::resource_binding::bind_group_layout::{
-    BindGroupLayoutEntry, BindingType, ShaderStages as ShaderStageFlags, SizedBufferLayout,
-    TexelType, UnsizedBufferLayout,
+    BindGroupLayoutEntry, BindingType, SizedBufferLayout, TexelType, UnsizedBufferLayout,
 };
 use crate::texture::format::Storable;
 use crate::type_flag::{TypeFlag, O, X};
 
 mod visibility_seal {
+    use flagset::FlagSet;
+
+    use crate::driver::ShaderStage;
+
     pub trait Seal {
         #[doc(hidden)]
-        const BITS: u32;
+        const FLAG_SET: FlagSet<ShaderStage>;
     }
 }
 
@@ -27,23 +34,42 @@ pub struct ShaderStages<Compute: TypeFlag, Fragment: TypeFlag, Vertex: TypeFlag>
 impl<Compute: TypeFlag, Fragment: TypeFlag, Vertex: TypeFlag> visibility_seal::Seal
     for ShaderStages<Compute, Fragment, Vertex>
 {
-    const BITS: u32 = {
-        let mut visibility = 0;
+    const FLAG_SET: FlagSet<ShaderStage> = {
+        let mut bits = 0;
 
         if Compute::IS_ENABLED {
-            visibility |= 1 << 2;
+            bits |= ShaderStage::Compute as u32;
         }
 
         if Fragment::IS_ENABLED {
-            visibility |= 1 << 1;
+            bits |= ShaderStage::Fragment as u32;
         }
 
         if Vertex::IS_ENABLED {
-            visibility |= 1 << 0;
+            bits |= ShaderStage::Vertex as u32;
         }
 
-        visibility
+        unsafe { FlagSet::new_unchecked(bits) }
     };
+
+    // TODO when const traits
+    // const FLAG_SET: FlagSet<ShaderStage> = {
+    //     let mut flag_set = FlagSet::from(ShaderStage::None);
+    //
+    //     if Compute::IS_ENABLED {
+    //         flag_set |= ShaderStage::Compute;
+    //     }
+    //
+    //     if Fragment::IS_ENABLED {
+    //         flag_set |= ShaderStage::Fragment;
+    //     }
+    //
+    //     if Vertex::IS_ENABLED {
+    //         flag_set |= ShaderStage::Vertex;
+    //     }
+    //
+    //     flag_set
+    // };
 }
 
 impl<Compute: TypeFlag, Fragment: TypeFlag, Vertex: TypeFlag> Visibility
@@ -116,7 +142,7 @@ pub struct Texture1D<T, Visibility> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for Texture1D<f32, V> {}
 impl<V: Visibility> TypedSlotBinding for Texture1D<f32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::Texture1D(TexelType::Float),
     });
 
@@ -126,7 +152,7 @@ impl<V: Visibility> TypedSlotBinding for Texture1D<f32, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for Texture1D<f32_unfiltered, V> {}
 impl<V: Visibility> TypedSlotBinding for Texture1D<f32_unfiltered, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::Texture1D(TexelType::UnfilterableFloat),
     });
 
@@ -136,8 +162,8 @@ impl<V: Visibility> TypedSlotBinding for Texture1D<f32_unfiltered, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for Texture1D<i32, V> {}
 impl<V: Visibility> TypedSlotBinding for Texture1D<i32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
-        binding_type: BindingType::Texture1D(TexelType::Integer),
+        visibility: V::FLAG_SET,
+        binding_type: BindingType::Texture1D(TexelType::SignedInteger),
     });
 
     type WithVisibility<T: Visibility> = Texture1D<i32, T>;
@@ -146,7 +172,7 @@ impl<V: Visibility> TypedSlotBinding for Texture1D<i32, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for Texture1D<u32, V> {}
 impl<V: Visibility> TypedSlotBinding for Texture1D<u32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::Texture1D(TexelType::UnsignedInteger),
     });
 
@@ -160,7 +186,7 @@ pub struct Texture2D<T, Visibility> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for Texture2D<f32, V> {}
 impl<V: Visibility> TypedSlotBinding for Texture2D<f32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::Texture2D(TexelType::Float),
     });
 
@@ -170,7 +196,7 @@ impl<V: Visibility> TypedSlotBinding for Texture2D<f32, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for Texture2D<f32_unfiltered, V> {}
 impl<V: Visibility> TypedSlotBinding for Texture2D<f32_unfiltered, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::Texture2D(TexelType::UnfilterableFloat),
     });
 
@@ -180,8 +206,8 @@ impl<V: Visibility> TypedSlotBinding for Texture2D<f32_unfiltered, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for Texture2D<i32, V> {}
 impl<V: Visibility> TypedSlotBinding for Texture2D<i32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
-        binding_type: BindingType::Texture2D(TexelType::Integer),
+        visibility: V::FLAG_SET,
+        binding_type: BindingType::Texture2D(TexelType::SignedInteger),
     });
 
     type WithVisibility<T: Visibility> = Texture2D<i32, T>;
@@ -190,7 +216,7 @@ impl<V: Visibility> TypedSlotBinding for Texture2D<i32, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for Texture2D<u32, V> {}
 impl<V: Visibility> TypedSlotBinding for Texture2D<u32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::Texture2D(TexelType::UnsignedInteger),
     });
 
@@ -204,7 +230,7 @@ pub struct Texture3D<T, Visibility> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for Texture3D<f32, V> {}
 impl<V: Visibility> TypedSlotBinding for Texture3D<f32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::Texture3D(TexelType::Float),
     });
 
@@ -214,7 +240,7 @@ impl<V: Visibility> TypedSlotBinding for Texture3D<f32, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for Texture3D<f32_unfiltered, V> {}
 impl<V: Visibility> TypedSlotBinding for Texture3D<f32_unfiltered, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::Texture3D(TexelType::UnfilterableFloat),
     });
 
@@ -224,8 +250,8 @@ impl<V: Visibility> TypedSlotBinding for Texture3D<f32_unfiltered, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for Texture3D<i32, V> {}
 impl<V: Visibility> TypedSlotBinding for Texture3D<i32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
-        binding_type: BindingType::Texture3D(TexelType::Integer),
+        visibility: V::FLAG_SET,
+        binding_type: BindingType::Texture3D(TexelType::SignedInteger),
     });
 
     type WithVisibility<T: Visibility> = Texture3D<i32, T>;
@@ -234,7 +260,7 @@ impl<V: Visibility> TypedSlotBinding for Texture3D<i32, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for Texture3D<u32, V> {}
 impl<V: Visibility> TypedSlotBinding for Texture3D<u32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::Texture3D(TexelType::UnsignedInteger),
     });
 
@@ -248,7 +274,7 @@ pub struct Texture2DArray<T, Visibility> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for Texture2DArray<f32, V> {}
 impl<V: Visibility> TypedSlotBinding for Texture2DArray<f32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::Texture2DArray(TexelType::Float),
     });
 
@@ -258,7 +284,7 @@ impl<V: Visibility> TypedSlotBinding for Texture2DArray<f32, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for Texture2DArray<f32_unfiltered, V> {}
 impl<V: Visibility> TypedSlotBinding for Texture2DArray<f32_unfiltered, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::Texture2DArray(TexelType::UnfilterableFloat),
     });
 
@@ -268,8 +294,8 @@ impl<V: Visibility> TypedSlotBinding for Texture2DArray<f32_unfiltered, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for Texture2DArray<i32, V> {}
 impl<V: Visibility> TypedSlotBinding for Texture2DArray<i32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
-        binding_type: BindingType::Texture2DArray(TexelType::Integer),
+        visibility: V::FLAG_SET,
+        binding_type: BindingType::Texture2DArray(TexelType::SignedInteger),
     });
 
     type WithVisibility<T: Visibility> = Texture2DArray<i32, T>;
@@ -278,7 +304,7 @@ impl<V: Visibility> TypedSlotBinding for Texture2DArray<i32, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for Texture2DArray<u32, V> {}
 impl<V: Visibility> TypedSlotBinding for Texture2DArray<u32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::Texture2DArray(TexelType::UnsignedInteger),
     });
 
@@ -292,7 +318,7 @@ pub struct TextureCube<T, Visibility> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for TextureCube<f32, V> {}
 impl<V: Visibility> TypedSlotBinding for TextureCube<f32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::TextureCube(TexelType::Float),
     });
 
@@ -302,7 +328,7 @@ impl<V: Visibility> TypedSlotBinding for TextureCube<f32, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for TextureCube<f32_unfiltered, V> {}
 impl<V: Visibility> TypedSlotBinding for TextureCube<f32_unfiltered, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::TextureCube(TexelType::UnfilterableFloat),
     });
 
@@ -312,8 +338,8 @@ impl<V: Visibility> TypedSlotBinding for TextureCube<f32_unfiltered, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for TextureCube<i32, V> {}
 impl<V: Visibility> TypedSlotBinding for TextureCube<i32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
-        binding_type: BindingType::TextureCube(TexelType::Integer),
+        visibility: V::FLAG_SET,
+        binding_type: BindingType::TextureCube(TexelType::SignedInteger),
     });
 
     type WithVisibility<T: Visibility> = TextureCube<i32, T>;
@@ -322,7 +348,7 @@ impl<V: Visibility> TypedSlotBinding for TextureCube<i32, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for TextureCube<u32, V> {}
 impl<V: Visibility> TypedSlotBinding for TextureCube<u32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::TextureCube(TexelType::UnsignedInteger),
     });
 
@@ -336,7 +362,7 @@ pub struct TextureCubeArray<T, Visibility> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for TextureCubeArray<f32, V> {}
 impl<V: Visibility> TypedSlotBinding for TextureCubeArray<f32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::TextureCubeArray(TexelType::Float),
     });
 
@@ -346,7 +372,7 @@ impl<V: Visibility> TypedSlotBinding for TextureCubeArray<f32, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for TextureCubeArray<f32_unfiltered, V> {}
 impl<V: Visibility> TypedSlotBinding for TextureCubeArray<f32_unfiltered, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::TextureCubeArray(TexelType::UnfilterableFloat),
     });
 
@@ -356,8 +382,8 @@ impl<V: Visibility> TypedSlotBinding for TextureCubeArray<f32_unfiltered, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for TextureCubeArray<i32, V> {}
 impl<V: Visibility> TypedSlotBinding for TextureCubeArray<i32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
-        binding_type: BindingType::TextureCubeArray(TexelType::Integer),
+        visibility: V::FLAG_SET,
+        binding_type: BindingType::TextureCubeArray(TexelType::SignedInteger),
     });
 
     type WithVisibility<T: Visibility> = TextureCubeArray<i32, T>;
@@ -366,7 +392,7 @@ impl<V: Visibility> TypedSlotBinding for TextureCubeArray<i32, V> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for TextureCubeArray<u32, V> {}
 impl<V: Visibility> TypedSlotBinding for TextureCubeArray<u32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::TextureCubeArray(TexelType::UnsignedInteger),
     });
 
@@ -380,7 +406,7 @@ pub struct TextureMultisampled2D<T, Visibility> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for TextureMultisampled2D<f32, V> {}
 impl<V: Visibility> TypedSlotBinding for TextureMultisampled2D<f32, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::TextureMultisampled2D(TexelType::Float),
     });
 
@@ -394,7 +420,7 @@ pub struct TextureDepth2D<Visibility> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for TextureDepth2D<V> {}
 impl<V: Visibility> TypedSlotBinding for TextureDepth2D<V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::TextureDepth2D,
     });
 
@@ -408,7 +434,7 @@ pub struct TextureDepth2DArray<Visibility> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for TextureDepth2DArray<V> {}
 impl<V: Visibility> TypedSlotBinding for TextureDepth2DArray<V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::TextureDepth2DArray,
     });
 
@@ -422,7 +448,7 @@ pub struct TextureDepthCube<Visibility> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for TextureDepthCube<V> {}
 impl<V: Visibility> TypedSlotBinding for TextureDepthCube<V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::TextureDepthCube,
     });
 
@@ -436,7 +462,7 @@ pub struct TextureDepthCubeArray<Visibility> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for TextureDepthCubeArray<V> {}
 impl<V: Visibility> TypedSlotBinding for TextureDepthCubeArray<V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::TextureDepthCubeArray,
     });
 
@@ -450,7 +476,7 @@ pub struct TextureDepthMultisampled2D<Visibility> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for TextureDepthMultisampled2D<V> {}
 impl<V: Visibility> TypedSlotBinding for TextureDepthMultisampled2D<V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::TextureDepthMultisampled2D,
     });
 
@@ -464,7 +490,7 @@ pub struct FilteringSampler<Visibility> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for FilteringSampler<V> {}
 impl<V: Visibility> TypedSlotBinding for FilteringSampler<V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::FilteringSampler,
     });
 
@@ -478,7 +504,7 @@ pub struct NonFilteringSampler<Visibility> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for NonFilteringSampler<V> {}
 impl<V: Visibility> TypedSlotBinding for NonFilteringSampler<V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::NonFilteringSampler,
     });
 
@@ -492,7 +518,7 @@ pub struct ComparisonSampler<Visibility> {
 impl<V: Visibility> typed_slot_binding_seal::Seal for ComparisonSampler<V> {}
 impl<V: Visibility> TypedSlotBinding for ComparisonSampler<V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::ComparisonSampler,
     });
 
@@ -506,7 +532,7 @@ pub struct Uniform<T, Visibility> {
 impl<T: abi::Sized, V: Visibility> typed_slot_binding_seal::Seal for Uniform<T, V> {}
 impl<T: abi::Sized, V: Visibility> TypedSlotBinding for Uniform<T, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::Uniform(SizedBufferLayout(T::LAYOUT)),
     });
 
@@ -520,50 +546,45 @@ impl<Compute: TypeFlag, Fragment: TypeFlag> ValidStorageVisibility
 {
 }
 
-pub struct Storage<T, Visibility>
+pub struct Storage<T, A, Visibility>
 where
     T: ?Sized,
 {
-    _marker: marker::PhantomData<(*const T, Visibility)>,
+    _marker: marker::PhantomData<(*const T, A, Visibility)>,
 }
 
 impl<T: abi::Unsized + ?Sized, V: ValidStorageVisibility> typed_slot_binding_seal::Seal
-    for Storage<T, V>
+    for Storage<T, ReadWrite, V>
 {
 }
-impl<T: abi::Unsized + ?Sized, V: ValidStorageVisibility> TypedSlotBinding for Storage<T, V> {
+impl<T: abi::Unsized + ?Sized, V: ValidStorageVisibility> TypedSlotBinding
+    for Storage<T, ReadWrite, V>
+{
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::Storage(UnsizedBufferLayout {
             sized_head: T::SIZED_HEAD_LAYOUT,
             unsized_tail: T::UNSIZED_TAIL_LAYOUT,
         }),
     });
 
-    type WithVisibility<N: Visibility> = Storage<T, N>;
-}
-
-pub struct ReadOnlyStorage<T, Visibility>
-where
-    T: ?Sized,
-{
-    _marker: marker::PhantomData<(*const T, Visibility)>,
+    type WithVisibility<N: Visibility> = Storage<T, ReadWrite, N>;
 }
 
 impl<T: abi::Unsized + ?Sized, V: Visibility> typed_slot_binding_seal::Seal
-    for ReadOnlyStorage<T, V>
+    for Storage<T, Read, V>
 {
 }
-impl<T: abi::Unsized + ?Sized, V: Visibility> TypedSlotBinding for ReadOnlyStorage<T, V> {
+impl<T: abi::Unsized + ?Sized, V: Visibility> TypedSlotBinding for Storage<T, Read, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::ReadOnlyStorage(UnsizedBufferLayout {
             sized_head: T::SIZED_HEAD_LAYOUT,
             unsized_tail: T::UNSIZED_TAIL_LAYOUT,
         }),
     });
 
-    type WithVisibility<N: Visibility> = ReadOnlyStorage<T, N>;
+    type WithVisibility<N: Visibility> = Storage<T, Read, N>;
 }
 
 pub struct StorageTexture1D<F, Visibility> {
@@ -573,7 +594,7 @@ pub struct StorageTexture1D<F, Visibility> {
 impl<F: Storable, V: Visibility> typed_slot_binding_seal::Seal for StorageTexture1D<F, V> {}
 impl<F: Storable, V: Visibility> TypedSlotBinding for StorageTexture1D<F, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::StorageTexture1D(F::FORMAT_ID),
     });
 
@@ -587,7 +608,7 @@ pub struct StorageTexture2D<F, Visibility> {
 impl<F: Storable, V: Visibility> typed_slot_binding_seal::Seal for StorageTexture2D<F, V> {}
 impl<F: Storable, V: Visibility> TypedSlotBinding for StorageTexture2D<F, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::StorageTexture2D(F::FORMAT_ID),
     });
 
@@ -601,7 +622,7 @@ pub struct StorageTexture2DArray<F: Storable, Visibility> {
 impl<F: Storable, V: Visibility> typed_slot_binding_seal::Seal for StorageTexture2DArray<F, V> {}
 impl<F: Storable, V: Visibility> TypedSlotBinding for StorageTexture2DArray<F, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::StorageTexture2DArray(F::FORMAT_ID),
     });
 
@@ -615,7 +636,7 @@ pub struct StorageTexture3D<F, Visibility> {
 impl<F: Storable, V: Visibility> typed_slot_binding_seal::Seal for StorageTexture3D<F, V> {}
 impl<F: Storable, V: Visibility> TypedSlotBinding for StorageTexture3D<F, V> {
     const ENTRY: Option<BindGroupLayoutEntry> = Some(BindGroupLayoutEntry {
-        visibility: unsafe { ShaderStageFlags::from_bits_unchecked(V::BITS) },
+        visibility: V::FLAG_SET,
         binding_type: BindingType::StorageTexture3D(F::FORMAT_ID),
     });
 

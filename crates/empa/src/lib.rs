@@ -1,9 +1,12 @@
-#![feature(new_uninit, once_cell)]
+#![feature(new_uninit)]
+
+mod driver;
 
 mod compare_function;
-pub use self::compare_function::CompareFunction;
+pub use compare_function::CompareFunction;
 
 pub mod abi;
+pub mod access_mode;
 pub mod adapter;
 pub mod buffer;
 pub mod command;

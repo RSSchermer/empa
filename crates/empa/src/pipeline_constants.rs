@@ -1,23 +1,11 @@
 use std::fmt;
 
-use empa_reflect::ConstantIdentifier;
-use wasm_bindgen::JsValue;
-
 use crate::shader_module::StaticConstantType;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PipelineConstantIdentifier<'a> {
     Number(u32),
     Name(&'a str),
-}
-
-impl PipelineConstantIdentifier<'_> {
-    pub(crate) fn to_js_value(&self) -> wasm_bindgen::JsValue {
-        match self {
-            PipelineConstantIdentifier::Number(n) => JsValue::from(*n),
-            PipelineConstantIdentifier::Name(n) => JsValue::from(*n),
-        }
-    }
 }
 
 impl fmt::Display for PipelineConstantIdentifier<'_> {
@@ -47,12 +35,12 @@ impl PipelineConstantValue {
         }
     }
 
-    pub(crate) fn to_js_value(&self) -> wasm_bindgen::JsValue {
-        match self {
-            PipelineConstantValue::Bool(v) => JsValue::from(*v),
-            PipelineConstantValue::Float(v) => JsValue::from(*v),
-            PipelineConstantValue::SignedInteger(v) => JsValue::from(*v),
-            PipelineConstantValue::UnsignedInteger(v) => JsValue::from(*v),
+    pub(crate) fn to_f64(&self) -> f64 {
+        match *self {
+            PipelineConstantValue::Bool(v) => v as u32 as f64,
+            PipelineConstantValue::Float(v) => v as f64,
+            PipelineConstantValue::SignedInteger(v) => v as f64,
+            PipelineConstantValue::UnsignedInteger(v) => v as f64,
         }
     }
 }

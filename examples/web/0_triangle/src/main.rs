@@ -10,7 +10,7 @@ use empa::buffer::Buffer;
 use empa::command::{Draw, DrawCommandEncoder, RenderPassDescriptor, RenderStateEncoder};
 use empa::device::DeviceDescriptor;
 use empa::render_pipeline::{
-    ColorOutput, ColorWriteMask, FragmentStageBuilder, RenderPipelineDescriptorBuilder,
+    ColorOutput, ColorWrite, FragmentStageBuilder, RenderPipelineDescriptorBuilder,
     VertexStageBuilder,
 };
 use empa::render_target::{FloatAttachment, LoadOp, RenderTarget, StoreOp};
@@ -66,15 +66,15 @@ async fn render() -> Result<(), Box<dyn Error>> {
             &RenderPipelineDescriptorBuilder::begin()
                 .layout(&pipeline_layout)
                 .vertex(
-                    &VertexStageBuilder::begin(&shader, "vert_main")
+                    VertexStageBuilder::begin(&shader, "vert_main")
                         .vertex_layout::<MyVertex>()
                         .finish(),
                 )
                 .fragment(
-                    &FragmentStageBuilder::begin(&shader, "frag_main")
+                    FragmentStageBuilder::begin(&shader, "frag_main")
                         .color_outputs(ColorOutput {
                             format: rgba8unorm,
-                            write_mask: ColorWriteMask::ALL,
+                            write_mask: ColorWrite::All,
                         })
                         .finish(),
                 )
@@ -102,9 +102,9 @@ async fn render() -> Result<(), Box<dyn Error>> {
 
     let command_buffer = device
         .create_command_encoder()
-        .begin_render_pass(&RenderPassDescriptor::new(&RenderTarget {
+        .begin_render_pass(RenderPassDescriptor::new(&RenderTarget {
             color: FloatAttachment {
-                image: &context
+                image: context
                     .get_current_texture()
                     .attachable_image(&AttachableImageDescriptor::default()),
                 load_op: LoadOp::Clear([0.0; 4]),

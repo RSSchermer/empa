@@ -1,9 +1,16 @@
+use flagset::FlagSet;
+
+use crate::driver::TextureUsage;
 use crate::type_flag::{TypeFlag, O, X};
 
 mod usage_flags_seal {
+    use flagset::FlagSet;
+
+    use crate::driver::TextureUsage;
+
     pub trait Seal {
         #[doc(hidden)]
-        const BITS: u32;
+        const FLAG_SET: FlagSet<TextureUsage>;
     }
 }
 
@@ -59,31 +66,58 @@ impl<
     > usage_flags_seal::Seal
     for Usages<RenderAttachment, StorageBinding, TextureBinding, CopyDst, CopySrc>
 {
-    const BITS: u32 = {
-        let mut flags = 0u32;
+    const FLAG_SET: FlagSet<TextureUsage> = {
+        let mut bits = TextureUsage::None as u32;
 
         if CopySrc::IS_ENABLED {
-            flags |= 1 << 0;
+            bits |= TextureUsage::CopySrc as u32;
         }
 
         if CopyDst::IS_ENABLED {
-            flags |= 1 << 1;
+            bits |= TextureUsage::CopyDst as u32;
         }
 
         if TextureBinding::IS_ENABLED {
-            flags |= 1 << 2;
+            bits |= TextureUsage::TextureBinding as u32;
         }
 
         if StorageBinding::IS_ENABLED {
-            flags |= 1 << 3;
+            bits |= TextureUsage::StorageBinding as u32;
         }
 
         if RenderAttachment::IS_ENABLED {
-            flags |= 1 << 4;
+            bits |= TextureUsage::RenderAttachment as u32;
         }
 
-        flags
+        unsafe { FlagSet::new_unchecked(bits) }
     };
+
+    // TODO when const traits
+    // const FLAG_SET: FlagSet<TextureUsage> = {
+    //     let mut flags = FlagSet::from(TextureUsage::None);
+    //
+    //     if CopySrc::IS_ENABLED {
+    //         flags |= TextureUsage::CopySrc;
+    //     }
+    //
+    //     if CopyDst::IS_ENABLED {
+    //         flags |= TextureUsage::CopyDst;
+    //     }
+    //
+    //     if TextureBinding::IS_ENABLED {
+    //         flags |= TextureUsage::TextureBinding;
+    //     }
+    //
+    //     if StorageBinding::IS_ENABLED {
+    //         flags |= TextureUsage::StorageBinding;
+    //     }
+    //
+    //     if RenderAttachment::IS_ENABLED {
+    //         flags |= TextureUsage::RenderAttachment;
+    //     }
+    //
+    //     flags
+    // };
 }
 
 impl<

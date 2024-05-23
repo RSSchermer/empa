@@ -5,9 +5,10 @@ use std::error::Error;
 
 use arwa::console;
 use arwa::window::window;
+use empa::access_mode::ReadWrite;
 use empa::arwa::{NavigatorExt, RequestAdapterOptions};
 use empa::buffer;
-use empa::buffer::{Buffer, ReadOnlyStorage, Storage, StorageBinding};
+use empa::buffer::{Buffer, Storage, StorageBinding};
 use empa::command::{DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
     ComputePipeline, ComputePipelineDescriptorBuilder, ComputeStageBuilder,
@@ -20,26 +21,26 @@ use futures::FutureExt;
 const SCAN_SHADER: ShaderSource = shader_source!("scan.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-struct ScanResources {
+struct ScanResources<'a> {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    data: Storage<[u32]>,
+    data: Storage<'a, [u32], ReadWrite>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    partial_sums: Storage<[u32]>,
+    partial_sums: Storage<'a, [u32], ReadWrite>,
 }
 
-type ScanLayout = <ScanResources as empa::resource_binding::Resources>::Layout;
+type ScanLayout = <ScanResources<'static> as empa::resource_binding::Resources>::Layout;
 
 const UNIFORM_ADD_SHADER: ShaderSource = shader_source!("uniform_add.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-struct UniformAddResources {
+struct UniformAddResources<'a> {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    sums: ReadOnlyStorage<[u32]>,
+    sums: Storage<'a, [u32], ReadWrite>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    data: Storage<[u32]>,
+    data: Storage<'a, [u32], ReadWrite>,
 }
 
-type UniformAddLayout = <UniformAddResources as empa::resource_binding::Resources>::Layout;
+type UniformAddLayout = <UniformAddResources<'static> as empa::resource_binding::Resources>::Layout;
 
 const BLOCK_SIZE: u32 = 512;
 
@@ -62,7 +63,7 @@ impl Evaluator {
             .create_compute_pipeline(
                 &ComputePipelineDescriptorBuilder::begin()
                     .layout(&scan_pipeline_layout)
-                    .compute(&ComputeStageBuilder::begin(&scan_shader, "main").finish())
+                    .compute(ComputeStageBuilder::begin(&scan_shader, "main").finish())
                     .finish(),
             )
             .await;
@@ -77,7 +78,7 @@ impl Evaluator {
             .create_compute_pipeline(
                 &ComputePipelineDescriptorBuilder::begin()
                     .layout(&uniform_add_pipeline_layout)
-                    .compute(&ComputeStageBuilder::begin(&uniform_add_shader, "main").finish())
+                    .compute(ComputeStageBuilder::begin(&uniform_add_shader, "main").finish())
                     .finish(),
             )
             .await;
@@ -183,7 +184,7 @@ impl Evaluator {
                 let bind_group = device.create_bind_group(
                     uniform_add_bind_group_layout,
                     UniformAddResources {
-                        sums: sums.read_only_storage(),
+                        sums: sums.storage(),
                         data: data.storage(),
                     },
                 );
@@ -207,7 +208,7 @@ impl Evaluator {
             let bind_group = device.create_bind_group(
                 uniform_add_bind_group_layout,
                 UniformAddResources {
-                    sums: multilevel_buffers[0].read_only_storage(),
+                    sums: multilevel_buffers[0].storage(),
                     data: data.storage(),
                 },
             );

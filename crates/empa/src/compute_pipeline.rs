@@ -1,32 +1,38 @@
+use std::collections::HashMap;
 use std::future::Future;
 use std::marker;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
 use atomic_counter::AtomicCounter;
 use empa_reflect::ShaderStage;
-use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
-use wasm_bindgen_futures::JsFuture;
-use web_sys::{GpuComputePipeline, GpuComputePipelineDescriptor, GpuProgrammableStage};
+use futures::FutureExt;
 
 use crate::device::{Device, ID_GEN};
+use crate::driver;
+use crate::driver::{Device as _, Driver, Dvr};
 use crate::pipeline_constants::PipelineConstants;
-use crate::resource_binding::{PipelineLayout, ShaderStages, TypedPipelineLayout};
+use crate::resource_binding::{PipelineLayout, TypedPipelineLayout};
 use crate::shader_module::{ShaderModule, ShaderSourceInternal};
 
 pub struct ComputePipeline<L> {
-    inner: GpuComputePipeline,
+    pub(crate) handle: <Dvr as Driver>::ComputePipelineHandle,
     id: usize,
     _marker: marker::PhantomData<*const L>,
 }
 
 impl<L> ComputePipeline<L> {
-    pub(crate) fn new(device: &Device, descriptor: &ComputePipelineDescriptor<L>) -> Self {
+    pub(crate) fn new_sync(device: &Device, descriptor: &ComputePipelineDescriptor<L>) -> Self {
+        let desc = driver::ComputePipelineDescriptor {
+            layout: &descriptor.layout,
+            shader_module: &descriptor.compute_stage.shader_module,
+            entry_point: &descriptor.compute_stage.entry_point,
+            constants: &descriptor.compute_stage.pipeline_constants,
+        };
+
         let id = ID_GEN.get();
-        let inner = device.inner.create_compute_pipeline(&descriptor.inner);
+        let handle = device.handle.create_compute_pipeline(&desc);
 
         ComputePipeline {
-            inner,
+            handle,
             id,
             _marker: Default::default(),
         }
@@ -35,78 +41,61 @@ impl<L> ComputePipeline<L> {
     pub(crate) fn new_async(
         device: &Device,
         descriptor: &ComputePipelineDescriptor<L>,
-    ) -> CreateComputePipelineAsync<L> {
-        CreateComputePipelineAsync {
-            inner: device
-                .inner
-                .create_compute_pipeline_async(&descriptor.inner)
-                .into(),
-            _marker: Default::default(),
-        }
+    ) -> impl Future<Output = Self> {
+        let desc = driver::ComputePipelineDescriptor {
+            layout: &descriptor.layout,
+            shader_module: &descriptor.compute_stage.shader_module,
+            entry_point: &descriptor.compute_stage.entry_point,
+            constants: &descriptor.compute_stage.pipeline_constants,
+        };
+
+        device
+            .handle
+            .create_compute_pipeline_async(&desc)
+            .map(|handle| {
+                let id = ID_GEN.get();
+
+                ComputePipeline {
+                    handle,
+                    id,
+                    _marker: Default::default(),
+                }
+            })
     }
 
     pub(crate) fn id(&self) -> usize {
         self.id
     }
-
-    pub(crate) fn as_web_sys(&self) -> &GpuComputePipeline {
-        &self.inner
-    }
-}
-
-pub(crate) struct CreateComputePipelineAsync<L> {
-    inner: JsFuture,
-    _marker: marker::PhantomData<*const L>,
-}
-
-impl<L> Future for CreateComputePipelineAsync<L> {
-    type Output = ComputePipeline<L>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Pin::new(&mut self.get_mut().inner).poll(cx).map(|result| {
-            let inner = result.expect("pipeline creation should not fail");
-            let id = ID_GEN.get();
-
-            ComputePipeline {
-                inner: inner.unchecked_into(),
-                id,
-                _marker: Default::default(),
-            }
-        })
-    }
 }
 
 pub struct ComputePipelineDescriptor<L> {
-    inner: GpuComputePipelineDescriptor,
+    compute_stage: ComputeStage,
+    layout: <Dvr as Driver>::PipelineLayoutHandle,
     _marker: marker::PhantomData<*const L>,
 }
 
 pub struct ComputePipelineDescriptorBuilder<L, S> {
-    inner: GpuComputePipelineDescriptor,
+    compute_stage: Option<ComputeStage>,
+    layout: Option<<Dvr as Driver>::PipelineLayoutHandle>,
     _marker: marker::PhantomData<(*const L, *const S)>,
 }
 
 impl ComputePipelineDescriptorBuilder<(), ()> {
     pub fn begin() -> Self {
-        let inner = GpuComputePipelineDescriptor::new(
-            JsValue::null().unchecked_ref(),
-            JsValue::null().unchecked_ref(),
-        );
-
         ComputePipelineDescriptorBuilder {
-            inner,
+            compute_stage: None,
+            layout: None,
             _marker: Default::default(),
         }
     }
 
     pub fn layout<Layout>(
-        mut self,
+        self,
         layout: &PipelineLayout<Layout>,
     ) -> ComputePipelineDescriptorBuilder<PipelineLayout<Layout>, ()> {
-        self.inner.layout(&layout.inner);
-
         ComputePipelineDescriptorBuilder {
-            inner: self.inner,
+            compute_stage: self.compute_stage,
+            layout: Some(layout.handle.clone()),
             _marker: Default::default(),
         }
     }
@@ -114,8 +103,8 @@ impl ComputePipelineDescriptorBuilder<(), ()> {
 
 impl<Layout: TypedPipelineLayout> ComputePipelineDescriptorBuilder<PipelineLayout<Layout>, ()> {
     pub fn compute(
-        mut self,
-        compute_stage: &ComputeStage,
+        self,
+        compute_stage: ComputeStage,
     ) -> ComputePipelineDescriptorBuilder<PipelineLayout<Layout>, ComputeStage> {
         let layout = Layout::BIND_GROUP_LAYOUTS;
 
@@ -135,7 +124,7 @@ impl<Layout: TypedPipelineLayout> ComputePipelineDescriptorBuilder<PipelineLayou
                 );
             };
 
-            if !entry.visibility.intersects(ShaderStages::COMPUTE) {
+            if !entry.visibility.contains(driver::ShaderStage::Compute) {
                 panic!(
                     "binding `{}` in group `{}` is not visible to the compute stage",
                     resource_binding.binding, resource_binding.group
@@ -154,10 +143,9 @@ impl<Layout: TypedPipelineLayout> ComputePipelineDescriptorBuilder<PipelineLayou
             }
         }
 
-        self.inner.compute(&compute_stage.inner);
-
         ComputePipelineDescriptorBuilder {
-            inner: self.inner,
+            compute_stage: Some(compute_stage),
+            layout: self.layout,
             _marker: Default::default(),
         }
     }
@@ -165,13 +153,12 @@ impl<Layout: TypedPipelineLayout> ComputePipelineDescriptorBuilder<PipelineLayou
 
 impl<Layout> ComputePipelineDescriptorBuilder<PipelineLayout<Layout>, ()> {
     pub unsafe fn compute_unchecked(
-        mut self,
-        compute_stage: &ComputeStage,
+        self,
+        compute_stage: ComputeStage,
     ) -> ComputePipelineDescriptorBuilder<PipelineLayout<Layout>, ComputeStage> {
-        self.inner.compute(&compute_stage.inner);
-
         ComputePipelineDescriptorBuilder {
-            inner: self.inner,
+            compute_stage: Some(compute_stage),
+            layout: self.layout,
             _marker: Default::default(),
         }
     }
@@ -180,27 +167,27 @@ impl<Layout> ComputePipelineDescriptorBuilder<PipelineLayout<Layout>, ()> {
 impl<Layout> ComputePipelineDescriptorBuilder<PipelineLayout<Layout>, ComputeStage> {
     pub fn finish(self) -> ComputePipelineDescriptor<Layout> {
         ComputePipelineDescriptor {
-            inner: self.inner,
+            compute_stage: self.compute_stage.unwrap(),
+            layout: self.layout.unwrap(),
             _marker: Default::default(),
         }
     }
 }
 
 pub struct ComputeStage {
-    pub(crate) inner: GpuProgrammableStage,
+    pub(crate) shader_module: <Dvr as Driver>::ShaderModuleHandle,
+    pub(crate) entry_point: String,
+    pub(crate) pipeline_constants: HashMap<String, f64>,
     pub(crate) shader_meta: ShaderSourceInternal,
 }
 
 pub struct ComputeStageBuilder {
-    inner: GpuProgrammableStage,
-    shader_meta: ShaderSourceInternal,
-    entry_index: usize,
+    compute_stage: ComputeStage,
     has_constants: bool,
 }
 
 impl ComputeStageBuilder {
     pub fn begin(shader_module: &ShaderModule, entry_point: &str) -> Self {
-        let inner = GpuProgrammableStage::new(entry_point, &shader_module.inner);
         let shader_meta = shader_module.meta.clone();
 
         let entry_index = shader_meta
@@ -213,50 +200,36 @@ impl ComputeStageBuilder {
             "entry point is not a compute stage"
         );
 
-        ComputeStageBuilder {
-            inner,
+        let compute_stage = ComputeStage {
+            shader_module: shader_module.handle.clone(),
+            entry_point: entry_point.to_string(),
+            pipeline_constants: Default::default(),
             shader_meta,
-            entry_index,
+        };
+
+        ComputeStageBuilder {
+            compute_stage,
             has_constants: false,
         }
     }
 
     pub fn pipeline_constants<C: PipelineConstants>(
-        self,
+        mut self,
         pipeline_constants: &C,
     ) -> ComputeStageBuilder {
-        let ComputeStageBuilder {
-            inner,
-            shader_meta,
-            entry_index,
-            ..
-        } = self;
+        self.compute_stage.pipeline_constants = self
+            .compute_stage
+            .shader_meta
+            .build_constants(pipeline_constants);
 
-        let record = shader_meta.build_constants(pipeline_constants);
-
-        // TODO: get support for WebIDL record types in wasm bindgen
-        js_sys::Reflect::set(inner.as_ref(), &JsValue::from("constants"), &record).unwrap_throw();
-
-        ComputeStageBuilder {
-            inner,
-            shader_meta,
-            entry_index,
-            has_constants: true,
-        }
+        self
     }
 
     pub fn finish(self) -> ComputeStage {
-        let ComputeStageBuilder {
-            inner,
-            shader_meta,
-            has_constants,
-            ..
-        } = self;
-
-        if !has_constants && shader_meta.has_required_constants() {
+        if !self.has_constants && self.compute_stage.shader_meta.has_required_constants() {
             panic!("the shader declares pipeline constants without fallback values, but no pipeline constants were set");
         }
 
-        ComputeStage { inner, shader_meta }
+        self.compute_stage
     }
 }

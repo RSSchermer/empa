@@ -1,5 +1,6 @@
-use web_sys::{GpuRenderPassColorAttachment, GpuRenderPassDepthStencilAttachment};
-
+use crate::driver::{
+    DepthStencilOperations, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
+};
 use crate::render_target::{
     ColorTargetEncoding, DepthStencilTargetEncoding, DepthValue, LoadOp, StoreOp, TypedColorLayout,
 };
@@ -16,9 +17,11 @@ mod color_targets_seal {
 pub trait ColorTargets: color_targets_seal::Seal {
     type Layout: TypedColorLayout;
 
-    type Encodings: Iterator<Item = ColorTargetEncoding>;
+    type Encodings<'a>: IntoIterator<Item = ColorTargetEncoding<'a>>
+    where
+        Self: 'a;
 
-    fn encodings(&self) -> Self::Encodings;
+    fn encodings<'a>(&'a self) -> Self::Encodings<'a>;
 }
 
 macro_rules! impl_color_targets {
@@ -29,13 +32,13 @@ macro_rules! impl_color_targets {
         #[allow(unused_parens)]
         impl<$($A),*> ColorTargets for ($($A),*) where $($A: ColorTarget),* {
             type Layout = ($($A::Format),*);
-            type Encodings = <[ColorTargetEncoding; $n] as IntoIterator>::IntoIter;
+            type Encodings<'a> = [ColorTargetEncoding<'a>; $n] where Self: 'a;
 
-            fn encodings(&self) -> Self::Encodings {
+            fn encodings<'a>(&'a self) -> Self::Encodings<'a> {
                 #[allow(non_snake_case)]
                 let ($($A),*) = self;
 
-                [$($A.to_encoding()),*].into_iter()
+                [$($A.to_encoding()),*]
             }
         }
     }
@@ -64,7 +67,7 @@ pub struct FloatAttachment<'a, F>
 where
     F: FloatRenderable,
 {
-    pub image: &'a AttachableImage<F>,
+    pub image: AttachableImage<'a, F>,
     pub load_op: LoadOp<[f32; 4]>,
     pub store_op: StoreOp,
 }
@@ -83,21 +86,15 @@ where
             store_op,
         } = self;
 
-        let mut inner = GpuRenderPassColorAttachment::new(
-            load_op.op_to_web_sys(),
-            store_op.to_web_sys(),
-            &image.inner,
-        );
-
-        if let Some(value) = load_op.value_to_web_sys() {
-            inner.clear_value(value.as_ref());
-        }
-
         ColorTargetEncoding {
-            inner,
+            inner: Some(RenderPassColorAttachment {
+                view: image.inner.clone(),
+                resolve_target: None,
+                load_op: load_op.to_4xf64(),
+                store_op: *store_op,
+            }),
             width: image.width,
             height: image.height,
-            _texture_handle: image.texture_handle.clone(),
         }
     }
 }
@@ -106,7 +103,7 @@ pub struct SignedIntegerAttachment<'a, F>
 where
     F: SignedIntegerRenderable,
 {
-    pub image: &'a AttachableImage<F>,
+    pub image: AttachableImage<'a, F>,
     pub load_op: LoadOp<[i32; 4]>,
     pub store_op: StoreOp,
 }
@@ -128,21 +125,15 @@ where
             store_op,
         } = self;
 
-        let mut inner = GpuRenderPassColorAttachment::new(
-            load_op.op_to_web_sys(),
-            store_op.to_web_sys(),
-            &image.inner,
-        );
-
-        if let Some(value) = load_op.value_to_web_sys() {
-            inner.clear_value(value.as_ref());
-        }
-
         ColorTargetEncoding {
-            inner,
+            inner: Some(RenderPassColorAttachment {
+                view: image.inner.clone(),
+                resolve_target: None,
+                load_op: load_op.to_4xf64(),
+                store_op: *store_op,
+            }),
             width: image.width,
             height: image.height,
-            _texture_handle: image.texture_handle.clone(),
         }
     }
 }
@@ -151,7 +142,7 @@ pub struct UnsignedIntegerAttachment<'a, F>
 where
     F: UnsignedIntegerRenderable,
 {
-    pub image: &'a AttachableImage<F>,
+    pub image: AttachableImage<'a, F>,
     pub load_op: LoadOp<[u32; 4]>,
     pub store_op: StoreOp,
 }
@@ -173,21 +164,15 @@ where
             store_op,
         } = self;
 
-        let mut inner = GpuRenderPassColorAttachment::new(
-            load_op.op_to_web_sys(),
-            store_op.to_web_sys(),
-            &image.inner,
-        );
-
-        if let Some(value) = load_op.value_to_web_sys() {
-            inner.clear_value(value.as_ref());
-        }
-
         ColorTargetEncoding {
-            inner,
+            inner: Some(RenderPassColorAttachment {
+                view: image.inner.clone(),
+                resolve_target: None,
+                load_op: load_op.to_4xf64(),
+                store_op: *store_op,
+            }),
             width: image.width,
             height: image.height,
-            _texture_handle: image.texture_handle.clone(),
         }
     }
 }
@@ -206,7 +191,7 @@ pub struct DepthStencilAttachment<'a, F>
 where
     F: CombinedDepthStencilRenderable,
 {
-    pub image: &'a AttachableImage<F>,
+    pub image: AttachableImage<'a, F>,
     pub depth_load_op: LoadOp<DepthValue>,
     pub depth_store_op: StoreOp,
     pub stencil_load_op: LoadOp<u32>,
@@ -232,29 +217,20 @@ where
             stencil_store_op,
         } = self;
 
-        let mut inner = GpuRenderPassDepthStencilAttachment::new(&image.inner);
-
-        inner.depth_read_only(false);
-        inner.depth_load_op(depth_load_op.op_to_web_sys());
-        inner.depth_store_op(depth_store_op.to_web_sys());
-
-        if let Some(value) = depth_load_op.value_to_web_sys() {
-            inner.depth_clear_value(value);
-        }
-
-        inner.stencil_read_only(false);
-        inner.stencil_load_op(stencil_load_op.op_to_web_sys());
-        inner.stencil_store_op(stencil_store_op.to_web_sys());
-
-        if let Some(value) = stencil_load_op.value_to_web_sys() {
-            inner.stencil_clear_value(value);
-        }
-
         DepthStencilTargetEncoding {
-            inner,
+            inner: Some(RenderPassDepthStencilAttachment {
+                view: image.inner.clone(),
+                depth_operations: Some(DepthStencilOperations {
+                    load_op: depth_load_op.to_f32(),
+                    store_op: *depth_store_op,
+                }),
+                stencil_operations: Some(DepthStencilOperations {
+                    load_op: *stencil_load_op,
+                    store_op: *stencil_store_op,
+                }),
+            }),
             width: image.width,
             height: image.height,
-            _texture_handle: image.texture_handle.clone(),
         }
     }
 }
@@ -263,7 +239,7 @@ pub struct ReadOnlyDepthStencilAttachment<'a, F>
 where
     F: CombinedDepthStencilRenderable,
 {
-    pub image: &'a AttachableImage<F>,
+    pub image: AttachableImage<'a, F>,
 }
 
 impl<'a, F> depth_stencil_target_seal::Seal for ReadOnlyDepthStencilAttachment<'a, F> where
@@ -279,16 +255,14 @@ where
     fn to_encoding(&self) -> DepthStencilTargetEncoding {
         let ReadOnlyDepthStencilAttachment { image } = self;
 
-        let mut inner = GpuRenderPassDepthStencilAttachment::new(&image.inner);
-
-        inner.depth_read_only(true);
-        inner.stencil_read_only(true);
-
         DepthStencilTargetEncoding {
-            inner,
+            inner: Some(RenderPassDepthStencilAttachment {
+                view: image.inner.clone(),
+                depth_operations: None,
+                stencil_operations: None,
+            }),
             width: image.width,
             height: image.height,
-            _texture_handle: image.texture_handle.clone(),
         }
     }
 }
@@ -297,7 +271,7 @@ pub struct DepthAttachment<'a, F>
 where
     F: DepthRenderable,
 {
-    pub image: &'a AttachableImage<F>,
+    pub image: AttachableImage<'a, F>,
     pub load_op: LoadOp<DepthValue>,
     pub store_op: StoreOp,
 }
@@ -316,21 +290,17 @@ where
             store_op,
         } = self;
 
-        let mut inner = GpuRenderPassDepthStencilAttachment::new(&image.inner);
-
-        inner.depth_read_only(false);
-        inner.depth_load_op(load_op.op_to_web_sys());
-        inner.depth_store_op(store_op.to_web_sys());
-
-        if let Some(value) = load_op.value_to_web_sys() {
-            inner.depth_clear_value(value);
-        }
-
         DepthStencilTargetEncoding {
-            inner,
+            inner: Some(RenderPassDepthStencilAttachment {
+                view: image.inner.clone(),
+                depth_operations: Some(DepthStencilOperations {
+                    load_op: load_op.to_f32(),
+                    store_op: *store_op,
+                }),
+                stencil_operations: None,
+            }),
             width: image.width,
             height: image.height,
-            _texture_handle: image.texture_handle.clone(),
         }
     }
 }
@@ -339,7 +309,7 @@ pub struct ReadOnlyDepthAttachment<'a, F>
 where
     F: DepthRenderable,
 {
-    pub image: &'a AttachableImage<F>,
+    pub image: AttachableImage<'a, F>,
 }
 
 impl<'a, F> depth_stencil_target_seal::Seal for ReadOnlyDepthAttachment<'a, F> where
@@ -355,15 +325,14 @@ where
     fn to_encoding(&self) -> DepthStencilTargetEncoding {
         let ReadOnlyDepthAttachment { image } = self;
 
-        let mut inner = GpuRenderPassDepthStencilAttachment::new(&image.inner);
-
-        inner.depth_read_only(true);
-
         DepthStencilTargetEncoding {
-            inner,
+            inner: Some(RenderPassDepthStencilAttachment {
+                view: image.inner.clone(),
+                depth_operations: None,
+                stencil_operations: None,
+            }),
             width: image.width,
             height: image.height,
-            _texture_handle: image.texture_handle.clone(),
         }
     }
 }
@@ -372,7 +341,7 @@ pub struct StencilAttachment<'a, F>
 where
     F: StencilRenderable,
 {
-    pub image: &'a AttachableImage<F>,
+    pub image: AttachableImage<'a, F>,
     pub load_op: LoadOp<u32>,
     pub store_op: StoreOp,
 }
@@ -391,21 +360,17 @@ where
             store_op,
         } = self;
 
-        let mut inner = GpuRenderPassDepthStencilAttachment::new(&image.inner);
-
-        inner.stencil_read_only(false);
-        inner.stencil_load_op(load_op.op_to_web_sys());
-        inner.stencil_store_op(store_op.to_web_sys());
-
-        if let Some(value) = load_op.value_to_web_sys() {
-            inner.stencil_clear_value(value);
-        }
-
         DepthStencilTargetEncoding {
-            inner,
+            inner: Some(RenderPassDepthStencilAttachment {
+                view: image.inner.clone(),
+                depth_operations: None,
+                stencil_operations: Some(DepthStencilOperations {
+                    load_op: *load_op,
+                    store_op: *store_op,
+                }),
+            }),
             width: image.width,
             height: image.height,
-            _texture_handle: image.texture_handle.clone(),
         }
     }
 }
@@ -414,7 +379,7 @@ pub struct ReadOnlyStencilAttachment<'a, F>
 where
     F: StencilRenderable,
 {
-    pub image: &'a AttachableImage<F>,
+    pub image: AttachableImage<'a, F>,
 }
 
 impl<'a, F> depth_stencil_target_seal::Seal for ReadOnlyStencilAttachment<'a, F> where
@@ -430,15 +395,14 @@ where
     fn to_encoding(&self) -> DepthStencilTargetEncoding {
         let ReadOnlyStencilAttachment { image } = self;
 
-        let mut inner = GpuRenderPassDepthStencilAttachment::new(&image.inner);
-
-        inner.stencil_read_only(true);
-
         DepthStencilTargetEncoding {
-            inner,
+            inner: Some(RenderPassDepthStencilAttachment {
+                view: image.inner.clone(),
+                depth_operations: None,
+                stencil_operations: None,
+            }),
             width: image.width,
             height: image.height,
-            _texture_handle: image.texture_handle.clone(),
         }
     }
 }

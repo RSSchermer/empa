@@ -1,9 +1,16 @@
+use flagset::FlagSet;
+
+use crate::driver::BufferUsage;
 use crate::type_flag::{TypeFlag, O, X};
 
 mod usage_flags_seal {
+    use flagset::FlagSet;
+
+    use crate::driver::BufferUsage;
+
     pub trait Seal {
         #[doc(hidden)]
-        const BITS: u32;
+        const FLAG_SET: FlagSet<BufferUsage>;
     }
 }
 
@@ -136,51 +143,98 @@ impl<
         MapRead,
     >
 {
-    const BITS: u32 = {
-        let mut flags = 0u32;
+    const FLAG_SET: FlagSet<BufferUsage> = {
+        let mut bits = 0;
 
         if MapRead::IS_ENABLED {
-            flags |= 1 << 0;
+            bits |= BufferUsage::MapRead as u32;
         }
 
         if MapWrite::IS_ENABLED {
-            flags |= 1 << 1;
+            bits |= BufferUsage::MapWrite as u32;
         }
 
         if CopySrc::IS_ENABLED {
-            flags |= 1 << 2;
+            bits |= BufferUsage::CopySrc as u32;
         }
 
         if CopyDst::IS_ENABLED {
-            flags |= 1 << 3;
+            bits |= BufferUsage::CopyDst as u32;
         }
 
         if Index::IS_ENABLED {
-            flags |= 1 << 4;
+            bits |= BufferUsage::Index as u32;
         }
 
         if Vertex::IS_ENABLED {
-            flags |= 1 << 5;
+            bits |= BufferUsage::Vertex as u32;
         }
 
         if UniformBinding::IS_ENABLED {
-            flags |= 1 << 6;
+            bits |= BufferUsage::Uniform as u32;
         }
 
         if StorageBinding::IS_ENABLED {
-            flags |= 1 << 7;
+            bits |= BufferUsage::Storage as u32;
         }
 
         if Indirect::IS_ENABLED {
-            flags |= 1 << 8;
+            bits |= BufferUsage::Indirect as u32;
         }
 
         if QueryResolve::IS_ENABLED {
-            flags |= 1 << 9;
+            bits |= BufferUsage::QueryResolve as u32;
         }
 
-        flags
+        unsafe { FlagSet::new_unchecked(bits) }
     };
+
+    // TODO: when const traits work
+    // const FLAG_SET: FlagSet<BufferUsage> = {
+    //     let mut flag_set = FlagSet::from(BufferUsage::None);
+    //
+    //     if MapRead::IS_ENABLED {
+    //         flag_set |= BufferUsage::MapRead;
+    //     }
+    //
+    //     if MapWrite::IS_ENABLED {
+    //         flag_set |= BufferUsage::MapWrite;
+    //     }
+    //
+    //     if CopySrc::IS_ENABLED {
+    //         flag_set |= BufferUsage::CopySrc;
+    //     }
+    //
+    //     if CopyDst::IS_ENABLED {
+    //         flag_set |= BufferUsage::CopyDst;
+    //     }
+    //
+    //     if Index::IS_ENABLED {
+    //         flag_set |= BufferUsage::Index;
+    //     }
+    //
+    //     if Vertex::IS_ENABLED {
+    //         flag_set |= BufferUsage::Vertex;
+    //     }
+    //
+    //     if UniformBinding::IS_ENABLED {
+    //         flag_set |= BufferUsage::Uniform;
+    //     }
+    //
+    //     if StorageBinding::IS_ENABLED {
+    //         flag_set |= BufferUsage::Storage;
+    //     }
+    //
+    //     if Indirect::IS_ENABLED {
+    //         flag_set |= BufferUsage::Indirect;
+    //     }
+    //
+    //     if QueryResolve::IS_ENABLED {
+    //         flag_set |= BufferUsage::QueryResolve;
+    //     }
+    //
+    //     flag_set
+    // };
 }
 
 impl<

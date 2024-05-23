@@ -1,148 +1,164 @@
 #![allow(non_camel_case_types)]
 
-use std::{fmt, iter};
-
-use web_sys::GpuTextureFormat;
+use std::iter;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct TextureFormatId {
-    inner: GpuTextureFormat,
+#[allow(non_camel_case_types)]
+pub enum TextureFormatId {
+    r8unorm,
+    r8snorm,
+    r8uint,
+    r8sint,
+    r16uint,
+    r16sint,
+    r16float,
+    rg8unorm,
+    rg8snorm,
+    rg8uint,
+    rg8sint,
+    r32uint,
+    r32sint,
+    r32float,
+    rg16uint,
+    rg16sint,
+    rg16float,
+    rgba8unorm,
+    rgba8unorm_srgb,
+    rgba8snorm,
+    rgba8uint,
+    rgba8sint,
+    bgra8unorm,
+    bgra8unorm_srgb,
+    rgb9e5ufloat,
+    rgb10a2unorm,
+    rg11b10ufloat,
+    rg32uint,
+    rg32sint,
+    rg32float,
+    rgba16uint,
+    rgba16sint,
+    rgba16float,
+    rgba32uint,
+    rgba32sint,
+    rgba32float,
+    stencil8,
+    depth16unorm,
+    depth24plus,
+    depth24plus_stencil8,
+    depth32float,
+    depth32float_stencil8,
+    bc1_rgba_unorm,
+    bc1_rgba_unorm_srgb,
+    bc2_rgba_unorm,
+    bc2_rgba_unorm_srgb,
+    bc3_rgba_unorm,
+    bc3_rgba_unorm_srgb,
+    bc4_r_unorm,
+    bc4_r_snorm,
+    bc5_rg_unorm,
+    bc5_rg_snorm,
+    bc6h_rgb_ufloat,
+    bc6h_rgb_float,
+    bc7_rgba_unorm,
+    bc7_rgba_unorm_srgb,
+    etc2_rgb8unorm,
+    etc2_rgb8unorm_srgb,
+    etc2_rgb8a1unorm,
+    etc2_rgb8a1unorm_srgb,
+    etc2_rgba8unorm,
+    etc2_rgba8unorm_srgb,
+    eac_r11unorm,
+    eac_r11snorm,
+    eac_rg11unorm,
+    eac_rg11snorm,
+    astc_4x4_unorm,
+    astc_4x4_unorm_srgb,
+    astc_5x4_unorm,
+    astc_5x4_unorm_srgb,
+    astc_5x5_unorm,
+    astc_5x5_unorm_srgb,
+    astc_6x5_unorm,
+    astc_6x5_unorm_srgb,
+    astc_6x6_unorm,
+    astc_6x6_unorm_srgb,
+    astc_8x5_unorm,
+    astc_8x5_unorm_srgb,
+    astc_8x6_unorm,
+    astc_8x6_unorm_srgb,
+    astc_8x8_unorm,
+    astc_8x8_unorm_srgb,
+    astc_10x5_unorm,
+    astc_10x5_unorm_srgb,
+    astc_10x6_unorm,
+    astc_10x6_unorm_srgb,
+    astc_10x8_unorm,
+    astc_10x8_unorm_srgb,
+    astc_10x10_unorm,
+    astc_10x10_unorm_srgb,
+    astc_12x10_unorm,
+    astc_12x10_unorm_srgb,
+    astc_12x12_unorm,
+    astc_12x12_unorm_srgb,
 }
 
 impl TextureFormatId {
-    #[doc(hidden)]
-    pub fn to_web_sys(&self) -> GpuTextureFormat {
-        self.inner
-    }
-
-    // Note: below 4 methods exist to determine compatibility with fragment shader outputs. However,
-    // I can not currently find an explicit definition in the spec of what compatibility means, so
-    // this may well be incorrect.
     pub(crate) fn is_float(&self) -> bool {
-        match self.inner {
-            GpuTextureFormat::R8unorm
-            | GpuTextureFormat::R8snorm
-            | GpuTextureFormat::Rg8unorm
-            | GpuTextureFormat::Rg8snorm
-            | GpuTextureFormat::R32float
-            | GpuTextureFormat::Rgba8unorm
-            | GpuTextureFormat::Rgba8unormSrgb
-            | GpuTextureFormat::Rgba8snorm
-            | GpuTextureFormat::Bgra8unorm
-            | GpuTextureFormat::Bgra8unormSrgb
-            | GpuTextureFormat::Rgb9e5ufloat
-            | GpuTextureFormat::Rgb10a2unorm
-            | GpuTextureFormat::Rg32float
-            | GpuTextureFormat::Rgba32float => true,
+        match self {
+            TextureFormatId::r8unorm
+            | TextureFormatId::r8snorm
+            | TextureFormatId::rg8unorm
+            | TextureFormatId::rg8snorm
+            | TextureFormatId::r32float
+            | TextureFormatId::rgba8unorm
+            | TextureFormatId::rgba8unorm_srgb
+            | TextureFormatId::rgba8snorm
+            | TextureFormatId::bgra8unorm
+            | TextureFormatId::bgra8unorm_srgb
+            | TextureFormatId::rgb9e5ufloat
+            | TextureFormatId::rgb10a2unorm
+            | TextureFormatId::rg32float
+            | TextureFormatId::rgba32float => true,
             _ => false,
         }
     }
 
     pub(crate) fn is_half_float(&self) -> bool {
-        match self.inner {
-            GpuTextureFormat::R16float
-            | GpuTextureFormat::Rg16float
-            | GpuTextureFormat::Rgba16float => true,
+        match self {
+            TextureFormatId::r16float
+            | TextureFormatId::rg16float
+            | TextureFormatId::rgba16float => true,
             _ => false,
         }
     }
 
     pub(crate) fn is_signed_integer(&self) -> bool {
-        match self.inner {
-            GpuTextureFormat::R8sint
-            | GpuTextureFormat::R16sint
-            | GpuTextureFormat::Rg8sint
-            | GpuTextureFormat::R32sint
-            | GpuTextureFormat::Rg16sint
-            | GpuTextureFormat::Rgba8sint
-            | GpuTextureFormat::Rg32sint
-            | GpuTextureFormat::Rgba16sint
-            | GpuTextureFormat::Rgba32sint => true,
+        match self {
+            TextureFormatId::r8sint
+            | TextureFormatId::r16sint
+            | TextureFormatId::rg8sint
+            | TextureFormatId::r32sint
+            | TextureFormatId::rg16sint
+            | TextureFormatId::rgba8sint
+            | TextureFormatId::rg32sint
+            | TextureFormatId::rgba16sint
+            | TextureFormatId::rgba32sint => true,
             _ => false,
         }
     }
 
     pub(crate) fn is_unsigned_integer(&self) -> bool {
-        match self.inner {
-            GpuTextureFormat::R8uint
-            | GpuTextureFormat::R16uint
-            | GpuTextureFormat::Rg8uint
-            | GpuTextureFormat::R32uint
-            | GpuTextureFormat::Rg16uint
-            | GpuTextureFormat::Rgba8uint
-            | GpuTextureFormat::Rg32uint
-            | GpuTextureFormat::Rgba16uint
-            | GpuTextureFormat::Rgba32uint => true,
+        match self {
+            TextureFormatId::r8uint
+            | TextureFormatId::r16uint
+            | TextureFormatId::rg8uint
+            | TextureFormatId::r32uint
+            | TextureFormatId::rg16uint
+            | TextureFormatId::rgba8uint
+            | TextureFormatId::rg32uint
+            | TextureFormatId::rgba16uint
+            | TextureFormatId::rgba32uint => true,
             _ => false,
         }
-    }
-
-    pub fn as_str(&self) -> &str {
-        match self.inner {
-            GpuTextureFormat::R8unorm => "r8unorm",
-            GpuTextureFormat::R8snorm => "r8snorm",
-            GpuTextureFormat::R8uint => "r8uint",
-            GpuTextureFormat::R8sint => "r8sint",
-            GpuTextureFormat::R16uint => "r16uint",
-            GpuTextureFormat::R16sint => "r16sint",
-            GpuTextureFormat::R16float => "r16float",
-            GpuTextureFormat::Rg8unorm => "rg8unorm",
-            GpuTextureFormat::Rg8snorm => "rg8snorm",
-            GpuTextureFormat::Rg8uint => "rg8uint",
-            GpuTextureFormat::Rg8sint => "rg8sint",
-            GpuTextureFormat::R32uint => "r32uint",
-            GpuTextureFormat::R32sint => "r32sint",
-            GpuTextureFormat::R32float => "r32float",
-            GpuTextureFormat::Rg16uint => "rg16uint",
-            GpuTextureFormat::Rg16sint => "rg16sint",
-            GpuTextureFormat::Rg16float => "rg16float",
-            GpuTextureFormat::Rgba8unorm => "rgba8unorm",
-            GpuTextureFormat::Rgba8unormSrgb => "rgba8unormSrgb",
-            GpuTextureFormat::Rgba8snorm => "rgba8snorm",
-            GpuTextureFormat::Rgba8uint => "rgba8uint",
-            GpuTextureFormat::Rgba8sint => "rgba8sint",
-            GpuTextureFormat::Bgra8unorm => "bgra8unorm",
-            GpuTextureFormat::Bgra8unormSrgb => "bgra8unorm-srgb",
-            GpuTextureFormat::Rgb9e5ufloat => "rgb9e5ufloat",
-            GpuTextureFormat::Rgb10a2unorm => "rgb10a2unorm",
-            GpuTextureFormat::Rg11b10ufloat => "rg11b10ufloat",
-            GpuTextureFormat::Rg32uint => "rg32uint",
-            GpuTextureFormat::Rg32sint => "rg32sint",
-            GpuTextureFormat::Rg32float => "rg32float",
-            GpuTextureFormat::Rgba16uint => "rgba16uint",
-            GpuTextureFormat::Rgba16sint => "rgba16sint",
-            GpuTextureFormat::Rgba16float => "rgba16float",
-            GpuTextureFormat::Rgba32uint => "rgba32uint",
-            GpuTextureFormat::Rgba32sint => "rgba32sint",
-            GpuTextureFormat::Rgba32float => "rgba32float",
-            GpuTextureFormat::Stencil8 => "stencil8",
-            GpuTextureFormat::Depth16unorm => "depth16unorm",
-            GpuTextureFormat::Depth24plus => "depth24plus",
-            GpuTextureFormat::Depth24plusStencil8 => "depth24plus-stencil8",
-            GpuTextureFormat::Depth32float => "depth32float",
-            GpuTextureFormat::Bc1RgbaUnorm => "bc1-rgba-unorm",
-            GpuTextureFormat::Bc1RgbaUnormSrgb => "bc1-rgba-unorm-srgb",
-            GpuTextureFormat::Bc2RgbaUnorm => "bc2-rgba-unorm",
-            GpuTextureFormat::Bc2RgbaUnormSrgb => "bc2-rgba-unorm-srgb",
-            GpuTextureFormat::Bc3RgbaUnorm => "bc3-rgba-unorm",
-            GpuTextureFormat::Bc3RgbaUnormSrgb => "bc3-rgba-unorm-srgb",
-            GpuTextureFormat::Bc4RUnorm => "bc4-r-unorm",
-            GpuTextureFormat::Bc4RSnorm => "bc4-r-snorm",
-            GpuTextureFormat::Bc5RgUnorm => "bc5-rg-unorm",
-            GpuTextureFormat::Bc5RgSnorm => "bc5-rg-snorm",
-            GpuTextureFormat::Bc6hRgbUfloat => "bc6h-rgb-ufloat",
-            GpuTextureFormat::Bc6hRgbFloat => "bc6h-rgb-float",
-            GpuTextureFormat::Bc7RgbaUnorm => "bc7-rgba-unorm",
-            GpuTextureFormat::Bc7RgbaUnormSrgb => "bc7-rgba-unorm-srgb",
-            GpuTextureFormat::Depth32floatStencil8 => "depth32float-stencil8",
-            _ => "unknown",
-        }
-    }
-}
-
-impl fmt::Display for TextureFormatId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.as_str().fmt(f)
     }
 }
 
@@ -157,120 +173,118 @@ pub trait TextureFormat: texture_format_seal::Seal {
 }
 
 macro_rules! typed_texture_format {
-    ($format:ident, $web_sys:ident, $block_width:literal, $block_height:literal) => {
+    ($format:ident, $block_width:literal, $block_height:literal) => {
         pub struct $format;
 
         impl texture_format_seal::Seal for $format {}
         impl TextureFormat for $format {
-            const FORMAT_ID: TextureFormatId = TextureFormatId {
-                inner: GpuTextureFormat::$web_sys,
-            };
+            const FORMAT_ID: TextureFormatId = TextureFormatId::$format;
 
             const BLOCK_SIZE: [u32; 2] = [$block_width, $block_height];
         }
     };
-    ($format:ident, $web_sys:ident) => {
-        typed_texture_format!($format, $web_sys, 1, 1);
+    ($format:ident) => {
+        typed_texture_format!($format, 1, 1);
     };
 }
 
-typed_texture_format!(r8unorm, R8unorm);
-typed_texture_format!(r8snorm, R8snorm);
-typed_texture_format!(r8uint, R8uint);
-typed_texture_format!(r8sint, R8sint);
-typed_texture_format!(r16uint, R16uint);
-typed_texture_format!(r16sint, R16sint);
-typed_texture_format!(r16float, R16float);
-typed_texture_format!(rg8unorm, Rg8unorm);
-typed_texture_format!(rg8snorm, Rg8snorm);
-typed_texture_format!(rg8uint, Rg8uint);
-typed_texture_format!(rg8sint, Rg8sint);
-typed_texture_format!(r32uint, R32uint);
-typed_texture_format!(r32sint, R32sint);
-typed_texture_format!(r32float, R32float);
-typed_texture_format!(rg16uint, Rg16uint);
-typed_texture_format!(rg16sint, Rg16sint);
-typed_texture_format!(rg16float, Rg16float);
-typed_texture_format!(rgba8unorm, Rgba8unorm);
-typed_texture_format!(rgba8unorm_srgb, Rgba8unormSrgb);
-typed_texture_format!(rgba8snorm, Rgba8snorm);
-typed_texture_format!(rgba8uint, Rgba8uint);
-typed_texture_format!(rgba8sint, Rgba8sint);
-typed_texture_format!(bgra8unorm, Bgra8unorm);
-typed_texture_format!(bgra8unorm_srgb, Bgra8unormSrgb);
-typed_texture_format!(rgb9e5ufloat, Rgb9e5ufloat);
-typed_texture_format!(rgb10a2unorm, Rgb10a2unorm);
-typed_texture_format!(rg11b10ufloat, Rg11b10ufloat);
-typed_texture_format!(rg32uint, Rg32uint);
-typed_texture_format!(rg32sint, Rg32sint);
-typed_texture_format!(rg32float, Rg32float);
-typed_texture_format!(rgba16uint, Rgba16uint);
-typed_texture_format!(rgba16sint, Rgba16sint);
-typed_texture_format!(rgba16float, Rgba16float);
-typed_texture_format!(rgba32uint, Rgba32uint);
-typed_texture_format!(rgba32sint, Rgba32sint);
-typed_texture_format!(rgba32float, Rgba32float);
-typed_texture_format!(stencil8, Stencil8);
-typed_texture_format!(depth16unorm, Depth16unorm);
-typed_texture_format!(depth24plus, Depth24plus);
-typed_texture_format!(depth24plus_stencil8, Depth24plusStencil8);
-typed_texture_format!(depth32float, Depth32float);
-typed_texture_format!(depth32float_stencil8, Depth32floatStencil8);
-typed_texture_format!(bc1_rgba_unorm, Bc1RgbaUnorm, 4, 4);
-typed_texture_format!(bc1_rgba_unorm_srgb, Bc1RgbaUnormSrgb, 4, 4);
-typed_texture_format!(bc2_rgba_unorm, Bc2RgbaUnorm, 4, 4);
-typed_texture_format!(bc2_rgba_unorm_srgb, Bc2RgbaUnormSrgb, 4, 4);
-typed_texture_format!(bc3_rgba_unorm, Bc3RgbaUnorm, 4, 4);
-typed_texture_format!(bc3_rgba_unorm_srgb, Bc3RgbaUnormSrgb, 4, 4);
-typed_texture_format!(bc4_r_unorm, Bc4RUnorm, 4, 4);
-typed_texture_format!(bc4_r_snorm, Bc4RSnorm, 4, 4);
-typed_texture_format!(bc5_rg_unorm, Bc5RgUnorm, 4, 4);
-typed_texture_format!(bc5_rg_snorm, Bc5RgSnorm, 4, 4);
-typed_texture_format!(bc6h_rgb_ufloat, Bc6hRgbUfloat, 4, 4);
-typed_texture_format!(bc6h_rgb_float, Bc6hRgbFloat, 4, 4);
-typed_texture_format!(bc7_rgba_unorm, Bc7RgbaUnorm, 4, 4);
-typed_texture_format!(bc7_rgba_unorm_srgb, Bc7RgbaUnormSrgb, 4, 4);
+typed_texture_format!(r8unorm);
+typed_texture_format!(r8snorm);
+typed_texture_format!(r8uint);
+typed_texture_format!(r8sint);
+typed_texture_format!(r16uint);
+typed_texture_format!(r16sint);
+typed_texture_format!(r16float);
+typed_texture_format!(rg8unorm);
+typed_texture_format!(rg8snorm);
+typed_texture_format!(rg8uint);
+typed_texture_format!(rg8sint);
+typed_texture_format!(r32uint);
+typed_texture_format!(r32sint);
+typed_texture_format!(r32float);
+typed_texture_format!(rg16uint);
+typed_texture_format!(rg16sint);
+typed_texture_format!(rg16float);
+typed_texture_format!(rgba8unorm);
+typed_texture_format!(rgba8unorm_srgb);
+typed_texture_format!(rgba8snorm);
+typed_texture_format!(rgba8uint);
+typed_texture_format!(rgba8sint);
+typed_texture_format!(bgra8unorm);
+typed_texture_format!(bgra8unorm_srgb);
+typed_texture_format!(rgb9e5ufloat);
+typed_texture_format!(rgb10a2unorm);
+typed_texture_format!(rg11b10ufloat);
+typed_texture_format!(rg32uint);
+typed_texture_format!(rg32sint);
+typed_texture_format!(rg32float);
+typed_texture_format!(rgba16uint);
+typed_texture_format!(rgba16sint);
+typed_texture_format!(rgba16float);
+typed_texture_format!(rgba32uint);
+typed_texture_format!(rgba32sint);
+typed_texture_format!(rgba32float);
+typed_texture_format!(stencil8);
+typed_texture_format!(depth16unorm);
+typed_texture_format!(depth24plus);
+typed_texture_format!(depth24plus_stencil8);
+typed_texture_format!(depth32float);
+typed_texture_format!(depth32float_stencil8);
+typed_texture_format!(bc1_rgba_unorm, 4, 4);
+typed_texture_format!(bc1_rgba_unorm_srgb, 4, 4);
+typed_texture_format!(bc2_rgba_unorm, 4, 4);
+typed_texture_format!(bc2_rgba_unorm_srgb, 4, 4);
+typed_texture_format!(bc3_rgba_unorm, 4, 4);
+typed_texture_format!(bc3_rgba_unorm_srgb, 4, 4);
+typed_texture_format!(bc4_r_unorm, 4, 4);
+typed_texture_format!(bc4_r_snorm, 4, 4);
+typed_texture_format!(bc5_rg_unorm, 4, 4);
+typed_texture_format!(bc5_rg_snorm, 4, 4);
+typed_texture_format!(bc6h_rgb_ufloat, 4, 4);
+typed_texture_format!(bc6h_rgb_float, 4, 4);
+typed_texture_format!(bc7_rgba_unorm, 4, 4);
+typed_texture_format!(bc7_rgba_unorm_srgb, 4, 4);
 
 // TODO: these are given temporary incorrect web_sys tags, because they are currently not in web_sys
 // Get web_sys up to date with the spec and replace these tags.
-typed_texture_format!(etc2_rgb8unorm, R8snorm, 4, 4);
-typed_texture_format!(etc2_rgb8unorm_srgb, R8snorm, 4, 4);
-typed_texture_format!(etc2_rgb8a1unorm, R8snorm, 4, 4);
-typed_texture_format!(etc2_rgb8a1unorm_srgb, R8snorm, 4, 4);
-typed_texture_format!(etc2_rgba8unorm, R8snorm, 4, 4);
-typed_texture_format!(etc2_rgba8unorm_srgb, R8snorm, 4, 4);
-typed_texture_format!(eac_r11unorm, R8snorm, 4, 4);
-typed_texture_format!(eac_r11snorm, R8snorm, 4, 4);
-typed_texture_format!(eac_rg11unorm, R8snorm, 4, 4);
-typed_texture_format!(eac_rg11snorm, R8snorm, 4, 4);
-typed_texture_format!(astc_4x4_unorm, R8snorm, 4, 4);
-typed_texture_format!(astc_4x4_unorm_srgb, R8snorm, 4, 4);
-typed_texture_format!(astc_5x4_unorm, R8snorm, 5, 4);
-typed_texture_format!(astc_5x4_unorm_srgb, R8snorm, 5, 4);
-typed_texture_format!(astc_5x5_unorm, R8snorm, 5, 5);
-typed_texture_format!(astc_5x5_unorm_srgb, R8snorm, 5, 5);
-typed_texture_format!(astc_6x5_unorm, R8snorm, 6, 5);
-typed_texture_format!(astc_6x5_unorm_srgb, R8snorm, 6, 5);
-typed_texture_format!(astc_6x6_unorm, R8snorm, 6, 6);
-typed_texture_format!(astc_6x6_unorm_srgb, R8snorm, 6, 6);
-typed_texture_format!(astc_8x5_unorm, R8snorm, 8, 5);
-typed_texture_format!(astc_8x5_unorm_srgb, R8snorm, 8, 5);
-typed_texture_format!(astc_8x6_unorm, R8snorm, 8, 6);
-typed_texture_format!(astc_8x6_unorm_srgb, R8snorm, 8, 6);
-typed_texture_format!(astc_8x8_unorm, R8snorm, 8, 8);
-typed_texture_format!(astc_8x8_unorm_srgb, R8snorm, 8, 8);
-typed_texture_format!(astc_10x5_unorm, R8snorm, 10, 5);
-typed_texture_format!(astc_10x5_unorm_srgb, R8snorm, 10, 5);
-typed_texture_format!(astc_10x6_unorm, R8snorm, 10, 6);
-typed_texture_format!(astc_10x6_unorm_srgb, R8snorm, 10, 6);
-typed_texture_format!(astc_10x8_unorm, R8snorm, 10, 8);
-typed_texture_format!(astc_10x8_unorm_srgb, R8snorm, 10, 8);
-typed_texture_format!(astc_10x10_unorm, R8snorm, 10, 10);
-typed_texture_format!(astc_10x10_unorm_srgb, R8snorm, 10, 10);
-typed_texture_format!(astc_12x10_unorm, R8snorm, 12, 10);
-typed_texture_format!(astc_12x10_unorm_srgb, R8snorm, 12, 10);
-typed_texture_format!(astc_12x12_unorm, R8snorm, 12, 12);
-typed_texture_format!(astc_12x12_unorm_srgb, R8snorm, 12, 12);
+typed_texture_format!(etc2_rgb8unorm, 4, 4);
+typed_texture_format!(etc2_rgb8unorm_srgb, 4, 4);
+typed_texture_format!(etc2_rgb8a1unorm, 4, 4);
+typed_texture_format!(etc2_rgb8a1unorm_srgb, 4, 4);
+typed_texture_format!(etc2_rgba8unorm, 4, 4);
+typed_texture_format!(etc2_rgba8unorm_srgb, 4, 4);
+typed_texture_format!(eac_r11unorm, 4, 4);
+typed_texture_format!(eac_r11snorm, 4, 4);
+typed_texture_format!(eac_rg11unorm, 4, 4);
+typed_texture_format!(eac_rg11snorm, 4, 4);
+typed_texture_format!(astc_4x4_unorm, 4, 4);
+typed_texture_format!(astc_4x4_unorm_srgb, 4, 4);
+typed_texture_format!(astc_5x4_unorm, 5, 4);
+typed_texture_format!(astc_5x4_unorm_srgb, 5, 4);
+typed_texture_format!(astc_5x5_unorm, 5, 5);
+typed_texture_format!(astc_5x5_unorm_srgb, 5, 5);
+typed_texture_format!(astc_6x5_unorm, 6, 5);
+typed_texture_format!(astc_6x5_unorm_srgb, 6, 5);
+typed_texture_format!(astc_6x6_unorm, 6, 6);
+typed_texture_format!(astc_6x6_unorm_srgb, 6, 6);
+typed_texture_format!(astc_8x5_unorm, 8, 5);
+typed_texture_format!(astc_8x5_unorm_srgb, 8, 5);
+typed_texture_format!(astc_8x6_unorm, 8, 6);
+typed_texture_format!(astc_8x6_unorm_srgb, 8, 6);
+typed_texture_format!(astc_8x8_unorm, 8, 8);
+typed_texture_format!(astc_8x8_unorm_srgb, 8, 8);
+typed_texture_format!(astc_10x5_unorm, 10, 5);
+typed_texture_format!(astc_10x5_unorm_srgb, 10, 5);
+typed_texture_format!(astc_10x6_unorm, 10, 6);
+typed_texture_format!(astc_10x6_unorm_srgb, 10, 6);
+typed_texture_format!(astc_10x8_unorm, 10, 8);
+typed_texture_format!(astc_10x8_unorm_srgb, 10, 8);
+typed_texture_format!(astc_10x10_unorm, 10, 10);
+typed_texture_format!(astc_10x10_unorm_srgb, 10, 10);
+typed_texture_format!(astc_12x10_unorm, 12, 10);
+typed_texture_format!(astc_12x10_unorm_srgb, 12, 10);
+typed_texture_format!(astc_12x12_unorm, 12, 12);
+typed_texture_format!(astc_12x12_unorm_srgb, 12, 12);
 
 pub trait Texture1DFormat: TextureFormat {}
 

@@ -1,102 +1,45 @@
-use std::borrow::Borrow;
-use std::ops::Rem;
-use std::sync::Arc;
+use std::borrow::Cow;
+use std::ops::{Range, Rem};
 use std::{marker, mem};
 
-use staticvec::StaticVec;
-use wasm_bindgen::JsValue;
-use web_sys::{
-    GpuColorDict, GpuCommandBuffer, GpuCommandEncoder, GpuComputePassEncoder, GpuExtent3dDict,
-    GpuRenderBundle, GpuRenderBundleEncoder, GpuRenderBundleEncoderDescriptor,
-    GpuRenderPassDescriptor, GpuRenderPassEncoder,
-};
-
 use crate::abi::{MemoryUnit, MemoryUnitLayout};
-use crate::buffer::BufferHandle;
+use crate::buffer::image_copy_buffer_validate;
 use crate::command::{
     BindGroupEncoding, BindGroups, IndexBuffer, IndexBufferEncoding, VertexBufferEncoding,
     VertexBuffers,
 };
 use crate::compute_pipeline::ComputePipeline;
 use crate::device::Device;
-use crate::query::{OcclusionQuerySet, QuerySetHandle, TimestampQuerySet};
+use crate::driver::{
+    ClearBuffer, CommandEncoder as _, ComputePassEncoder as _, CopyBufferToBuffer,
+    CopyBufferToTexture, CopyTextureToBuffer, CopyTextureToTexture, Device as _, Driver, Dvr,
+    ExecuteRenderBundlesEncoder, ImageCopyBuffer, ProgrammablePassEncoder,
+    RenderBundleEncoder as _, RenderEncoder, RenderPassEncoder as _, ResolveQuerySet,
+    SetIndexBuffer, SetVertexBuffer,
+};
+use crate::query::{OcclusionQuerySet, TimestampQuerySet};
 use crate::render_pipeline::{PipelineIndexFormat, PipelineIndexFormatCompatible, RenderPipeline};
 use crate::render_target::{
-    MultisampleRenderLayout, ReadOnly, RenderLayout, RenderLayoutCompatible, RenderTargetEncoding,
-    TypedColorLayout, TypedMultisampleColorLayout, ValidRenderTarget,
+    MultisampleRenderLayout, ReadOnly, RenderLayout, RenderLayoutCompatible, TypedColorLayout,
+    TypedMultisampleColorLayout, ValidRenderTarget,
 };
-use crate::resource_binding::BindGroupResource;
-use crate::texture::format::{DepthStencilRenderable, ImageData, TextureFormat};
-use crate::texture::{ImageCopySize3D, TextureHandle};
+use crate::texture::format::{DepthStencilRenderable, ImageData, TextureFormat, TextureFormatId};
+use crate::texture::ImageCopySize3D;
 use crate::type_flag::{TypeFlag, O, X};
-use crate::{abi, buffer, texture};
-
-enum ResourceHandle {
-    Buffer(Arc<BufferHandle>),
-    Texture(Arc<TextureHandle>),
-    BindGroup(Arc<Vec<BindGroupResource>>),
-    RenderTarget(Arc<StaticVec<Arc<TextureHandle>, 9>>),
-    RenderBundle(Arc<Vec<ResourceHandle>>),
-    QuerySet(Arc<QuerySetHandle>),
-}
-
-impl From<Arc<BufferHandle>> for ResourceHandle {
-    fn from(resource_handle: Arc<BufferHandle>) -> Self {
-        ResourceHandle::Buffer(resource_handle)
-    }
-}
-
-impl From<Arc<TextureHandle>> for ResourceHandle {
-    fn from(resource_handle: Arc<TextureHandle>) -> Self {
-        ResourceHandle::Texture(resource_handle)
-    }
-}
-
-impl From<Arc<Vec<BindGroupResource>>> for ResourceHandle {
-    fn from(bind_group_resources: Arc<Vec<BindGroupResource>>) -> Self {
-        ResourceHandle::BindGroup(bind_group_resources)
-    }
-}
-
-impl From<Arc<StaticVec<Arc<TextureHandle>, 9_usize>>> for ResourceHandle {
-    fn from(render_target_resources: Arc<StaticVec<Arc<TextureHandle>, 9>>) -> Self {
-        ResourceHandle::RenderTarget(render_target_resources)
-    }
-}
-
-impl From<Arc<Vec<ResourceHandle>>> for ResourceHandle {
-    fn from(render_bundle_resources: Arc<Vec<ResourceHandle>>) -> Self {
-        ResourceHandle::RenderBundle(render_bundle_resources)
-    }
-}
-
-impl From<Arc<QuerySetHandle>> for ResourceHandle {
-    fn from(resource_handle: Arc<QuerySetHandle>) -> Self {
-        ResourceHandle::QuerySet(resource_handle)
-    }
-}
+use crate::{abi, buffer, driver, texture};
 
 pub struct CommandBuffer {
-    inner: GpuCommandBuffer,
-    _resource_handles: Vec<ResourceHandle>,
-}
-
-impl CommandBuffer {
-    pub(crate) fn as_web_sys(&self) -> &GpuCommandBuffer {
-        &self.inner
-    }
+    pub(crate) handle: <Dvr as Driver>::CommandBufferHandle,
 }
 
 pub struct CommandEncoder {
-    inner: GpuCommandEncoder,
-    _resource_handles: Vec<ResourceHandle>,
+    handle: <Dvr as Driver>::CommandEncoderHandle,
 }
 
 impl CommandEncoder {
     pub(crate) fn new(device: &Device) -> Self {
         CommandEncoder {
-            inner: device.inner.create_command_encoder(),
-            _resource_handles: Vec::new(),
+            handle: device.handle.create_command_encoder(),
         }
     }
 
@@ -104,8 +47,8 @@ impl CommandEncoder {
     where
         U: buffer::CopyDst + 'static,
     {
-        let size = buffer.size_in_bytes() as u32;
-        let offset = buffer.offset_in_bytes() as u32;
+        let size = buffer.size_in_bytes();
+        let offset = buffer.offset_in_bytes();
 
         assert!(
             size.rem(4) == 0,
@@ -116,11 +59,13 @@ impl CommandEncoder {
             "cleared region's offset in bytes must be a multiple of `8`"
         );
 
-        self.inner
-            .clear_buffer_with_u32_and_u32(buffer.as_web_sys(), offset, size);
+        let start = offset;
+        let end = offset + size;
 
-        self._resource_handles
-            .push(buffer.buffer.inner.clone().into());
+        self.handle.clear_buffer(ClearBuffer {
+            buffer: &buffer.buffer.handle,
+            range: start..end,
+        });
 
         self
     }
@@ -129,8 +74,8 @@ impl CommandEncoder {
     where
         U: buffer::CopyDst + 'static,
     {
-        let size = buffer.size_in_bytes() as u32;
-        let offset = buffer.offset_in_bytes() as u32;
+        let size = buffer.size_in_bytes();
+        let offset = buffer.offset_in_bytes();
 
         assert!(
             size.rem(4) == 0,
@@ -141,11 +86,13 @@ impl CommandEncoder {
             "cleared region's offset in bytes must be a multiple of `8`"
         );
 
-        self.inner
-            .clear_buffer_with_u32_and_u32(buffer.as_web_sys(), offset, size);
+        let start = offset;
+        let end = offset + size;
 
-        self._resource_handles
-            .push(buffer.buffer.inner.clone().into());
+        self.handle.clear_buffer(ClearBuffer {
+            buffer: &buffer.buffer.handle,
+            range: start..end,
+        });
 
         self
     }
@@ -160,8 +107,8 @@ impl CommandEncoder {
         U1: buffer::CopyDst + 'static,
         T: 'static,
     {
-        let src_offset = src.offset_in_bytes() as u32;
-        let dst_offset = dst.offset_in_bytes() as u32;
+        let source_offset = src.offset_in_bytes();
+        let destination_offset = dst.offset_in_bytes();
         let size = mem::size_of::<T>();
 
         assert!(
@@ -171,24 +118,21 @@ impl CommandEncoder {
 
         // This may be redundant, because the offset must be sized aligned anyway?
         assert!(
-            src_offset.rem(4) == 0,
+            source_offset.rem(4) == 0,
             "`src` view's offset in bytes must be a multiple of `8`"
         );
         assert!(
-            dst_offset.rem(4) == 0,
+            destination_offset.rem(4) == 0,
             "`dst` view's offset in bytes must be a multiple of `8`"
         );
 
-        self.inner.copy_buffer_to_buffer_with_u32_and_u32_and_u32(
-            src.as_web_sys(),
-            src_offset,
-            dst.as_web_sys(),
-            dst_offset,
-            size as u32,
-        );
-
-        self._resource_handles.push(src.buffer.inner.clone().into());
-        self._resource_handles.push(dst.buffer.inner.clone().into());
+        self.handle.copy_buffer_to_buffer(CopyBufferToBuffer {
+            source: &src.buffer.handle,
+            source_offset,
+            destination: &dst.buffer.handle,
+            destination_offset,
+            size,
+        });
 
         self
     }
@@ -208,8 +152,8 @@ impl CommandEncoder {
             "source and destination have different lengths"
         );
 
-        let src_offset = src.offset_in_bytes() as u32;
-        let dst_offset = dst.offset_in_bytes() as u32;
+        let source_offset = src.offset_in_bytes();
+        let destination_offset = dst.offset_in_bytes();
 
         debug_assert!(src.size_in_bytes() == dst.size_in_bytes());
 
@@ -220,129 +164,112 @@ impl CommandEncoder {
             "copied size in bytes must be a multiple of `4`"
         );
         assert!(
-            src_offset.rem(4) == 0,
+            source_offset.rem(4) == 0,
             "`src` view's offset in bytes must be a multiple of `8`"
         );
         assert!(
-            dst_offset.rem(4) == 0,
+            destination_offset.rem(4) == 0,
             "`dst` view's offset in bytes must be a multiple of `8`"
         );
 
-        self.inner.copy_buffer_to_buffer_with_u32_and_u32_and_u32(
-            src.as_web_sys(),
-            src_offset,
-            dst.as_web_sys(),
-            dst_offset,
-            size as u32,
-        );
-
-        self._resource_handles.push(src.buffer.inner.clone().into());
-        self._resource_handles.push(dst.buffer.inner.clone().into());
+        self.handle.copy_buffer_to_buffer(CopyBufferToBuffer {
+            source: &src.buffer.handle,
+            source_offset,
+            destination: &dst.buffer.handle,
+            destination_offset,
+            size,
+        });
 
         self
     }
 
     fn image_copy_buffer_to_texture_internal<F>(
         mut self,
-        src: &buffer::ImageCopyBuffer,
-        dst: &texture::ImageCopyDst<F>,
+        src: ImageCopyBuffer<Dvr>,
+        dst: texture::ImageCopyTexture<F>,
     ) -> Self {
-        let width = dst.inner.width;
-        let height = dst.inner.height;
-        let depth_or_layers = dst.inner.depth_or_layers;
+        let width = dst.width;
+        let height = dst.height;
+        let depth_or_layers = dst.depth_or_layers;
 
-        src.validate_with_size_and_block_size(
-            ImageCopySize3D {
-                width,
-                height,
-                depth_or_layers,
-            },
-            dst.inner.block_size,
-        );
+        image_copy_buffer_validate(&src, (width, height, depth_or_layers), dst.block_size);
 
-        let mut extent = GpuExtent3dDict::new(width);
-
-        extent.height(height);
-        extent.depth_or_array_layers(depth_or_layers);
-
-        self.inner.copy_buffer_to_texture_with_gpu_extent_3d_dict(
-            &src.to_web_sys(),
-            &dst.inner.to_web_sys(),
-            &extent,
-        );
-
-        self._resource_handles.push(src.buffer.clone().into());
-        self._resource_handles
-            .push(dst.inner.texture.clone().into());
+        self.handle.copy_buffer_to_texture(CopyBufferToTexture {
+            source: src,
+            destination: dst.inner,
+            copy_size: (width, height, depth_or_layers),
+        });
 
         self
     }
 
     pub fn image_copy_buffer_to_texture<T, F>(
         self,
-        src: &buffer::ImageCopySrc<T>,
-        dst: &texture::ImageCopyDst<F>,
+        src: buffer::ImageCopySrc<T>,
+        dst: texture::ImageCopyDst<F>,
     ) -> Self
     where
         T: ImageData<F>,
         F: TextureFormat,
     {
-        self.image_copy_buffer_to_texture_internal(&src.inner, dst)
+        self.image_copy_buffer_to_texture_internal(src.inner, dst.inner)
     }
 
     pub fn image_copy_buffer_to_texture_raw<F>(
         self,
-        src: &buffer::ImageCopySrcRaw,
-        dst: &texture::ImageCopyDst<F>,
+        src: buffer::ImageCopySrcRaw,
+        dst: texture::ImageCopyDst<F>,
     ) -> Self {
         assert!(
             src.inner.bytes_per_block == dst.inner.bytes_per_block,
             "`src` bytes per block does not match `dst` bytes per block"
         );
 
-        self.image_copy_buffer_to_texture_internal(&src.inner, dst)
+        self.image_copy_buffer_to_texture_internal(src.inner, dst.inner)
     }
 
     fn sub_image_copy_buffer_to_texture_internal<F>(
         mut self,
-        src: &buffer::ImageCopyBuffer,
-        dst: &texture::SubImageCopyDst<F>,
+        src: ImageCopyBuffer<Dvr>,
+        dst: texture::ImageCopyTexture<F>,
         size: ImageCopySize3D,
     ) -> Self {
-        size.validate_with_block_size(dst.inner.block_size);
-        src.validate_with_size_and_block_size(size, dst.inner.block_size);
-        dst.inner.validate_dst_with_size(size);
+        let ImageCopySize3D {
+            width,
+            height,
+            depth_or_layers,
+        } = size;
 
-        self.inner.copy_buffer_to_texture_with_gpu_extent_3d_dict(
-            &src.to_web_sys(),
-            &dst.inner.to_web_sys(),
-            &size.to_web_sys(),
-        );
+        size.validate_with_block_size(dst.block_size);
+        image_copy_buffer_validate(&src, (width, height, depth_or_layers), dst.block_size);
+        dst.validate_dst_with_size(size);
 
-        self._resource_handles.push(src.buffer.clone().into());
-        self._resource_handles
-            .push(dst.inner.texture.clone().into());
+        self.handle.copy_buffer_to_texture(CopyBufferToTexture {
+            source: src,
+            destination: dst.inner,
+            copy_size: (width, height, depth_or_layers),
+        });
 
         self
     }
 
     pub fn sub_image_copy_buffer_to_texture<T, F>(
         self,
-        src: &buffer::ImageCopySrc<T>,
-        dst: &texture::SubImageCopyDst<F>,
+        src: buffer::ImageCopySrc<T>,
+        dst: texture::SubImageCopyDst<F>,
         size: ImageCopySize3D,
     ) -> Self
     where
         T: ImageData<F>,
         F: TextureFormat,
     {
-        self.sub_image_copy_buffer_to_texture_internal(&src.inner, dst, size)
+        self.sub_image_copy_buffer_to_texture_internal(src.inner, dst.inner, size)
     }
 
     pub fn sub_image_copy_buffer_to_texture_raw<F>(
         self,
-        src: &buffer::ImageCopySrcRaw,
-        dst: &texture::SubImageCopyDst<F>,
+        src: buffer::ImageCopySrcRaw,
+        dst: texture::SubImageCopyDst<F>,
         size: ImageCopySize3D,
     ) -> Self {
         assert!(
@@ -350,110 +277,96 @@ impl CommandEncoder {
             "`src` bytes per block does not match `dst` bytes per block"
         );
 
-        self.sub_image_copy_buffer_to_texture_internal(&src.inner, dst, size)
+        self.sub_image_copy_buffer_to_texture_internal(src.inner, dst.inner, size)
     }
 
     fn image_copy_texture_to_buffer_internal<F>(
         mut self,
-        src: &texture::ImageCopySrc<F>,
-        dst: &buffer::ImageCopyBuffer,
+        src: texture::ImageCopyTexture<F>,
+        dst: ImageCopyBuffer<Dvr>,
     ) -> Self {
-        let width = src.inner.width;
-        let height = src.inner.height;
-        let depth_or_layers = src.inner.depth_or_layers;
+        let width = src.width;
+        let height = src.height;
+        let depth_or_layers = src.depth_or_layers;
 
-        dst.validate_with_size_and_block_size(
-            ImageCopySize3D {
-                width,
-                height,
-                depth_or_layers,
-            },
-            src.inner.block_size,
-        );
+        image_copy_buffer_validate(&dst, (width, height, depth_or_layers), src.block_size);
 
-        let mut extent = GpuExtent3dDict::new(width);
-
-        extent.height(height);
-        extent.depth_or_array_layers(depth_or_layers);
-
-        self.inner.copy_texture_to_buffer_with_gpu_extent_3d_dict(
-            &src.inner.to_web_sys(),
-            &dst.to_web_sys(),
-            &extent,
-        );
-
-        self._resource_handles
-            .push(src.inner.texture.clone().into());
-        self._resource_handles.push(dst.buffer.clone().into());
+        self.handle.copy_texture_to_buffer(CopyTextureToBuffer {
+            source: src.inner,
+            destination: dst,
+            copy_size: (width, height, depth_or_layers),
+        });
 
         self
     }
 
     pub fn image_copy_texture_to_buffer<F, T>(
         self,
-        src: &texture::ImageCopySrc<F>,
-        dst: &buffer::ImageCopyDst<T>,
+        src: texture::ImageCopySrc<F>,
+        dst: buffer::ImageCopyDst<T>,
     ) -> Self
     where
         F: TextureFormat,
         T: ImageData<F>,
     {
-        self.image_copy_texture_to_buffer_internal(src, &dst.inner)
+        self.image_copy_texture_to_buffer_internal(src.inner, dst.inner)
     }
 
     pub fn image_copy_texture_to_buffer_raw<F>(
         self,
-        src: &texture::ImageCopySrc<F>,
-        dst: &buffer::ImageCopyDstRaw,
+        src: texture::ImageCopySrc<F>,
+        dst: buffer::ImageCopyDstRaw,
     ) -> Self {
         assert!(
             src.inner.bytes_per_block == dst.inner.bytes_per_block,
             "`src` bytes per block does not match `dst` bytes per block"
         );
 
-        self.image_copy_texture_to_buffer_internal(src, &dst.inner)
+        self.image_copy_texture_to_buffer_internal(src.inner, dst.inner)
     }
 
     fn sub_image_copy_texture_to_buffer_internal<F>(
         mut self,
-        src: &texture::SubImageCopySrc<F>,
-        dst: &buffer::ImageCopyBuffer,
+        src: texture::ImageCopyTexture<F>,
+        dst: ImageCopyBuffer<Dvr>,
         size: ImageCopySize3D,
     ) -> Self {
-        size.validate_with_block_size(src.inner.block_size);
-        src.inner.validate_src_with_size(size);
-        dst.validate_with_size_and_block_size(size, src.inner.block_size);
+        let ImageCopySize3D {
+            width,
+            height,
+            depth_or_layers,
+        } = size;
 
-        self.inner.copy_texture_to_buffer_with_gpu_extent_3d_dict(
-            &src.inner.to_web_sys(),
-            &dst.to_web_sys(),
-            &size.to_web_sys(),
-        );
+        size.validate_with_block_size(src.block_size);
+        src.validate_src_with_size(size);
+        image_copy_buffer_validate(&dst, (width, height, depth_or_layers), src.block_size);
 
-        self._resource_handles
-            .push(src.inner.texture.clone().into());
-        self._resource_handles.push(dst.buffer.clone().into());
+        self.handle.copy_texture_to_buffer(CopyTextureToBuffer {
+            source: src.inner,
+            destination: dst,
+            copy_size: (width, height, depth_or_layers),
+        });
 
         self
     }
 
     pub fn sub_image_copy_texture_to_buffer<F, T>(
         self,
-        src: &texture::SubImageCopySrc<F>,
-        dst: &buffer::ImageCopyDst<T>,
+        src: texture::SubImageCopySrc<F>,
+        dst: buffer::ImageCopyDst<T>,
         size: ImageCopySize3D,
     ) -> Self
     where
         F: TextureFormat,
         T: ImageData<F>,
     {
-        self.sub_image_copy_texture_to_buffer_internal(src, &dst.inner, size)
+        self.sub_image_copy_texture_to_buffer_internal(src.inner, dst.inner, size)
     }
 
     pub fn sub_image_copy_texture_to_buffer_raw<F>(
         self,
-        src: &texture::SubImageCopySrc<F>,
-        dst: &buffer::ImageCopyDstRaw,
+        src: texture::SubImageCopySrc<F>,
+        dst: buffer::ImageCopyDstRaw,
         size: ImageCopySize3D,
     ) -> Self {
         assert!(
@@ -461,13 +374,13 @@ impl CommandEncoder {
             "`src` bytes per block does not match `dst` bytes per block"
         );
 
-        self.sub_image_copy_texture_to_buffer_internal(src, &dst.inner, size)
+        self.sub_image_copy_texture_to_buffer_internal(src.inner, dst.inner, size)
     }
 
     pub fn image_copy_texture_to_texture<F>(
         mut self,
-        src: &texture::ImageCopyToTextureSrc<F>,
-        dst: &texture::ImageCopyFromTextureDst<F>,
+        src: texture::ImageCopyToTextureSrc<F>,
+        dst: texture::ImageCopyFromTextureDst<F>,
     ) -> Self {
         assert!(
             src.inner.width == dst.inner.width,
@@ -482,48 +395,38 @@ impl CommandEncoder {
             "`src` and `dst` depth/layers must match"
         );
 
-        let mut extent = GpuExtent3dDict::new(src.inner.width);
-
-        extent.height(src.inner.height);
-        extent.depth_or_array_layers(src.inner.depth_or_layers);
-
-        self.inner.copy_texture_to_texture_with_gpu_extent_3d_dict(
-            &src.inner.to_web_sys(),
-            &dst.inner.to_web_sys(),
-            &extent,
-        );
-
-        self._resource_handles
-            .push(src.inner.texture.clone().into());
-        self._resource_handles
-            .push(dst.inner.texture.clone().into());
+        self.handle.copy_texture_to_texture(CopyTextureToTexture {
+            source: src.inner.inner,
+            destination: dst.inner.inner,
+            copy_size: (src.inner.width, src.inner.height, src.inner.depth_or_layers),
+        });
 
         self
     }
 
     pub fn sub_image_copy_texture_to_texture<F>(
-        self,
-        src: &texture::SubImageCopyToTextureSrc<F>,
-        dst: &texture::SubImageCopyFromTextureDst<F>,
+        mut self,
+        src: texture::SubImageCopyToTextureSrc<F>,
+        dst: texture::SubImageCopyFromTextureDst<F>,
         size: ImageCopySize3D,
     ) -> Self {
         size.validate_with_block_size(src.inner.block_size);
         src.inner.validate_src_with_size(size);
         dst.inner.validate_dst_with_size(size);
 
-        self.inner.copy_texture_to_texture_with_gpu_extent_3d_dict(
-            &src.inner.to_web_sys(),
-            &dst.inner.to_web_sys(),
-            &size.to_web_sys(),
-        );
+        self.handle.copy_texture_to_texture(CopyTextureToTexture {
+            source: src.inner.inner,
+            destination: dst.inner.inner,
+            copy_size: (size.width, size.height, size.depth_or_layers),
+        });
 
         self
     }
 
     pub fn image_copy_texture_to_texture_multisample<F, const SAMPLES: u8>(
         mut self,
-        src: &texture::ImageCopyToTextureSrcMultisample<F, SAMPLES>,
-        dst: &texture::ImageCopyToTextureDstMultisample<F, SAMPLES>,
+        src: texture::ImageCopyToTextureSrcMultisample<F, SAMPLES>,
+        dst: texture::ImageCopyToTextureDstMultisample<F, SAMPLES>,
     ) -> Self {
         assert!(
             src.inner.width == dst.inner.width,
@@ -534,29 +437,20 @@ impl CommandEncoder {
             "`src` and `dst` heights must match"
         );
 
-        let mut extent = GpuExtent3dDict::new(src.inner.width);
-
-        extent.height(src.inner.height);
-
-        self.inner.copy_texture_to_texture_with_gpu_extent_3d_dict(
-            &src.inner.to_web_sys(),
-            &dst.inner.to_web_sys(),
-            &extent,
-        );
-
-        self._resource_handles
-            .push(src.inner.texture.clone().into());
-        self._resource_handles
-            .push(dst.inner.texture.clone().into());
+        self.handle.copy_texture_to_texture(CopyTextureToTexture {
+            source: src.inner.inner,
+            destination: dst.inner.inner,
+            copy_size: (src.inner.width, src.inner.height, src.inner.depth_or_layers),
+        });
 
         self
     }
 
-    pub fn begin_compute_pass(self) -> ComputePassEncoder<(), ()> {
-        let inner = self.inner.begin_compute_pass();
+    pub fn begin_compute_pass(mut self) -> ComputePassEncoder<(), ()> {
+        let handle = self.handle.begin_compute_pass();
 
         ComputePassEncoder {
-            inner,
+            handle,
             command_encoder: self,
             current_pipeline_id: None,
             current_bind_group_ids: [None; 4],
@@ -566,34 +460,39 @@ impl CommandEncoder {
 
     pub fn begin_render_pass<T, Q>(
         mut self,
-        descriptor: &RenderPassDescriptor<T, Q>,
-    ) -> ClearRenderPassEncoder<T, Q> {
-        let inner = self.inner.begin_render_pass(&descriptor.inner);
-
-        self._resource_handles
-            .push(descriptor._texture_handles.clone().into());
-
-        if let Some(query_set_handle) = &descriptor._occlusion_query_set_handle {
-            self._resource_handles.push(query_set_handle.clone().into());
-        }
+        descriptor: RenderPassDescriptor<T, Q>,
+    ) -> ClearRenderPassEncoder<T::RenderLayout, Q>
+    where
+        T: ValidRenderTarget,
+    {
+        let handle = self.handle.begin_render_pass(driver::RenderPassDescriptor {
+            color_attachments: descriptor
+                .render_target
+                .color_target_encodings()
+                .into_iter()
+                .map(|a| a.inner),
+            depth_stencil_attachment: descriptor
+                .render_target
+                .depth_stencil_target_encoding()
+                .inner,
+            occlusion_query_set: descriptor.occlusion_query_set,
+        });
 
         RenderPassEncoder {
-            inner,
+            handle,
             command_encoder: self,
             current_pipeline_id: None,
-            current_vertex_buffers: [None; 8],
+            current_vertex_buffers: [None, None, None, None, None, None, None, None],
             current_index_buffer: None,
             current_bind_group_ids: [None; 4],
             _marker: Default::default(),
         }
     }
 
-    pub fn write_timestamp(mut self, query_set: &TimestampQuerySet, index: u32) -> Self {
+    pub fn write_timestamp(mut self, query_set: &TimestampQuerySet, index: usize) -> Self {
         assert!(index < query_set.len(), "index out of bounds");
 
-        self.inner.write_timestamp(query_set.as_web_sys(), index);
-
-        self._resource_handles.push(query_set.inner.clone().into());
+        self.handle.write_timestamp(&query_set.handle, index);
 
         self
     }
@@ -601,28 +500,23 @@ impl CommandEncoder {
     pub fn resolve_occlusion_query_set<U>(
         mut self,
         query_set: &OcclusionQuerySet,
-        offset: u32,
+        offset: usize,
         view: buffer::View<[u64], U>,
     ) -> Self
     where
         U: buffer::QueryResolve,
     {
-        assert!(
-            offset + view.len() as u32 <= query_set.len(),
-            "resolve range out of bounds"
-        );
+        let start = offset;
+        let end = start + view.len();
 
-        self.inner.resolve_query_set_with_u32(
-            query_set.as_web_sys(),
-            offset,
-            view.len() as u32,
-            view.as_web_sys(),
-            view.offset_in_bytes() as u32,
-        );
+        assert!(end <= query_set.len(), "resolve range out of bounds");
 
-        self._resource_handles.push(query_set.inner.clone().into());
-        self._resource_handles
-            .push(view.buffer.inner.clone().into());
+        self.handle.resolve_query_set(ResolveQuerySet {
+            query_set: &query_set.handle,
+            query_range: start..end,
+            destination: &view.buffer.handle,
+            destination_offset: view.offset_in_bytes(),
+        });
 
         self
     }
@@ -630,41 +524,30 @@ impl CommandEncoder {
     pub fn resolve_timestamp_query_set<U>(
         mut self,
         query_set: &TimestampQuerySet,
-        offset: u32,
+        offset: usize,
         view: buffer::View<[u64], U>,
     ) -> Self
     where
         U: buffer::QueryResolve,
     {
-        assert!(
-            offset + view.len() as u32 <= query_set.len(),
-            "resolve range out of bounds"
-        );
+        let start = offset;
+        let end = start + view.len();
 
-        self.inner.resolve_query_set_with_u32(
-            query_set.as_web_sys(),
-            offset,
-            view.len() as u32,
-            view.as_web_sys(),
-            view.offset_in_bytes() as u32,
-        );
+        assert!(end <= query_set.len(), "resolve range out of bounds");
 
-        self._resource_handles.push(query_set.inner.clone().into());
-        self._resource_handles
-            .push(view.buffer.inner.clone().into());
+        self.handle.resolve_query_set(ResolveQuerySet {
+            query_set: &query_set.handle,
+            query_range: start..end,
+            destination: &view.buffer.handle,
+            destination_offset: view.offset_in_bytes(),
+        });
 
         self
     }
 
     pub fn finish(self) -> CommandBuffer {
-        let CommandEncoder {
-            inner,
-            _resource_handles,
-        } = self;
-
         CommandBuffer {
-            inner: inner.finish(),
-            _resource_handles,
+            handle: self.handle.finish(),
         }
     }
 }
@@ -707,7 +590,7 @@ unsafe impl abi::Sized for DispatchWorkgroups {
 }
 
 pub struct ComputePassEncoder<Pipeline, Resources> {
-    inner: GpuComputePassEncoder,
+    handle: <Dvr as Driver>::ComputePassEncoderHandle,
     command_encoder: CommandEncoder,
     current_pipeline_id: Option<usize>,
     current_bind_group_ids: [Option<usize>; 4],
@@ -723,8 +606,8 @@ impl<P, R> ResourceBindingCommandEncoder for ComputePassEncoder<P, R> {
         RNew: BindGroups,
     {
         let ComputePassEncoder {
-            inner,
-            mut command_encoder,
+            mut handle,
+            command_encoder,
             current_pipeline_id,
             mut current_bind_group_ids,
             ..
@@ -732,23 +615,19 @@ impl<P, R> ResourceBindingCommandEncoder for ComputePassEncoder<P, R> {
 
         for (i, encoding) in bind_groups.encodings().enumerate() {
             let BindGroupEncoding {
-                bind_group,
+                bind_group_handle,
                 id,
-                _resource_handles,
             } = encoding;
 
             if current_bind_group_ids[i] != Some(id) {
-                inner.set_bind_group(i as u32, Some(&bind_group));
-                command_encoder
-                    ._resource_handles
-                    .push(_resource_handles.into());
+                handle.set_bind_group(i as u32, &bind_group_handle);
 
                 current_bind_group_ids[i] = Some(id);
             }
         }
 
         ComputePassEncoder {
-            inner,
+            handle,
             command_encoder,
             current_pipeline_id,
             current_bind_group_ids,
@@ -763,7 +642,7 @@ impl<P, R> ComputePassEncoder<P, R> {
         pipeline: &ComputePipeline<PR>,
     ) -> ComputePassEncoder<ComputePipeline<PR>, R> {
         let ComputePassEncoder {
-            inner,
+            mut handle,
             command_encoder,
             current_pipeline_id,
             current_bind_group_ids,
@@ -771,11 +650,11 @@ impl<P, R> ComputePassEncoder<P, R> {
         } = self;
 
         if Some(pipeline.id()) != current_pipeline_id {
-            inner.set_pipeline(pipeline.as_web_sys());
+            handle.set_pipeline(&pipeline.handle);
         }
 
         ComputePassEncoder {
-            inner,
+            handle,
             command_encoder,
             current_pipeline_id: Some(pipeline.id()),
             current_bind_group_ids,
@@ -784,7 +663,7 @@ impl<P, R> ComputePassEncoder<P, R> {
     }
 
     pub fn end(self) -> CommandEncoder {
-        self.inner.end();
+        self.handle.end();
 
         self.command_encoder
     }
@@ -794,29 +673,27 @@ impl<RLayout, R> ComputePassEncoder<ComputePipeline<RLayout>, R>
 where
     R: BindGroups<Layout = RLayout>,
 {
-    pub fn dispatch_workgroups(self, dispatch_workgroups: DispatchWorkgroups) -> Self {
+    pub fn dispatch_workgroups(mut self, dispatch_workgroups: DispatchWorkgroups) -> Self {
         let DispatchWorkgroups {
             count_x,
             count_y,
             count_z,
         } = dispatch_workgroups;
 
-        self.inner
-            .dispatch_workgroups_with_workgroup_count_y_and_workgroup_count_z(
-                count_x, count_y, count_z,
-            );
+        self.handle.dispatch_workgroups(count_x, count_y, count_z);
 
         self
     }
 
-    pub fn dispatch_workgroups_indirect<U>(self, view: buffer::View<DispatchWorkgroups, U>) -> Self
+    pub fn dispatch_workgroups_indirect<U>(
+        mut self,
+        view: buffer::View<DispatchWorkgroups, U>,
+    ) -> Self
     where
         U: buffer::Indirect,
     {
-        self.inner.dispatch_workgroups_indirect_with_u32(
-            view.as_web_sys(),
-            view.offset_in_bytes() as u32,
-        );
+        self.handle
+            .dispatch_workgroups_indirect(&view.buffer.handle, view.offset_in_bytes());
 
         self
     }
@@ -858,6 +735,10 @@ pub struct DrawIndexed {
     pub index_count: u32,
     pub instance_count: u32,
     pub first_index: u32,
+
+    // TODO: base_vertex is specced to be a signed integer, but specced to be an unsigned
+    // integer in the indirect version. Going with unsigned for both for now (what's the
+    // use-case for a negative base vertex number?), but should investigate.
     pub base_vertex: u32,
     pub first_instance: u32,
 }
@@ -964,11 +845,10 @@ pub struct BlendConstant {
     pub a: f32,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 struct CurrentBufferRange {
     id: usize,
-    offset: u32,
-    size: u32,
+    range: Range<usize>,
 }
 
 pub struct OcclusionQueryState<T>
@@ -1008,86 +888,68 @@ impl EndRenderPass for OcclusionQueryState<O> {}
 impl end_render_pass_seal::Seal for () {}
 impl EndRenderPass for () {}
 
-pub struct RenderPassDescriptor<RenderTarget, OcclusionQueryState> {
-    inner: GpuRenderPassDescriptor,
-    _texture_handles: Arc<StaticVec<Arc<TextureHandle>, 9>>,
-    _occlusion_query_set_handle: Option<Arc<QuerySetHandle>>,
-    _marker: marker::PhantomData<(*const RenderTarget, OcclusionQueryState)>,
+pub struct RenderPassDescriptor<'a, RenderTarget, OcclusionQueryState> {
+    render_target: &'a RenderTarget,
+    occlusion_query_set: Option<&'a <Dvr as Driver>::QuerySetHandle>,
+    _marker: marker::PhantomData<OcclusionQueryState>,
 }
 
-impl RenderPassDescriptor<(), ()> {
-    pub fn new<T: ValidRenderTarget>(
-        render_target: &T,
-    ) -> RenderPassDescriptor<T::RenderLayout, ()> {
-        let RenderTargetEncoding {
-            color_attachments,
-            depth_stencil_attachment,
-        } = render_target.encoding();
+impl<'a> RenderPassDescriptor<'a, (), ()> {
+    pub fn new<T: ValidRenderTarget>(render_target: &'a T) -> RenderPassDescriptor<'a, T, ()> {
+        let mut dimensions = None;
 
-        let width;
-        let height;
+        for attachment in render_target.color_target_encodings() {
+            if attachment.inner.is_some() {
+                if let Some((width, height)) = dimensions {
+                    if attachment.width != width || attachment.height != height {
+                        panic!("all attachment dimensions must match")
+                    }
+                } else {
+                    dimensions = Some((attachment.width, attachment.height));
+                }
+            }
+        }
 
-        if let Some(attachment) = &depth_stencil_attachment {
-            width = attachment.width;
-            height = attachment.height;
-        } else {
-            let first = color_attachments.first().expect(
+        let depth_stencil_attachment = render_target.depth_stencil_target_encoding();
+
+        if depth_stencil_attachment.inner.is_some() {
+            if let Some((width, height)) = dimensions {
+                if depth_stencil_attachment.width != width
+                    || depth_stencil_attachment.height != height
+                {
+                    panic!("all attachment dimensions must match")
+                }
+            } else {
+                dimensions = Some((
+                    depth_stencil_attachment.width,
+                    depth_stencil_attachment.height,
+                ));
+            }
+        }
+
+        if dimensions.is_none() {
+            panic!(
                 "target must specify either at least 1 color attachment or a depth-stencil \
-                attachment",
+                attachment"
             );
-
-            width = first.width;
-            height = first.height;
-        }
-
-        for attachment in color_attachments.iter() {
-            if attachment.width != width || attachment.height != height {
-                panic!("all attachment dimensions must match")
-            }
-        }
-
-        if let Some(attachment) = &depth_stencil_attachment {
-            if attachment.width != width || attachment.height != height {
-                panic!("all attachment dimensions must match")
-            }
-        }
-
-        let color_array = js_sys::Array::new();
-        let mut texture_handles = StaticVec::new();
-
-        for attachment in color_attachments {
-            color_array.push(attachment.inner.as_ref());
-            texture_handles.push(attachment._texture_handle);
-        }
-
-        let mut inner = GpuRenderPassDescriptor::new(&color_array);
-
-        if let Some(depth_stencil_attachment) = depth_stencil_attachment {
-            inner.depth_stencil_attachment(&depth_stencil_attachment.inner);
-            texture_handles.push(depth_stencil_attachment._texture_handle);
         }
 
         RenderPassDescriptor {
-            inner,
-            _texture_handles: Arc::new(texture_handles),
-            _occlusion_query_set_handle: None,
+            render_target,
+            occlusion_query_set: None,
             _marker: Default::default(),
         }
     }
 }
 
-impl<T> RenderPassDescriptor<T, ()> {
+impl<'a, T> RenderPassDescriptor<'a, T, ()> {
     pub fn occlusion_query_set(
-        mut self,
-        occlusion_query_set: &OcclusionQuerySet,
-    ) -> RenderPassDescriptor<T, OcclusionQueryState<O>> {
-        self.inner
-            .occlusion_query_set(occlusion_query_set.as_web_sys());
-
+        self,
+        occlusion_query_set: &'a OcclusionQuerySet,
+    ) -> RenderPassDescriptor<'a, T, OcclusionQueryState<O>> {
         RenderPassDescriptor {
-            inner: self.inner,
-            _texture_handles: self._texture_handles,
-            _occlusion_query_set_handle: Some(occlusion_query_set.inner.clone()),
+            render_target: self.render_target,
+            occlusion_query_set: Some(&occlusion_query_set.handle),
             _marker: Default::default(),
         }
     }
@@ -1096,7 +958,7 @@ impl<T> RenderPassDescriptor<T, ()> {
 pub type ClearRenderPassEncoder<Target, Q> = RenderPassEncoder<Target, (), (), (), (), Q>;
 
 pub struct RenderPassEncoder<Target, Pipeline, Vertex, Index, Resources, OcclusionQueryState> {
-    inner: GpuRenderPassEncoder,
+    handle: <Dvr as Driver>::RenderPassEncoderHandle,
     command_encoder: CommandEncoder,
     current_pipeline_id: Option<usize>,
     current_vertex_buffers: [Option<CurrentBufferRange>; 8],
@@ -1124,8 +986,8 @@ impl<T, P, V, I, R, Q> ResourceBindingCommandEncoder for RenderPassEncoder<T, P,
         RNew: BindGroups,
     {
         let RenderPassEncoder {
-            inner,
-            mut command_encoder,
+            mut handle,
+            command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
             current_index_buffer,
@@ -1135,23 +997,19 @@ impl<T, P, V, I, R, Q> ResourceBindingCommandEncoder for RenderPassEncoder<T, P,
 
         for (i, encoding) in bind_groups.encodings().enumerate() {
             let BindGroupEncoding {
-                bind_group,
+                bind_group_handle,
                 id,
-                _resource_handles,
             } = encoding;
 
             if current_bind_group_ids[i] != Some(id) {
-                inner.set_bind_group(i as u32, Some(&bind_group));
-                command_encoder
-                    ._resource_handles
-                    .push(_resource_handles.into());
+                handle.set_bind_group(i as u32, &bind_group_handle);
 
                 current_bind_group_ids[i] = Some(id);
             }
         }
 
         RenderPassEncoder {
-            inner,
+            handle,
             command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
@@ -1176,7 +1034,7 @@ impl<T, P, V, I, R, Q> RenderStateEncoder<T> for RenderPassEncoder<T, P, V, I, R
         PT: RenderLayoutCompatible<T>,
     {
         let RenderPassEncoder {
-            inner,
+            mut handle,
             command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
@@ -1186,11 +1044,11 @@ impl<T, P, V, I, R, Q> RenderStateEncoder<T> for RenderPassEncoder<T, P, V, I, R
         } = self;
 
         if Some(pipeline.id()) != current_pipeline_id {
-            inner.set_pipeline(pipeline.as_web_sys());
+            handle.set_pipeline(&pipeline.handle);
         }
 
         RenderPassEncoder {
-            inner,
+            handle,
             command_encoder,
             current_pipeline_id: Some(pipeline.id()),
             current_vertex_buffers,
@@ -1205,8 +1063,8 @@ impl<T, P, V, I, R, Q> RenderStateEncoder<T> for RenderPassEncoder<T, P, V, I, R
         VNew: VertexBuffers,
     {
         let RenderPassEncoder {
-            inner,
-            mut command_encoder,
+            mut handle,
+            command_encoder,
             current_pipeline_id,
             mut current_vertex_buffers,
             current_index_buffer,
@@ -1214,26 +1072,27 @@ impl<T, P, V, I, R, Q> RenderStateEncoder<T> for RenderPassEncoder<T, P, V, I, R
             ..
         } = self;
 
-        for (i, encoding) in vertex_buffers.encodings().enumerate() {
-            let VertexBufferEncoding {
-                buffer,
-                id,
-                offset,
-                size,
-            } = encoding;
+        for (i, encoding) in vertex_buffers.encodings().as_ref().iter().enumerate() {
+            let VertexBufferEncoding { buffer, id, range } = encoding;
 
-            let range = CurrentBufferRange { id, offset, size };
+            let range_id = CurrentBufferRange {
+                id: *id,
+                range: range.clone(),
+            };
 
-            if current_vertex_buffers[i] != Some(range) {
-                inner.set_vertex_buffer_with_u32_and_u32(i as u32, Some(&buffer.buffer), offset, size);
-                command_encoder._resource_handles.push(buffer.into());
+            if current_vertex_buffers[i] != Some(range_id.clone()) {
+                handle.set_vertex_buffer(SetVertexBuffer {
+                    slot: i as u32,
+                    buffer_handle: Some(buffer),
+                    range: Some(range.clone()),
+                });
 
-                current_vertex_buffers[i] = Some(range);
+                current_vertex_buffers[i] = Some(range_id);
             }
         }
 
         RenderPassEncoder {
-            inner,
+            handle,
             command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
@@ -1248,8 +1107,8 @@ impl<T, P, V, I, R, Q> RenderStateEncoder<T> for RenderPassEncoder<T, P, V, I, R
         INew: IndexBuffer,
     {
         let RenderPassEncoder {
-            inner,
-            mut command_encoder,
+            mut handle,
+            command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
             mut current_index_buffer,
@@ -1261,21 +1120,26 @@ impl<T, P, V, I, R, Q> RenderStateEncoder<T> for RenderPassEncoder<T, P, V, I, R
             buffer,
             id,
             format,
-            offset,
-            size,
+            range,
         } = index_buffer.to_encoding();
 
-        let range = CurrentBufferRange { id, offset, size };
+        let range_id = CurrentBufferRange {
+            id,
+            range: range.clone(),
+        };
 
-        if current_index_buffer != Some(range) {
-            inner.set_index_buffer_with_u32_and_u32(&buffer.buffer, format, offset, size);
-            command_encoder._resource_handles.push(buffer.into());
+        if current_index_buffer != Some(range_id.clone()) {
+            handle.set_index_buffer(SetIndexBuffer {
+                buffer_handle: &buffer,
+                index_format: format,
+                range: Some(range),
+            });
 
-            current_index_buffer = Some(range);
+            current_index_buffer = Some(range_id);
         }
 
         RenderPassEncoder {
-            inner,
+            handle,
             command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
@@ -1287,54 +1151,33 @@ impl<T, P, V, I, R, Q> RenderStateEncoder<T> for RenderPassEncoder<T, P, V, I, R
 }
 
 impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
-    pub fn set_viewport(self, viewport: Viewport) -> Self {
-        let Viewport {
-            x,
-            y,
-            width,
-            height,
-            min_depth,
-            max_depth,
-        } = viewport;
-
-        self.inner
-            .set_viewport(x, y, width, height, min_depth, max_depth);
+    pub fn set_viewport(mut self, viewport: &Viewport) -> Self {
+        self.handle.set_viewport(viewport);
 
         self
     }
 
-    pub fn set_scissor_rect(self, scissor_rect: ScissorRect) -> Self {
-        let ScissorRect {
-            x,
-            y,
-            width,
-            height,
-        } = scissor_rect;
-
-        self.inner.set_scissor_rect(x, y, width, height);
+    pub fn set_scissor_rect(mut self, scissor_rect: &ScissorRect) -> Self {
+        self.handle.set_scissor_rect(scissor_rect);
 
         self
     }
 
-    pub fn set_blend_constant(self, blend_constant: BlendConstant) -> Self {
-        let BlendConstant { r, g, b, a } = blend_constant;
-
-        let color = GpuColorDict::new(r as f64, g as f64, b as f64, a as f64);
-
-        self.inner.set_blend_constant_with_gpu_color_dict(&color);
+    pub fn set_blend_constant(mut self, blend_constant: &BlendConstant) -> Self {
+        self.handle.set_blend_constant(blend_constant);
 
         self
     }
 
-    pub fn set_stencil_reference(self, stencil_reference: u32) -> Self {
-        self.inner.set_stencil_reference(stencil_reference);
+    pub fn set_stencil_reference(mut self, stencil_reference: u32) -> Self {
+        self.handle.set_stencil_reference(stencil_reference);
 
         self
     }
 
     pub fn clear_state(self) -> ClearRenderPassEncoder<T, Q> {
         let RenderPassEncoder {
-            inner,
+            handle,
             command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
@@ -1344,7 +1187,7 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
         } = self;
 
         RenderPassEncoder {
-            inner,
+            handle,
             command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
@@ -1356,8 +1199,8 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
 
     pub fn execute_bundle(self, render_bundle: &RenderBundle<T>) -> ClearRenderPassEncoder<T, Q> {
         let RenderPassEncoder {
-            inner,
-            mut command_encoder,
+            mut handle,
+            command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
             current_index_buffer,
@@ -1365,18 +1208,13 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
             ..
         } = self;
 
-        let array = js_sys::Array::new();
+        let mut encoder = handle.execute_bundles();
 
-        array.push(render_bundle.inner.as_ref());
-
-        inner.execute_bundles(array.as_ref());
-
-        command_encoder
-            ._resource_handles
-            .push(render_bundle._resource_handles.clone().into());
+        encoder.push_bundle(&render_bundle.handle);
+        encoder.finish();
 
         RenderPassEncoder {
-            inner,
+            handle,
             command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
@@ -1389,11 +1227,11 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
     pub fn execute_bundles<B>(self, render_bundles: B) -> ClearRenderPassEncoder<T, Q>
     where
         B: IntoIterator,
-        B::Item: Borrow<RenderBundle<T>>,
+        B::Item: AsRef<RenderBundle<T>>,
     {
         let RenderPassEncoder {
-            inner,
-            mut command_encoder,
+            mut handle,
+            command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
             current_index_buffer,
@@ -1401,22 +1239,16 @@ impl<T, P, V, I, R, Q> RenderPassEncoder<T, P, V, I, R, Q> {
             ..
         } = self;
 
-        let array = js_sys::Array::new();
+        let mut encoder = handle.execute_bundles();
 
-        for bundle in render_bundles {
-            let bundle = bundle.borrow();
-
-            array.push(bundle.inner.as_ref());
-
-            command_encoder
-                ._resource_handles
-                .push(bundle._resource_handles.clone().into());
+        for bundle in render_bundles.into_iter() {
+            encoder.push_bundle(&bundle.as_ref().handle);
         }
 
-        inner.execute_bundles(array.as_ref());
+        encoder.finish();
 
         RenderPassEncoder {
-            inner,
+            handle,
             command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
@@ -1434,31 +1266,18 @@ where
     V: VertexBuffers<Layout = PV>,
     R: BindGroups<Layout = PR>,
 {
-    fn draw(self, draw: Draw) -> Self {
-        let Draw {
-            vertex_count,
-            instance_count,
-            first_vertex,
-            first_instance,
-        } = draw;
-
-        self.inner
-            .draw_with_instance_count_and_first_vertex_and_first_instance(
-                vertex_count,
-                instance_count,
-                first_vertex,
-                first_instance,
-            );
+    fn draw(mut self, draw: Draw) -> Self {
+        self.handle.draw(draw);
 
         self
     }
 
-    fn draw_indirect<U>(self, view: buffer::View<Draw, U>) -> Self
+    fn draw_indirect<U>(mut self, view: buffer::View<Draw, U>) -> Self
     where
         U: buffer::Indirect,
     {
-        self.inner
-            .draw_indirect_with_u32(view.as_web_sys(), view.offset_in_bytes() as u32);
+        self.handle
+            .draw_indirect(&view.buffer.handle, view.offset_in_bytes());
 
         self
     }
@@ -1477,36 +1296,18 @@ where
     I::IndexData: PipelineIndexFormatCompatible<PI>,
     R: BindGroups<Layout = PR>,
 {
-    fn draw_indexed(self, draw_indexed: DrawIndexed) -> Self {
-        let DrawIndexed {
-            index_count,
-            instance_count,
-            first_index,
-            base_vertex,
-            first_instance,
-        } = draw_indexed;
-
-        // TODO: base_vertex in specced to be a signed integer here, but specced to be an unsigned
-        // integer in the indirect version. Going with unsigned for both for now (what's the
-        // use-case for a negative base vertex number?), but should investigate.
-        self.inner
-            .draw_indexed_with_instance_count_and_first_index_and_base_vertex_and_first_instance(
-                index_count,
-                instance_count,
-                first_index,
-                base_vertex as i32,
-                first_instance,
-            );
+    fn draw_indexed(mut self, draw_indexed: DrawIndexed) -> Self {
+        self.handle.draw_indexed(draw_indexed);
 
         self
     }
 
-    fn draw_indexed_indirect<U>(self, view: buffer::View<DrawIndexed, U>) -> Self
+    fn draw_indexed_indirect<U>(mut self, view: buffer::View<DrawIndexed, U>) -> Self
     where
         U: buffer::Indirect,
     {
-        self.inner
-            .draw_indexed_indirect_with_u32(view.as_web_sys(), view.offset_in_bytes() as u32);
+        self.handle
+            .draw_indirect(&view.buffer.handle, view.offset_in_bytes());
 
         self
     }
@@ -1518,7 +1319,7 @@ where
 {
     pub fn begin_occlusion_query(self, query_index: u32) -> RenderPassEncoder<T, P, V, I, R, X> {
         let RenderPassEncoder {
-            inner,
+            mut handle,
             command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
@@ -1527,10 +1328,10 @@ where
             ..
         } = self;
 
-        inner.begin_occlusion_query(query_index);
+        handle.begin_occlusion_query(query_index);
 
         RenderPassEncoder {
-            inner,
+            handle,
             command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
@@ -1547,7 +1348,7 @@ where
 {
     pub fn end_occlusion_query(self) -> RenderPassEncoder<T, P, V, I, R, X> {
         let RenderPassEncoder {
-            inner,
+            mut handle,
             command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
@@ -1556,10 +1357,10 @@ where
             ..
         } = self;
 
-        inner.end_occlusion_query();
+        handle.end_occlusion_query();
 
         RenderPassEncoder {
-            inner,
+            handle,
             command_encoder,
             current_pipeline_id,
             current_vertex_buffers,
@@ -1575,20 +1376,29 @@ where
     Q: EndRenderPass,
 {
     pub fn end(self) -> CommandEncoder {
-        self.inner.end();
+        self.handle.end();
 
         self.command_encoder
     }
 }
 
 pub struct RenderBundle<Target> {
-    inner: GpuRenderBundle,
-    _resource_handles: Arc<Vec<ResourceHandle>>,
+    handle: <Dvr as Driver>::RenderBundleHandle,
     _marker: marker::PhantomData<Target>,
 }
 
+impl<T> AsRef<<Dvr as Driver>::RenderBundleHandle> for RenderBundle<T> {
+    fn as_ref(&self) -> &<Dvr as Driver>::RenderBundleHandle {
+        &self.handle
+    }
+}
+
 pub struct RenderBundleEncoderDescriptor<Target> {
-    inner: GpuRenderBundleEncoderDescriptor,
+    color_formats: Cow<'static, [TextureFormatId]>,
+    depth_stencil_format: Option<TextureFormatId>,
+    sample_count: u32,
+    depth_read_only: bool,
+    stencil_read_only: bool,
     _marker: marker::PhantomData<Target>,
 }
 
@@ -1597,16 +1407,12 @@ impl RenderBundleEncoderDescriptor<()> {
     where
         C: TypedColorLayout,
     {
-        let color_formats = js_sys::Array::new();
-
-        for format in C::COLOR_FORMATS {
-            color_formats.push(&JsValue::from(format.as_str()));
-        }
-
-        let inner = GpuRenderBundleEncoderDescriptor::new(&color_formats);
-
         RenderBundleEncoderDescriptor {
-            inner,
+            color_formats: Cow::Borrowed(C::COLOR_FORMATS),
+            depth_stencil_format: None,
+            sample_count: 1,
+            depth_read_only: false,
+            stencil_read_only: false,
             _marker: Default::default(),
         }
     }
@@ -1616,18 +1422,12 @@ impl RenderBundleEncoderDescriptor<()> {
     where
         C: TypedMultisampleColorLayout,
     {
-        let color_formats = js_sys::Array::new();
-
-        for format in C::COLOR_FORMATS {
-            color_formats.push(&JsValue::from(format.as_str()));
-        }
-
-        let mut inner = GpuRenderBundleEncoderDescriptor::new(&color_formats);
-
-        inner.sample_count(SAMPLES as u32);
-
         RenderBundleEncoderDescriptor {
-            inner,
+            color_formats: Cow::Borrowed(C::COLOR_FORMATS),
+            depth_stencil_format: None,
+            sample_count: SAMPLES as u32,
+            depth_read_only: false,
+            stencil_read_only: false,
             _marker: Default::default(),
         }
     }
@@ -1638,12 +1438,18 @@ impl<C> RenderBundleEncoderDescriptor<RenderLayout<C, ()>> {
     where
         Ds: DepthStencilRenderable,
     {
-        let RenderBundleEncoderDescriptor { mut inner, .. } = self;
-
-        inner.depth_stencil_format(Ds::FORMAT_ID.to_web_sys());
+        let RenderBundleEncoderDescriptor {
+            color_formats,
+            sample_count,
+            ..
+        } = self;
 
         RenderBundleEncoderDescriptor {
-            inner,
+            color_formats,
+            depth_stencil_format: Some(Ds::FORMAT_ID),
+            sample_count,
+            depth_read_only: false,
+            stencil_read_only: false,
             _marker: Default::default(),
         }
     }
@@ -1654,12 +1460,18 @@ impl<C> RenderBundleEncoderDescriptor<RenderLayout<C, ()>> {
     where
         Ds: DepthStencilRenderable,
     {
-        let RenderBundleEncoderDescriptor { mut inner, .. } = self;
-
-        inner.depth_stencil_format(Ds::FORMAT_ID.to_web_sys());
+        let RenderBundleEncoderDescriptor {
+            color_formats,
+            sample_count,
+            ..
+        } = self;
 
         RenderBundleEncoderDescriptor {
-            inner,
+            color_formats,
+            depth_stencil_format: Some(Ds::FORMAT_ID),
+            sample_count,
+            depth_read_only: true,
+            stencil_read_only: true,
             _marker: Default::default(),
         }
     }
@@ -1672,12 +1484,18 @@ impl<C, const SAMPLES: u8> RenderBundleEncoderDescriptor<MultisampleRenderLayout
     where
         Ds: DepthStencilRenderable,
     {
-        let RenderBundleEncoderDescriptor { mut inner, .. } = self;
-
-        inner.depth_stencil_format(Ds::FORMAT_ID.to_web_sys());
+        let RenderBundleEncoderDescriptor {
+            color_formats,
+            sample_count,
+            ..
+        } = self;
 
         RenderBundleEncoderDescriptor {
-            inner,
+            color_formats,
+            depth_stencil_format: Some(Ds::FORMAT_ID),
+            sample_count,
+            depth_read_only: false,
+            stencil_read_only: false,
             _marker: Default::default(),
         }
     }
@@ -1688,24 +1506,41 @@ impl<C, const SAMPLES: u8> RenderBundleEncoderDescriptor<MultisampleRenderLayout
     where
         Ds: DepthStencilRenderable,
     {
-        let RenderBundleEncoderDescriptor { mut inner, .. } = self;
-
-        inner.depth_stencil_format(Ds::FORMAT_ID.to_web_sys());
+        let RenderBundleEncoderDescriptor {
+            color_formats,
+            sample_count,
+            ..
+        } = self;
 
         RenderBundleEncoderDescriptor {
-            inner,
+            color_formats,
+            depth_stencil_format: Some(Ds::FORMAT_ID),
+            sample_count,
+            depth_read_only: true,
+            stencil_read_only: true,
             _marker: Default::default(),
         }
     }
 }
 
+impl<T> RenderBundleEncoderDescriptor<T> {
+    pub(crate) fn to_driver(&self) -> driver::RenderBundleEncoderDescriptor {
+        driver::RenderBundleEncoderDescriptor {
+            color_formats: self.color_formats.as_ref(),
+            depth_stencil_format: self.depth_stencil_format,
+            sample_count: self.sample_count,
+            depth_read_only: self.depth_read_only,
+            stencil_read_only: self.stencil_read_only,
+        }
+    }
+}
+
 pub struct RenderBundleEncoder<Target, Pipeline, Vertex, Index, Resources> {
-    inner: GpuRenderBundleEncoder,
+    handle: <Dvr as Driver>::RenderBundleEncoderHandle,
     current_pipeline_id: Option<usize>,
     current_vertex_buffers: [Option<CurrentBufferRange>; 8],
     current_index_buffer: Option<CurrentBufferRange>,
     current_bind_group_ids: [Option<usize>; 4],
-    _resource_handles: Vec<ResourceHandle>,
     _marker: marker::PhantomData<(
         *const Target,
         *const Pipeline,
@@ -1717,15 +1552,16 @@ pub struct RenderBundleEncoder<Target, Pipeline, Vertex, Index, Resources> {
 
 impl<T, P, V, I, R> RenderBundleEncoder<T, P, V, I, R> {
     pub fn new(device: &Device, descriptor: &RenderBundleEncoderDescriptor<T>) -> Self {
-        let inner = device.inner.create_render_bundle_encoder(&descriptor.inner);
+        let handle = device
+            .handle
+            .create_render_bundle_encoder(&descriptor.to_driver());
 
         RenderBundleEncoder {
-            inner,
+            handle,
             current_pipeline_id: None,
-            current_vertex_buffers: [None; 8],
+            current_vertex_buffers: [None, None, None, None, None, None, None, None],
             current_index_buffer: None,
             current_bind_group_ids: [None; 4],
-            _resource_handles: Vec::new(),
             _marker: Default::default(),
         }
     }
@@ -1734,8 +1570,7 @@ impl<T, P, V, I, R> RenderBundleEncoder<T, P, V, I, R> {
 impl<T, P, V, I, R> RenderBundleEncoder<T, P, V, I, R> {
     pub fn finish(self) -> RenderBundle<T> {
         RenderBundle {
-            inner: self.inner.finish(),
-            _resource_handles: Arc::new(self._resource_handles),
+            handle: self.handle.finish(),
             _marker: Default::default(),
         }
     }
@@ -1753,37 +1588,33 @@ impl<T, P, V, I, R> ResourceBindingCommandEncoder for RenderBundleEncoder<T, P, 
         RNew: BindGroups,
     {
         let RenderBundleEncoder {
-            inner,
+            mut handle,
             current_pipeline_id,
             current_vertex_buffers,
             current_index_buffer,
             mut current_bind_group_ids,
-            _resource_handles: mut _resource_handles,
             ..
         } = self;
 
         for (i, encoding) in bind_groups.encodings().enumerate() {
             let BindGroupEncoding {
-                bind_group,
+                bind_group_handle,
                 id,
-                _resource_handles: bind_group_resource_handles,
             } = encoding;
 
             if current_bind_group_ids[i] != Some(id) {
-                inner.set_bind_group(i as u32, Some(&bind_group));
-                _resource_handles.push(bind_group_resource_handles.into());
+                handle.set_bind_group(i as u32, &bind_group_handle);
 
                 current_bind_group_ids[i] = Some(id);
             }
         }
 
         RenderBundleEncoder {
-            inner,
+            handle,
             current_pipeline_id,
             current_vertex_buffers,
             current_index_buffer,
             current_bind_group_ids,
-            _resource_handles,
             _marker: Default::default(),
         }
     }
@@ -1803,26 +1634,24 @@ impl<T, P, V, I, R> RenderStateEncoder<T> for RenderBundleEncoder<T, P, V, I, R>
         PT: RenderLayoutCompatible<T>,
     {
         let RenderBundleEncoder {
-            inner,
+            mut handle,
             current_pipeline_id,
             current_vertex_buffers,
             current_index_buffer,
             current_bind_group_ids,
-            _resource_handles,
             ..
         } = self;
 
         if Some(pipeline.id()) != current_pipeline_id {
-            inner.set_pipeline(pipeline.as_web_sys());
+            handle.set_pipeline(&pipeline.handle);
         }
 
         RenderBundleEncoder {
-            inner,
+            handle,
             current_pipeline_id: Some(pipeline.id()),
             current_vertex_buffers,
             current_index_buffer,
             current_bind_group_ids,
-            _resource_handles,
             _marker: Default::default(),
         }
     }
@@ -1832,40 +1661,39 @@ impl<T, P, V, I, R> RenderStateEncoder<T> for RenderBundleEncoder<T, P, V, I, R>
         VNew: VertexBuffers,
     {
         let RenderBundleEncoder {
-            inner,
+            mut handle,
             current_pipeline_id,
             mut current_vertex_buffers,
             current_index_buffer,
             current_bind_group_ids,
-            mut _resource_handles,
             ..
         } = self;
 
-        for (i, encoding) in vertex_buffers.encodings().enumerate() {
-            let VertexBufferEncoding {
-                buffer,
-                id,
-                offset,
-                size,
-            } = encoding;
+        for (i, encoding) in vertex_buffers.encodings().as_ref().iter().enumerate() {
+            let VertexBufferEncoding { buffer, id, range } = encoding;
 
-            let range = CurrentBufferRange { id, offset, size };
+            let range_id = CurrentBufferRange {
+                id: *id,
+                range: range.clone(),
+            };
 
-            if current_vertex_buffers[i] != Some(range) {
-                inner.set_vertex_buffer_with_u32_and_u32(i as u32, Some(&buffer.buffer), offset, size);
-                _resource_handles.push(buffer.into());
+            if current_vertex_buffers[i] != Some(range_id.clone()) {
+                handle.set_vertex_buffer(SetVertexBuffer {
+                    slot: i as u32,
+                    buffer_handle: Some(buffer),
+                    range: Some(range.clone()),
+                });
 
-                current_vertex_buffers[i] = Some(range);
+                current_vertex_buffers[i] = Some(range_id);
             }
         }
 
         RenderBundleEncoder {
-            inner,
+            handle,
             current_pipeline_id,
             current_vertex_buffers,
             current_index_buffer,
             current_bind_group_ids,
-            _resource_handles,
             _marker: Default::default(),
         }
     }
@@ -1875,12 +1703,11 @@ impl<T, P, V, I, R> RenderStateEncoder<T> for RenderBundleEncoder<T, P, V, I, R>
         INew: IndexBuffer,
     {
         let RenderBundleEncoder {
-            inner,
+            mut handle,
             current_pipeline_id,
             current_vertex_buffers,
             mut current_index_buffer,
             current_bind_group_ids,
-            mut _resource_handles,
             ..
         } = self;
 
@@ -1888,26 +1715,30 @@ impl<T, P, V, I, R> RenderStateEncoder<T> for RenderBundleEncoder<T, P, V, I, R>
             buffer,
             id,
             format,
-            offset,
-            size,
+            range,
         } = index_buffer.to_encoding();
 
-        let range = CurrentBufferRange { id, offset, size };
+        let range_id = CurrentBufferRange {
+            id,
+            range: range.clone(),
+        };
 
-        if current_index_buffer != Some(range) {
-            inner.set_index_buffer_with_u32_and_u32(&buffer.buffer, format, offset, size);
-            _resource_handles.push(buffer.into());
+        if current_index_buffer != Some(range_id.clone()) {
+            handle.set_index_buffer(SetIndexBuffer {
+                buffer_handle: &buffer,
+                index_format: format,
+                range: Some(range),
+            });
 
-            current_index_buffer = Some(range);
+            current_index_buffer = Some(range_id);
         }
 
         RenderBundleEncoder {
-            inner,
+            handle,
             current_pipeline_id,
             current_vertex_buffers,
             current_index_buffer,
             current_bind_group_ids,
-            _resource_handles,
             _marker: Default::default(),
         }
     }
@@ -1920,31 +1751,18 @@ where
     V: VertexBuffers<Layout = PV>,
     R: BindGroups<Layout = PR>,
 {
-    fn draw(self, draw: Draw) -> Self {
-        let Draw {
-            vertex_count,
-            instance_count,
-            first_vertex,
-            first_instance,
-        } = draw;
-
-        self.inner
-            .draw_with_instance_count_and_first_vertex_and_first_instance(
-                vertex_count,
-                instance_count,
-                first_vertex,
-                first_instance,
-            );
+    fn draw(mut self, draw: Draw) -> Self {
+        self.handle.draw(draw);
 
         self
     }
 
-    fn draw_indirect<U>(self, view: buffer::View<Draw, U>) -> Self
+    fn draw_indirect<U>(mut self, view: buffer::View<Draw, U>) -> Self
     where
         U: buffer::Indirect,
     {
-        self.inner
-            .draw_indirect_with_u32(view.as_web_sys(), view.offset_in_bytes() as u32);
+        self.handle
+            .draw_indirect(&view.buffer.handle, view.offset_in_bytes());
 
         self
     }
@@ -1960,36 +1778,18 @@ where
     I::IndexData: PipelineIndexFormatCompatible<PI>,
     R: BindGroups<Layout = PR>,
 {
-    fn draw_indexed(self, draw_indexed: DrawIndexed) -> Self {
-        let DrawIndexed {
-            index_count,
-            instance_count,
-            first_index,
-            base_vertex,
-            first_instance,
-        } = draw_indexed;
-
-        // TODO: base_vertex in specced to be a signed integer here, but specced to be an unsigned
-        // integer in the indirect version. Going with unsigned for both for now (what's the
-        // use-case for a negative base vertex number?), but should investigate.
-        self.inner
-            .draw_indexed_with_instance_count_and_first_index_and_base_vertex_and_first_instance(
-                index_count,
-                instance_count,
-                first_index,
-                base_vertex as i32,
-                first_instance,
-            );
+    fn draw_indexed(mut self, draw_indexed: DrawIndexed) -> Self {
+        self.handle.draw_indexed(draw_indexed);
 
         self
     }
 
-    fn draw_indexed_indirect<U>(self, view: buffer::View<DrawIndexed, U>) -> Self
+    fn draw_indexed_indirect<U>(mut self, view: buffer::View<DrawIndexed, U>) -> Self
     where
         U: buffer::Indirect,
     {
-        self.inner
-            .draw_indexed_indirect_with_u32(view.as_web_sys(), view.offset_in_bytes() as u32);
+        self.handle
+            .draw_indirect(&view.buffer.handle, view.offset_in_bytes());
 
         self
     }

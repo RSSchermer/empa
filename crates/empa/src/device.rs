@@ -3,15 +3,18 @@ use std::mem::MaybeUninit;
 use std::{mem, slice};
 
 use atomic_counter::RelaxedCounter;
+use flagset::FlagSet;
 use lazy_static::lazy_static;
-use web_sys::{GpuDevice, GpuQueue};
 
-use crate::adapter::{Features, Limits};
+use crate::adapter::{Feature, Limits};
 use crate::buffer::{AsBuffer, Buffer};
 use crate::command::{
     CommandBuffer, CommandEncoder, RenderBundleEncoder, RenderBundleEncoderDescriptor,
 };
 use crate::compute_pipeline::{ComputePipeline, ComputePipelineDescriptor};
+use crate::driver::{
+    Device as _, Driver, Dvr, Queue as _, WriteBufferOperation, WriteTextureOperation,
+};
 use crate::query::{OcclusionQuerySet, TimestampQuerySet};
 use crate::render_pipeline::{RenderPipeline, RenderPipelineDescriptor};
 use crate::resource_binding::{
@@ -40,21 +43,16 @@ lazy_static! {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub struct DeviceDescriptor {
-    pub required_features: Features,
+    pub required_features: FlagSet<Feature>,
     pub required_limits: Limits,
 }
 
 #[derive(Clone)]
 pub struct Device {
-    pub(crate) inner: GpuDevice,
+    pub(crate) handle: <Dvr as Driver>::DeviceHandle,
 }
 
 impl Device {
-    #[doc(hidden)]
-    pub fn as_web_sys(&self) -> &GpuDevice {
-        &self.inner
-    }
-
     pub fn create_buffer<D, T, U>(&self, data: D, usage: U) -> Buffer<T, U>
     where
         D: AsBuffer<T>,
@@ -191,7 +189,7 @@ impl Device {
         &self,
         descriptor: &ComputePipelineDescriptor<R>,
     ) -> ComputePipeline<R> {
-        ComputePipeline::new(self, descriptor)
+        ComputePipeline::new_sync(self, descriptor)
     }
 
     pub fn create_render_pipeline<T, V, I, R>(
@@ -277,11 +275,11 @@ impl Device {
         TextureMultisampled2D::new(self, descriptor)
     }
 
-    pub fn create_occlusion_query_set(&self, len: u32) -> OcclusionQuerySet {
+    pub fn create_occlusion_query_set(&self, len: usize) -> OcclusionQuerySet {
         OcclusionQuerySet::new(self, len)
     }
 
-    pub fn create_timestamp_query_set(&self, len: u32) -> TimestampQuerySet {
+    pub fn create_timestamp_query_set(&self, len: usize) -> TimestampQuerySet {
         TimestampQuerySet::new(self, len)
     }
 
@@ -298,22 +296,18 @@ impl Device {
 
     pub fn queue(&self) -> Queue {
         Queue {
-            inner: self.inner.queue(),
+            handle: self.handle.queue_handle(),
         }
     }
 }
 
 pub struct Queue {
-    pub(crate) inner: GpuQueue,
+    pub(crate) handle: <Dvr as Driver>::QueueHandle,
 }
 
 impl Queue {
     pub fn submit(&self, command_buffer: CommandBuffer) {
-        let array = js_sys::Array::new();
-
-        array.push(command_buffer.as_web_sys().as_ref());
-
-        self.inner.submit(array.as_ref());
+        self.handle.submit(&command_buffer.handle);
     }
 
     pub fn write_buffer<T, U>(&self, dst: buffer::View<T, U>, data: &T)
@@ -324,13 +318,13 @@ impl Queue {
         let ptr = data as *const T as *const u8;
         let len = mem::size_of::<T>();
 
-        let bytes = unsafe { slice::from_raw_parts(ptr, len) };
+        let data = unsafe { slice::from_raw_parts(ptr, len) };
 
-        self.inner.write_buffer_with_u32_and_u8_array(
-            dst.as_web_sys(),
-            dst.offset_in_bytes() as u32,
-            bytes,
-        );
+        self.handle.write_buffer(WriteBufferOperation {
+            buffer_handle: &dst.buffer.handle,
+            offset: dst.offset_in_bytes(),
+            data,
+        });
     }
 
     pub fn write_buffer_slice<T, U>(&self, dst: buffer::View<[T], U>, data: &[T])
@@ -347,18 +341,18 @@ impl Queue {
         let ptr = data as *const [T] as *const u8;
         let len = mem::size_of::<T>() * data.len();
 
-        let bytes = unsafe { slice::from_raw_parts(ptr, len) };
+        let data = unsafe { slice::from_raw_parts(ptr, len) };
 
-        self.inner.write_buffer_with_u32_and_u8_array(
-            dst.as_web_sys(),
-            dst.offset_in_bytes() as u32,
-            bytes,
-        );
+        self.handle.write_buffer(WriteBufferOperation {
+            buffer_handle: &dst.buffer.handle,
+            offset: dst.offset_in_bytes(),
+            data,
+        });
     }
 
     fn write_texture_internal<F, T>(
         &self,
-        dst: &texture::ImageCopyTexture<F>,
+        dst: texture::ImageCopyTexture<F>,
         data: &[T],
         layout: ImageDataByteLayout,
         size: ImageCopySize3D,
@@ -398,20 +392,19 @@ impl Queue {
         let ptr = data as *const [T] as *const u8;
         let len = mem::size_of::<T>() * data.len();
 
-        let bytes = unsafe { slice::from_raw_parts(ptr, len) };
+        let data = unsafe { slice::from_raw_parts(ptr, len) };
 
-        self.inner
-            .write_texture_with_u8_array_and_gpu_extent_3d_dict(
-                &dst.to_web_sys(),
-                bytes,
-                &layout.to_web_sys(),
-                &size.to_web_sys(),
-            );
+        self.handle.write_texture(WriteTextureOperation {
+            image_copy_texture: dst.inner,
+            image_data_layout: layout.to_driver(),
+            extent: (width, height, depth_or_layers),
+            data,
+        });
     }
 
     pub fn write_texture<F, T>(
         &self,
-        dst: &texture::ImageCopyDst<F>,
+        dst: texture::ImageCopyDst<F>,
         data: &[T],
         layout: ImageDataLayout,
     ) where
@@ -425,12 +418,12 @@ impl Queue {
         };
         let byte_layout = layout.to_byte_layout(mem::size_of::<T>() as u32);
 
-        self.write_texture_internal(&dst.inner, data, byte_layout, size);
+        self.write_texture_internal(dst.inner, data, byte_layout, size);
     }
 
     pub fn write_texture_sub_image<F, T>(
         &self,
-        dst: &texture::SubImageCopyDst<F>,
+        dst: texture::SubImageCopyDst<F>,
         data: &[T],
         layout: ImageDataLayout,
         size: ImageCopySize3D,
@@ -443,12 +436,12 @@ impl Queue {
 
         let byte_layout = layout.to_byte_layout(mem::size_of::<T>() as u32);
 
-        self.write_texture_internal(&dst.inner, data, byte_layout, size);
+        self.write_texture_internal(dst.inner, data, byte_layout, size);
     }
 
     fn write_texture_raw_internal<F>(
         &self,
-        dst: &texture::ImageCopyTexture<F>,
+        dst: texture::ImageCopyTexture<F>,
         bytes: &[u8],
         layout: ImageDataByteLayout,
         size: ImageCopySize3D,
@@ -493,18 +486,17 @@ impl Queue {
             min_size
         );
 
-        self.inner
-            .write_texture_with_u8_array_and_gpu_extent_3d_dict(
-                &dst.to_web_sys(),
-                bytes,
-                &layout.to_web_sys(),
-                &size.to_web_sys(),
-            );
+        self.handle.write_texture(WriteTextureOperation {
+            image_copy_texture: dst.inner,
+            image_data_layout: layout.to_driver(),
+            extent: (width, height, depth_or_layers),
+            data: bytes,
+        });
     }
 
     pub fn write_texture_raw<F>(
         &self,
-        dst: &texture::ImageCopyDst<F>,
+        dst: texture::ImageCopyDst<F>,
         bytes: &[u8],
         layout: ImageDataByteLayout,
     ) where
@@ -516,12 +508,12 @@ impl Queue {
             depth_or_layers: dst.inner.depth_or_layers,
         };
 
-        self.write_texture_raw_internal(&dst.inner, bytes, layout, size);
+        self.write_texture_raw_internal(dst.inner, bytes, layout, size);
     }
 
     pub fn write_texture_sub_image_raw<F>(
         &self,
-        dst: &texture::SubImageCopyDst<F>,
+        dst: texture::SubImageCopyDst<F>,
         bytes: &[u8],
         layout: ImageDataByteLayout,
         size: ImageCopySize3D,
@@ -531,6 +523,6 @@ impl Queue {
         size.validate_with_block_size(dst.inner.block_size);
         dst.inner.validate_dst_with_size(size);
 
-        self.write_texture_raw_internal(&dst.inner, bytes, layout, size);
+        self.write_texture_raw_internal(dst.inner, bytes, layout, size);
     }
 }

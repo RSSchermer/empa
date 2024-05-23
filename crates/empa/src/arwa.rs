@@ -1,7 +1,6 @@
 use std::future::Future;
 use std::marker;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use arwa::html::HtmlCanvasElement;
@@ -19,13 +18,14 @@ use web_sys::{
 
 use crate::adapter::Adapter;
 use crate::device::{Device, Queue};
+use crate::driver::web::{size_3d_to_web_sys, texture_format_to_str, texture_format_to_web_sys};
 use crate::texture;
 use crate::texture::format::{
     bgra8unorm, bgra8unorm_srgb, r16float, r32float, r8unorm, rg16float, rg32float, rg8unorm,
     rgb10a2unorm, rgba16float, rgba32float, rgba8unorm, rgba8unorm_srgb, TextureFormat,
     TextureFormatId, ViewFormats,
 };
-use crate::texture::{ImageCopySize2D, Texture2D, TextureHandle};
+use crate::texture::{ImageCopySize2D, Texture2D};
 
 mod navigator_ext_seal {
     pub trait Seal {}
@@ -131,7 +131,9 @@ impl Future for RequestAdapter {
                 if v.is_null() {
                     None
                 } else {
-                    Some(Adapter::from_web_sys(v.unchecked_into()))
+                    Some(Adapter::from_handle(
+                        v.unchecked_into::<web_sys::GpuAdapter>().into(),
+                    ))
                 }
             })
         })
@@ -225,15 +227,17 @@ impl CanvasContext {
             ..
         } = configuration;
 
-        let mut config =
-            GpuCanvasConfiguration::new(device.as_web_sys(), F::FORMAT_ID.to_web_sys());
+        let mut config = GpuCanvasConfiguration::new(
+            &device.handle.inner,
+            texture_format_to_web_sys(&F::FORMAT_ID),
+        );
 
-        config.usage(U::BITS);
+        config.usage(U::FLAG_SET.bits());
 
         let formats = js_sys::Array::new();
 
         for format in view_formats.formats() {
-            formats.push(&JsValue::from(format.as_str()));
+            formats.push(&JsValue::from(texture_format_to_str(&format)));
         }
 
         // TODO: view formats not in web-sys
@@ -273,7 +277,7 @@ where
 
     pub fn get_current_texture(&self) -> Texture2D<F, U> {
         Texture2D::from_swap_chain_texture(
-            self.inner.get_current_texture(),
+            self.inner.get_current_texture().into(),
             self.canvas.width(),
             self.canvas.height(),
             &self.view_formats,
@@ -342,11 +346,12 @@ impl QueueExt for Queue {
         assert!(width <= dst.width, "copy width outside of `dst` bounds");
         assert!(height <= dst.height, "copy height outside of `dst` bounds");
 
-        self.inner
+        self.handle
+            .inner
             .copy_external_image_to_texture_with_gpu_extent_3d_dict(
                 &src.inner,
                 &dst.inner,
-                &size.to_web_sys(),
+                &size_3d_to_web_sys((width, height, 1)),
             );
     }
 }
@@ -450,7 +455,6 @@ pub struct ExternalSubImageCopyDstDescriptor {
 
 pub struct ExternalImageCopyDst {
     inner: GpuImageCopyTextureTagged,
-    _texture: Arc<TextureHandle>,
     width: u32,
     height: u32,
 }
@@ -515,7 +519,7 @@ impl<F, U> Texture2DExt<F, U> for Texture2D<F, U> {
             "mipmap level out of bounds"
         );
 
-        let mut inner = GpuImageCopyTextureTagged::new(self.as_web_sys());
+        let mut inner = GpuImageCopyTextureTagged::new(&self.handle.inner);
 
         inner.mip_level(mipmap_level as u32);
         // Ignoring for now, see comment above
@@ -524,7 +528,6 @@ impl<F, U> Texture2DExt<F, U> for Texture2D<F, U> {
 
         ExternalImageCopyDst {
             inner,
-            _texture: self.inner.clone(),
             width: self.width,
             height: self.height,
         }
@@ -562,7 +565,7 @@ impl<F, U> Texture2DExt<F, U> for Texture2D<F, U> {
         origin.y(origin_y);
         origin.z(origin_layer);
 
-        let mut inner = GpuImageCopyTextureTagged::new(self.as_web_sys());
+        let mut inner = GpuImageCopyTextureTagged::new(&self.handle.inner);
 
         inner.origin(origin.as_ref());
         inner.mip_level(mipmap_level as u32);
@@ -572,7 +575,6 @@ impl<F, U> Texture2DExt<F, U> for Texture2D<F, U> {
 
         ExternalImageCopyDst {
             inner,
-            _texture: self.inner.clone(),
             width: self.width - origin_x,
             height: self.height - origin_y,
         }

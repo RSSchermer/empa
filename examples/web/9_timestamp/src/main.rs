@@ -1,9 +1,9 @@
 use std::error::Error;
-use std::ops::Deref;
 
 use arwa::console;
 use arwa::window::window;
-use empa::adapter::Features;
+use empa::access_mode::ReadWrite;
+use empa::adapter::Feature;
 use empa::arwa::{NavigatorExt, RequestAdapterOptions};
 use empa::buffer;
 use empa::buffer::{Buffer, Storage};
@@ -17,7 +17,7 @@ use futures::FutureExt;
 #[derive(empa::resource_binding::Resources)]
 struct MyResources<'a> {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    data: &'a Storage<[u32]>,
+    data: Storage<'a, [u32], ReadWrite>,
 }
 
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
@@ -37,7 +37,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
         .ok_or("adapter not found")?;
     let device = adapter
         .request_device(&DeviceDescriptor {
-            required_features: Features::TIMESTAMP_QUERY,
+            required_features: Feature::TimestampQuery.into(),
             ..Default::default()
         })
         .await?;
@@ -53,7 +53,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
         .create_compute_pipeline(
             &ComputePipelineDescriptorBuilder::begin()
                 .layout(&pipeline_layout)
-                .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
+                .compute(ComputeStageBuilder::begin(&shader, "main").finish())
                 .finish(),
         )
         .await;
@@ -66,7 +66,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
     let bind_group = device.create_bind_group(
         &bind_group_layout,
         MyResources {
-            data: &data_buffer.storage(),
+            data: data_buffer.storage(),
         },
     );
 

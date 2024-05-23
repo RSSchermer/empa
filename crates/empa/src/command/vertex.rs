@@ -1,14 +1,14 @@
-use std::sync::Arc;
+use std::ops::Range;
 
 use crate::buffer;
-use crate::buffer::{Buffer, BufferHandle};
+use crate::buffer::Buffer;
+use crate::driver::{Driver, Dvr};
 use crate::render_pipeline::{TypedVertexLayout, Vertex};
 
 pub struct VertexBufferEncoding {
-    pub(crate) buffer: Arc<BufferHandle>,
+    pub(crate) buffer: <Dvr as Driver>::BufferHandle,
     pub(crate) id: usize,
-    pub(crate) offset: u32,
-    pub(crate) size: u32,
+    pub(crate) range: Range<usize>,
 }
 
 mod vertex_buffer_seal {
@@ -35,11 +35,13 @@ where
     type Vertex = V;
 
     fn to_encoding(&self) -> VertexBufferEncoding {
+        let start = 0;
+        let end = self.size_in_bytes();
+
         VertexBufferEncoding {
-            buffer: self.internal.inner.clone(),
+            buffer: self.internal.handle.clone(),
             id: self.id(),
-            offset: 0,
-            size: self.size_in_bytes() as u32,
+            range: start..end,
         }
     }
 }
@@ -58,11 +60,13 @@ where
     type Vertex = V;
 
     fn to_encoding(&self) -> VertexBufferEncoding {
+        let start = self.offset_in_bytes();
+        let end = start + self.size_in_bytes();
+
         VertexBufferEncoding {
-            buffer: self.buffer.inner.clone(),
+            buffer: self.buffer.handle.clone(),
             id: self.id(),
-            offset: 0,
-            size: self.size_in_bytes() as u32,
+            range: start..end,
         }
     }
 }
@@ -74,7 +78,7 @@ mod vertex_buffers_seal {
 pub trait VertexBuffers: vertex_buffers_seal::Seal {
     type Layout: TypedVertexLayout;
 
-    type Encodings: Iterator<Item = VertexBufferEncoding>;
+    type Encodings: AsRef<[VertexBufferEncoding]>;
 
     fn encodings(&self) -> Self::Encodings;
 }
@@ -83,10 +87,10 @@ impl vertex_buffers_seal::Seal for () {}
 impl VertexBuffers for () {
     type Layout = ();
 
-    type Encodings = std::iter::Empty<VertexBufferEncoding>;
+    type Encodings = [VertexBufferEncoding; 0];
 
     fn encodings(&self) -> Self::Encodings {
-        std::iter::empty()
+        []
     }
 }
 
@@ -99,13 +103,13 @@ macro_rules! impl_vertex_buffers {
         impl<$($B),*> VertexBuffers for ($($B),*) where $($B: VertexBuffer),* {
             type Layout = ($($B::Vertex),*);
 
-            type Encodings = <[VertexBufferEncoding; $n] as IntoIterator>::IntoIter;
+            type Encodings = [VertexBufferEncoding; $n];
 
             fn encodings(&self) -> Self::Encodings {
                 #[allow(non_snake_case)]
                 let ($($B),*) = self;
 
-                [$($B.to_encoding()),*].into_iter()
+                [$($B.to_encoding()),*]
             }
         }
     }
