@@ -95,6 +95,7 @@ where
             }),
             width: image.width,
             height: image.height,
+            _marker: Default::default(),
         }
     }
 }
@@ -134,6 +135,7 @@ where
             }),
             width: image.width,
             height: image.height,
+            _marker: Default::default(),
         }
     }
 }
@@ -173,6 +175,7 @@ where
             }),
             width: image.width,
             height: image.height,
+            _marker: Default::default(),
         }
     }
 }
@@ -231,6 +234,7 @@ where
             }),
             width: image.width,
             height: image.height,
+            _marker: Default::default(),
         }
     }
 }
@@ -263,6 +267,7 @@ where
             }),
             width: image.width,
             height: image.height,
+            _marker: Default::default(),
         }
     }
 }
@@ -301,6 +306,7 @@ where
             }),
             width: image.width,
             height: image.height,
+            _marker: Default::default(),
         }
     }
 }
@@ -333,6 +339,7 @@ where
             }),
             width: image.width,
             height: image.height,
+            _marker: Default::default(),
         }
     }
 }
@@ -371,6 +378,7 @@ where
             }),
             width: image.width,
             height: image.height,
+            _marker: Default::default(),
         }
     }
 }
@@ -403,6 +411,7 @@ where
             }),
             width: image.width,
             height: image.height,
+            _marker: Default::default(),
         }
     }
 }

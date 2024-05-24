@@ -116,8 +116,8 @@ where
 }
 
 pub struct AttachableMultisampledImage<'a, F, const SAMPLES: u8> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
     pub(crate) width: u32,
     pub(crate) height: u32,
-    _marker: marker::PhantomData<*const F>,
+    _marker: marker::PhantomData<&'a F>,
 }

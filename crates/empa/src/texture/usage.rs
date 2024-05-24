@@ -70,23 +70,23 @@ impl<
         let mut bits = TextureUsage::None as u32;
 
         if CopySrc::IS_ENABLED {
-            bits |= TextureUsage::CopySrc as u32;
+            bits |= 0x0001;
         }
 
         if CopyDst::IS_ENABLED {
-            bits |= TextureUsage::CopyDst as u32;
+            bits |= 0x0002;
         }
 
         if TextureBinding::IS_ENABLED {
-            bits |= TextureUsage::TextureBinding as u32;
+            bits |= 0x0004;
         }
 
         if StorageBinding::IS_ENABLED {
-            bits |= TextureUsage::StorageBinding as u32;
+            bits |= 0x0008;
         }
 
         if RenderAttachment::IS_ENABLED {
-            bits |= TextureUsage::RenderAttachment as u32;
+            bits |= 0x0010;
         }
 
         unsafe { FlagSet::new_unchecked(bits) }

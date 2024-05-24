@@ -95,7 +95,7 @@ impl<F, U> Texture1D<F, U> {
         self.size
     }
 
-    fn view_internal<'a>(&'a self, format: TextureFormatId) -> <Dvr as Driver>::TextureView<'a> {
+    fn view_internal(&self, format: TextureFormatId) -> <Dvr as Driver>::TextureView {
         self.handle.texture_view(&TextureViewDescriptor {
             format,
             dimensions: TextureViewDimension::One,
@@ -112,6 +112,7 @@ impl<F, U> Texture1D<F, U> {
     {
         Sampled1DFloat {
             inner: self.view_internal(F::FORMAT_ID),
+            _marker: Default::default(),
         }
     }
 
@@ -125,6 +126,7 @@ impl<F, U> Texture1D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled1DFloat {
                 inner: self.view_internal(ViewedFormat::FORMAT_ID),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -141,6 +143,7 @@ impl<F, U> Texture1D<F, U> {
     {
         Sampled1DUnfilteredFloat {
             inner: self.view_internal(F::FORMAT_ID),
+            _marker: Default::default(),
         }
     }
 
@@ -154,6 +157,7 @@ impl<F, U> Texture1D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled1DUnfilteredFloat {
                 inner: self.view_internal(ViewedFormat::FORMAT_ID),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -170,6 +174,7 @@ impl<F, U> Texture1D<F, U> {
     {
         Sampled1DSignedInteger {
             inner: self.view_internal(F::FORMAT_ID),
+            _marker: Default::default(),
         }
     }
 
@@ -183,6 +188,7 @@ impl<F, U> Texture1D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled1DSignedInteger {
                 inner: self.view_internal(ViewedFormat::FORMAT_ID),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -199,6 +205,7 @@ impl<F, U> Texture1D<F, U> {
     {
         Sampled1DUnsignedInteger {
             inner: self.view_internal(F::FORMAT_ID),
+            _marker: Default::default(),
         }
     }
 
@@ -212,6 +219,7 @@ impl<F, U> Texture1D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled1DUnsignedInteger {
                 inner: self.view_internal(ViewedFormat::FORMAT_ID),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -362,33 +370,37 @@ impl<F, U> Texture1D<F, U> {
 /// View on a 1D texture that can be bound to a pipeline as a float sampled texture resource.
 #[derive(Clone)]
 pub struct Sampled1DFloat<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 /// View on a 1D texture that can be bound to a pipeline as a unfiltered float sampled texture
 /// resource.
 #[derive(Clone)]
 pub struct Sampled1DUnfilteredFloat<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 /// View on a 1D texture that can be bound to a pipeline as a signed integer sampled texture
 /// resource.
 #[derive(Clone)]
 pub struct Sampled1DSignedInteger<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 /// View on a 1D texture that can be bound to a pipeline as a unsigned integer sampled texture
 /// resource.
 #[derive(Clone)]
 pub struct Sampled1DUnsignedInteger<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 /// View on a 1D texture that can be bound to a pipeline as a texture storage resource.
 #[derive(Clone)]
 pub struct Storage1D<'a, F, A = Read> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
-    _marker: marker::PhantomData<(*const F, A)>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<(&'a F, A)>,
 }

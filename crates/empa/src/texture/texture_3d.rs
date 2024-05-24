@@ -146,11 +146,11 @@ impl<F, U> Texture3D<F, U> {
         self.mip_level_count
     }
 
-    fn view_internal<'a>(
-        &'a self,
+    fn view_internal(
+        &self,
         format: TextureFormatId,
         descriptor: &View3DDescriptor,
-    ) -> <Dvr as Driver>::TextureView<'a> {
+    ) -> <Dvr as Driver>::TextureView {
         let View3DDescriptor {
             base_mipmap_level,
             mipmap_level_count,
@@ -191,6 +191,7 @@ impl<F, U> Texture3D<F, U> {
     {
         Sampled3DFloat {
             inner: self.view_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -205,6 +206,7 @@ impl<F, U> Texture3D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled3DFloat {
                 inner: self.view_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -224,6 +226,7 @@ impl<F, U> Texture3D<F, U> {
     {
         Sampled3DUnfilteredFloat {
             inner: self.view_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -238,6 +241,7 @@ impl<F, U> Texture3D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled3DUnfilteredFloat {
                 inner: self.view_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -254,6 +258,7 @@ impl<F, U> Texture3D<F, U> {
     {
         Sampled3DSignedInteger {
             inner: self.view_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -268,6 +273,7 @@ impl<F, U> Texture3D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled3DSignedInteger {
                 inner: self.view_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -287,6 +293,7 @@ impl<F, U> Texture3D<F, U> {
     {
         Sampled3DUnsignedInteger {
             inner: self.view_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -301,6 +308,7 @@ impl<F, U> Texture3D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled3DUnsignedInteger {
                 inner: self.view_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -310,11 +318,11 @@ impl<F, U> Texture3D<F, U> {
         }
     }
 
-    fn storage_internal<'a>(
-        &'a self,
+    fn storage_internal(
+        &self,
         format: TextureFormatId,
         mipmap_level: u8,
-    ) -> <Dvr as Driver>::TextureView<'a> {
+    ) -> <Dvr as Driver>::TextureView {
         assert!(
             mipmap_level < self.mip_level_count,
             "`mipmap_level` must not exceed the texture's mipmap level count"
@@ -528,33 +536,37 @@ impl<F, U> Texture3D<F, U> {
 /// View on a 3D texture that can be bound to a pipeline as a float sampled texture resource.
 #[derive(Clone)]
 pub struct Sampled3DFloat<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 /// View on a 3D texture that can be bound to a pipeline as a unfiltered float sampled texture
 /// resource.
 #[derive(Clone)]
 pub struct Sampled3DUnfilteredFloat<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 /// View on a 3D texture that can be bound to a pipeline as a signed integer sampled texture
 /// resource.
 #[derive(Clone)]
 pub struct Sampled3DSignedInteger<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 /// View on a 3D texture that can be bound to a pipeline as a unsigned integer sampled texture
 /// resource.
 #[derive(Clone)]
 pub struct Sampled3DUnsignedInteger<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 /// View on a 3D texture that can be bound to a pipeline as a texture storage resource.
 #[derive(Clone)]
 pub struct Storage3D<'a, F> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
-    _marker: marker::PhantomData<*const F>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a F>,
 }

@@ -37,7 +37,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
         .ok_or("adapter not found")?;
     let device = adapter
         .request_device(&DeviceDescriptor {
-            required_features: Feature::TimestampQuery.into(),
+            required_features: Feature::TimestampQuery,
             ..Default::default()
         })
         .await?;

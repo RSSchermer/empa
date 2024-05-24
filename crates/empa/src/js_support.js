@@ -15,7 +15,7 @@ export function __empa_js_copy_buffer_to_memory(
     memory_bytes.set(range_view, pointer);
 }
 
-export function __empa_write_time_stamp(
+export function __empa_write_timestamp(
     command_encoder,
     query_set_handle,
     index,

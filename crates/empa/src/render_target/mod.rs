@@ -9,7 +9,7 @@ pub use self::render_layout::*;
 
 mod render_target;
 use std::error::Error;
-use std::fmt;
+use std::{fmt, marker};
 
 pub use self::render_target::*;
 use crate::driver::{Dvr, RenderPassColorAttachment, RenderPassDepthStencilAttachment};
@@ -105,13 +105,15 @@ pub enum StoreOp {
 }
 
 pub struct ColorTargetEncoding<'a> {
-    pub(crate) inner: Option<RenderPassColorAttachment<'a, Dvr>>,
+    pub(crate) inner: Option<RenderPassColorAttachment<Dvr>>,
     pub(crate) width: u32,
     pub(crate) height: u32,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 pub struct DepthStencilTargetEncoding<'a> {
-    pub(crate) inner: Option<RenderPassDepthStencilAttachment<'a, Dvr>>,
+    pub(crate) inner: Option<RenderPassDepthStencilAttachment<Dvr>>,
     pub(crate) width: u32,
     pub(crate) height: u32,
+    _marker: marker::PhantomData<&'a ()>,
 }

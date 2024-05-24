@@ -3,7 +3,6 @@ use std::mem::MaybeUninit;
 use std::{mem, slice};
 
 use atomic_counter::RelaxedCounter;
-use flagset::FlagSet;
 use lazy_static::lazy_static;
 
 use crate::adapter::{Feature, Limits};
@@ -41,10 +40,19 @@ lazy_static! {
     pub(crate) static ref ID_GEN: RelaxedCounter = RelaxedCounter::new(1);
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
-pub struct DeviceDescriptor {
-    pub required_features: FlagSet<Feature>,
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct DeviceDescriptor<Flags> {
+    pub required_features: Flags,
     pub required_limits: Limits,
+}
+
+impl Default for DeviceDescriptor<Feature> {
+    fn default() -> Self {
+        DeviceDescriptor {
+            required_features: Feature::None,
+            required_limits: Default::default(),
+        }
+    }
 }
 
 #[derive(Clone)]

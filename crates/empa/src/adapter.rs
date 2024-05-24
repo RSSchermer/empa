@@ -25,6 +25,12 @@ flags! {
     }
 }
 
+impl Default for Feature {
+    fn default() -> Self {
+        Feature::None
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
     pub max_texture_dimension_1d: u32,
@@ -113,10 +119,13 @@ impl Adapter {
             .get_or_init(|| self.handle.supported_limits())
     }
 
-    pub fn request_device(
+    pub fn request_device<Flags>(
         &self,
-        descriptor: &DeviceDescriptor,
-    ) -> impl Future<Output = Result<Device, RequestDeviceError>> {
+        descriptor: &DeviceDescriptor<Flags>,
+    ) -> impl Future<Output = Result<Device, RequestDeviceError>>
+    where
+        Flags: Into<FlagSet<Feature>> + Copy,
+    {
         self.handle
             .request_device(descriptor)
             .map_ok(|handle| Device { handle })

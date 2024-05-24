@@ -38,15 +38,15 @@ impl<Compute: TypeFlag, Fragment: TypeFlag, Vertex: TypeFlag> visibility_seal::S
         let mut bits = 0;
 
         if Compute::IS_ENABLED {
-            bits |= ShaderStage::Compute as u32;
+            bits |= 0x0004;
         }
 
         if Fragment::IS_ENABLED {
-            bits |= ShaderStage::Fragment as u32;
+            bits |= 0x0002;
         }
 
         if Vertex::IS_ENABLED {
-            bits |= ShaderStage::Vertex as u32;
+            bits |= 0x0001;
         }
 
         unsafe { FlagSet::new_unchecked(bits) }

@@ -277,7 +277,7 @@ impl<F, U> Texture2D<F, U> {
         &'a self,
         format: TextureFormatId,
         descriptor: &View2DDescriptor,
-    ) -> <Dvr as Driver>::TextureView<'a> {
+    ) -> <Dvr as Driver>::TextureView {
         let View2DDescriptor {
             layer,
             base_mipmap_level,
@@ -324,6 +324,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DFloat {
             inner: self.view_2d_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -338,6 +339,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DFloat {
                 inner: self.view_2d_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -357,6 +359,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DUnfilteredFloat {
             inner: self.view_2d_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -371,6 +374,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DUnfilteredFloat {
                 inner: self.view_2d_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -387,6 +391,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DSignedInteger {
             inner: self.view_2d_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -401,6 +406,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DSignedInteger {
                 inner: self.view_2d_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -420,6 +426,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DUnsignedInteger {
             inner: self.view_2d_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -434,6 +441,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DUnsignedInteger {
                 inner: self.view_2d_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -450,6 +458,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DDepth {
             inner: self.view_2d_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -464,6 +473,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DDepth {
                 inner: self.view_2d_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -480,6 +490,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DDepth {
             inner: self.view_2d_internal(F::DepthAspect::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -487,7 +498,7 @@ impl<F, U> Texture2D<F, U> {
         &'a self,
         format: TextureFormatId,
         descriptor: &View2DArrayDescriptor,
-    ) -> <Dvr as Driver>::TextureView<'a> {
+    ) -> <Dvr as Driver>::TextureView {
         let View2DArrayDescriptor {
             base_layer,
             layer_count,
@@ -545,6 +556,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DArrayFloat {
             inner: self.view_2d_array_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -559,6 +571,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DArrayFloat {
                 inner: self.view_2d_array_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -578,6 +591,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DArrayUnfilteredFloat {
             inner: self.view_2d_array_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -592,6 +606,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DArrayUnfilteredFloat {
                 inner: self.view_2d_array_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -611,6 +626,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DArraySignedInteger {
             inner: self.view_2d_array_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -625,6 +641,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DArraySignedInteger {
                 inner: self.view_2d_array_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -644,6 +661,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DArrayUnsignedInteger {
             inner: self.view_2d_array_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -658,6 +676,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DArrayUnsignedInteger {
                 inner: self.view_2d_array_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -674,6 +693,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DArrayDepth {
             inner: self.view_2d_array_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -688,6 +708,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(Sampled2DArrayDepth {
                 inner: self.view_2d_array_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -707,6 +728,7 @@ impl<F, U> Texture2D<F, U> {
     {
         Sampled2DArrayDepth {
             inner: self.view_2d_array_internal(F::DepthAspect::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -714,7 +736,7 @@ impl<F, U> Texture2D<F, U> {
         &'a self,
         format: TextureFormatId,
         descriptor: &ViewCubeDescriptor,
-    ) -> <Dvr as Driver>::TextureView<'a> {
+    ) -> <Dvr as Driver>::TextureView {
         let ViewCubeDescriptor {
             base_layer,
             base_mipmap_level,
@@ -765,6 +787,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeFloat {
             inner: self.view_cube_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -779,6 +802,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeFloat {
                 inner: self.view_cube_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -798,6 +822,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeUnfilteredFloat {
             inner: self.view_cube_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -812,6 +837,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeUnfilteredFloat {
                 inner: self.view_cube_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -831,6 +857,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeSignedInteger {
             inner: self.view_cube_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -845,6 +872,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeSignedInteger {
                 inner: self.view_cube_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -864,6 +892,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeUnsignedInteger {
             inner: self.view_cube_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -878,6 +907,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeUnsignedInteger {
                 inner: self.view_cube_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -894,6 +924,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeDepth {
             inner: self.view_cube_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -908,6 +939,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeDepth {
                 inner: self.view_cube_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -924,6 +956,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeDepth {
             inner: self.view_cube_internal(F::DepthAspect::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -931,7 +964,7 @@ impl<F, U> Texture2D<F, U> {
         &'a self,
         format: TextureFormatId,
         descriptor: &ViewCubeArrayDescriptor,
-    ) -> <Dvr as Driver>::TextureView<'a> {
+    ) -> <Dvr as Driver>::TextureView {
         let ViewCubeArrayDescriptor {
             base_layer,
             cube_count,
@@ -997,6 +1030,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeArrayFloat {
             inner: self.view_cube_array_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -1011,6 +1045,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeArrayFloat {
                 inner: self.view_cube_array_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -1030,6 +1065,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeArrayUnfilteredFloat {
             inner: self.view_cube_array_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -1044,6 +1080,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeArrayUnfilteredFloat {
                 inner: self.view_cube_array_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -1063,6 +1100,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeArraySignedInteger {
             inner: self.view_cube_array_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -1077,6 +1115,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeArraySignedInteger {
                 inner: self.view_cube_array_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -1096,6 +1135,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeArrayUnsignedInteger {
             inner: self.view_cube_array_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -1110,6 +1150,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeArrayUnsignedInteger {
                 inner: self.view_cube_array_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -1129,6 +1170,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeArrayDepth {
             inner: self.view_cube_array_internal(F::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -1143,6 +1185,7 @@ impl<F, U> Texture2D<F, U> {
         if self.view_formats.contains(&ViewedFormat::FORMAT_ID) {
             Ok(SampledCubeArrayDepth {
                 inner: self.view_cube_array_internal(ViewedFormat::FORMAT_ID, descriptor),
+                _marker: Default::default(),
             })
         } else {
             Err(UnsupportedViewFormat {
@@ -1162,6 +1205,7 @@ impl<F, U> Texture2D<F, U> {
     {
         SampledCubeArrayDepth {
             inner: self.view_cube_array_internal(F::DepthAspect::FORMAT_ID, descriptor),
+            _marker: Default::default(),
         }
     }
 
@@ -1620,120 +1664,140 @@ impl<F, U> Texture2D<F, U> {
 
 #[derive(Clone)]
 pub struct Sampled2DFloat<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct Sampled2DUnfilteredFloat<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct Sampled2DSignedInteger<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct Sampled2DUnsignedInteger<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct Sampled2DDepth<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct Sampled2DArrayFloat<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct Sampled2DArrayUnfilteredFloat<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct Sampled2DArraySignedInteger<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct Sampled2DArrayUnsignedInteger<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct Sampled2DArrayDepth<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct SampledCubeFloat<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct SampledCubeUnfilteredFloat<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct SampledCubeSignedInteger<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct SampledCubeUnsignedInteger<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct SampledCubeDepth<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct SampledCubeArrayFloat<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct SampledCubeArrayUnfilteredFloat<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct SampledCubeArraySignedInteger<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct SampledCubeArrayUnsignedInteger<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct SampledCubeArrayDepth<'a> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
 pub struct Storage2D<'a, F> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
-    _marker: marker::PhantomData<*const F>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a F>,
 }
 
 #[derive(Clone)]
 pub struct Storage2DArray<'a, F> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
-    _marker: marker::PhantomData<*const F>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
+    _marker: marker::PhantomData<&'a F>,
 }
 
 #[derive(Clone)]
 pub struct AttachableImage<'a, F> {
-    pub(crate) inner: <Dvr as Driver>::TextureView<'a>,
+    pub(crate) inner: <Dvr as Driver>::TextureView,
     pub(crate) width: u32,
     pub(crate) height: u32,
-    _marker: marker::PhantomData<*const F>,
+    _marker: marker::PhantomData<&'a F>,
 }

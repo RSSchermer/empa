@@ -69,6 +69,7 @@ where
             inner: None,
             width: 0,
             height: 0,
+            _marker: Default::default(),
         }
     }
 }
@@ -144,6 +145,7 @@ where
             inner: None,
             width: 0,
             height: 0,
+            _marker: Default::default(),
         }
     }
 }

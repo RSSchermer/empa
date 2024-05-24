@@ -50,9 +50,9 @@ impl driver::Driver for Driver {
     type BindGroupHandle = BindGroupHandle;
     type DeviceHandle = DeviceHandle;
     type BufferHandle = BufferHandle;
-    type BufferBinding<'a> = BufferBinding;
+    type BufferBinding = BufferBinding;
     type TextureHandle = TextureHandle;
-    type TextureView<'a> = TextureView;
+    type TextureView = TextureView;
     type CommandEncoderHandle = CommandEncoderHandle;
     type ComputePassEncoderHandle = ComputePassEncoderHandle;
     type RenderPassEncoderHandle = RenderPassEncoderHandle;
@@ -92,7 +92,10 @@ impl Adapter<Driver> for AdapterHandle {
         limits_from_web_sys(&self.inner.limits())
     }
 
-    fn request_device(&self, descriptor: &DeviceDescriptor) -> RequestDevice {
+    fn request_device<Flags>(&self, descriptor: &DeviceDescriptor<Flags>) -> RequestDevice
+    where
+        Flags: Into<FlagSet<Feature>> + Copy,
+    {
         let DeviceDescriptor {
             required_features,
             required_limits,
@@ -100,8 +103,10 @@ impl Adapter<Driver> for AdapterHandle {
 
         let mut desc = web_sys::GpuDeviceDescriptor::new();
 
-        if required_features != &FlagSet::from(Feature::None) {
-            desc.required_features(features_to_web_sys(required_features).as_ref());
+        let required_features = (*required_features).into();
+
+        if required_features != FlagSet::from(Feature::None) {
+            desc.required_features(features_to_web_sys(&required_features).as_ref());
         }
 
         if required_limits != &Limits::default() {
@@ -660,7 +665,11 @@ pub struct QueueHandle {
 
 impl Queue<Driver> for QueueHandle {
     fn submit(&self, command_buffer: &CommandBufferHandle) {
-        self.inner.submit(&command_buffer.inner);
+        let array = js_sys::Array::new();
+
+        array.push(command_buffer.inner.as_ref());
+
+        self.inner.submit(array.as_ref());
     }
 
     fn write_buffer(&self, operation: WriteBufferOperation<Driver>) {
@@ -820,12 +829,12 @@ impl CommandEncoder<Driver> for CommandEncoderHandle {
         ComputePassEncoderHandle { inner }
     }
 
-    fn begin_render_pass<'a, I>(
+    fn begin_render_pass<I>(
         &mut self,
-        descriptor: RenderPassDescriptor<'a, Driver, I>,
+        descriptor: RenderPassDescriptor<Driver, I>,
     ) -> RenderPassEncoderHandle
     where
-        I: IntoIterator<Item = Option<RenderPassColorAttachment<'a, Driver>>>,
+        I: IntoIterator<Item = Option<RenderPassColorAttachment<Driver>>>,
     {
         let color_attachments = js_sys::Array::new();
 

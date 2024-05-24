@@ -147,43 +147,43 @@ impl<
         let mut bits = 0;
 
         if MapRead::IS_ENABLED {
-            bits |= BufferUsage::MapRead as u32;
+            bits |= 0x0001;
         }
 
         if MapWrite::IS_ENABLED {
-            bits |= BufferUsage::MapWrite as u32;
+            bits |= 0x0002;
         }
 
         if CopySrc::IS_ENABLED {
-            bits |= BufferUsage::CopySrc as u32;
+            bits |= 0x0004;
         }
 
         if CopyDst::IS_ENABLED {
-            bits |= BufferUsage::CopyDst as u32;
+            bits |= 0x0008;
         }
 
         if Index::IS_ENABLED {
-            bits |= BufferUsage::Index as u32;
+            bits |= 0x0010;
         }
 
         if Vertex::IS_ENABLED {
-            bits |= BufferUsage::Vertex as u32;
+            bits |= 0x0020;
         }
 
         if UniformBinding::IS_ENABLED {
-            bits |= BufferUsage::Uniform as u32;
+            bits |= 0x0040;
         }
 
         if StorageBinding::IS_ENABLED {
-            bits |= BufferUsage::Storage as u32;
+            bits |= 0x0080;
         }
 
         if Indirect::IS_ENABLED {
-            bits |= BufferUsage::Indirect as u32;
+            bits |= 0x0100;
         }
 
         if QueryResolve::IS_ENABLED {
-            bits |= BufferUsage::QueryResolve as u32;
+            bits |= 0x0200;
         }
 
         unsafe { FlagSet::new_unchecked(bits) }

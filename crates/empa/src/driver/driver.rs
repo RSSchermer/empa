@@ -23,9 +23,9 @@ pub trait Driver: Sized {
     type BindGroupHandle: Clone + 'static;
     type DeviceHandle: Device<Self> + 'static;
     type BufferHandle: Buffer<Self> + 'static;
-    type BufferBinding<'a>: Clone;
+    type BufferBinding: Clone;
     type TextureHandle: Texture<Self> + 'static;
-    type TextureView<'a>: Clone;
+    type TextureView: Clone;
     type CommandEncoderHandle: CommandEncoder<Self> + 'static;
     type ComputePassEncoderHandle: ComputePassEncoder<Self> + 'static;
     type RenderPassEncoderHandle: RenderPassEncoder<Self> + 'static;
@@ -53,7 +53,9 @@ where
 
     fn supported_limits(&self) -> Limits;
 
-    fn request_device(&self, descriptor: &DeviceDescriptor) -> Self::RequestDevice;
+    fn request_device<Flags>(&self, descriptor: &DeviceDescriptor<Flags>) -> Self::RequestDevice
+    where
+        Flags: Into<FlagSet<Feature>> + Copy;
 }
 
 pub trait Device<D>: Clone + Sized
@@ -140,18 +142,18 @@ flags! {
 
     pub enum TextureUsage: u32 {
         None             = 0x0000,
-        RenderAttachment = 0x0001,
-        StorageBinding   = 0x0002,
+        CopySrc          = 0x0001,
+        CopyDst          = 0x0002,
         TextureBinding   = 0x0004,
-        CopyDst          = 0x0008,
-        CopySrc          = 0x0010,
+        StorageBinding   = 0x0008,
+        RenderAttachment = 0x0010,
     }
 
     pub enum ShaderStage: u32 {
-        None    = 0x0000,
-        Vertex  = 0x0001,
+        None     = 0x0000,
+        Vertex   = 0x0001,
         Fragment = 0x0002,
-        Compute = 0x0004,
+        Compute  = 0x0004,
     }
 }
 
@@ -259,7 +261,7 @@ where
 
     fn unmap(&self);
 
-    fn binding<'a>(&'a self, offset: usize, size: usize) -> D::BufferBinding<'a>;
+    fn binding(&self, offset: usize, size: usize) -> D::BufferBinding;
 }
 
 pub struct TextureViewDescriptor {
@@ -274,7 +276,7 @@ pub trait Texture<D>: Clone + Sized
 where
     D: Driver,
 {
-    fn texture_view<'a>(&'a self, descriptor: &TextureViewDescriptor) -> D::TextureView<'a>;
+    fn texture_view(&self, descriptor: &TextureViewDescriptor) -> D::TextureView;
 }
 
 pub struct CopyBufferToBuffer<'a, D>
@@ -349,13 +351,12 @@ where
 
     fn begin_compute_pass(&mut self) -> D::ComputePassEncoderHandle;
 
-    fn begin_render_pass<'a, I>(
+    fn begin_render_pass<I>(
         &mut self,
-        descriptor: RenderPassDescriptor<'a, D, I>,
+        descriptor: RenderPassDescriptor<D, I>,
     ) -> D::RenderPassEncoderHandle
     where
-        I: IntoIterator<Item = Option<RenderPassColorAttachment<'a, D>>>,
-        D: 'a;
+        I: IntoIterator<Item = Option<RenderPassColorAttachment<D>>>;
 
     fn write_timestamp(&mut self, query_set: &D::QuerySetHandle, index: usize);
 
@@ -486,8 +487,8 @@ pub enum BindingResource<'a, D>
 where
     D: Driver,
 {
-    BufferBinding(D::BufferBinding<'a>),
-    TextureView(D::TextureView<'a>),
+    BufferBinding(D::BufferBinding),
+    TextureView(D::TextureView),
     Sampler(&'a D::SamplerHandle),
 }
 
@@ -806,12 +807,12 @@ pub struct RenderBundleEncoderDescriptor<'a> {
 }
 
 #[derive(Clone)]
-pub struct RenderPassColorAttachment<'a, D>
+pub struct RenderPassColorAttachment<D>
 where
     D: Driver,
 {
-    pub view: D::TextureView<'a>,
-    pub resolve_target: Option<D::TextureView<'a>>,
+    pub view: D::TextureView,
+    pub resolve_target: Option<D::TextureView>,
     pub load_op: LoadOp<[f64; 4]>,
     pub store_op: StoreOp,
 }
@@ -821,11 +822,11 @@ pub struct DepthStencilOperations<T> {
     pub store_op: StoreOp,
 }
 
-pub struct RenderPassDepthStencilAttachment<'a, D>
+pub struct RenderPassDepthStencilAttachment<D>
 where
     D: Driver,
 {
-    pub view: D::TextureView<'a>,
+    pub view: D::TextureView,
     pub depth_operations: Option<DepthStencilOperations<f32>>,
     pub stencil_operations: Option<DepthStencilOperations<u32>>,
 }
@@ -835,6 +836,6 @@ where
     D: Driver,
 {
     pub color_attachments: I,
-    pub depth_stencil_attachment: Option<RenderPassDepthStencilAttachment<'a, D>>,
+    pub depth_stencil_attachment: Option<RenderPassDepthStencilAttachment<D>>,
     pub occlusion_query_set: Option<&'a D::QuerySetHandle>,
 }

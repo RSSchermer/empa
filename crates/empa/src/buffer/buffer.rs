@@ -24,7 +24,7 @@ use crate::{abi, driver};
 type BufferHandle = <Dvr as Driver>::BufferHandle;
 type MappedInternal<'a> = <BufferHandle as driver::Buffer<Dvr>>::Mapped<'a>;
 type MappedMutInternal<'a> = <BufferHandle as driver::Buffer<Dvr>>::MappedMut<'a>;
-type BufferBinding<'a> = <Dvr as Driver>::BufferBinding<'a>;
+type BufferBinding = <Dvr as Driver>::BufferBinding;
 
 #[derive(Clone, Copy)]
 pub struct Projection<T, P> {
@@ -99,7 +99,7 @@ where
         let handle = device.handle.create_buffer(&BufferDescriptor {
             size: size_in_bytes,
             usage_flags: Usage::FLAG_SET,
-            mapped_at_creation,
+            mapped_at_creation: true,
         });
 
         let mut mapped = handle.mapped_mut(0..size_in_bytes);
@@ -153,7 +153,7 @@ where
         let handle = device.handle.create_buffer(&BufferDescriptor {
             size: size_in_bytes,
             usage_flags: Usage::FLAG_SET,
-            mapped_at_creation,
+            mapped_at_creation: true,
         });
 
         let mut mapped = handle.mapped_mut(0..size_in_bytes);
@@ -740,7 +740,7 @@ impl<'a, T, U> View<'a, T, U> {
         }
     }
 
-    pub fn uniform(&self) -> Uniform<T>
+    pub fn uniform(&self) -> Uniform<'a, T>
     where
         T: abi::Sized,
         U: UniformBinding,
@@ -760,7 +760,7 @@ impl<'a, T, U> View<'a, T, U> {
         }
     }
 
-    pub fn storage<A: AccessMode>(&self) -> Storage<T, A>
+    pub fn storage<A: AccessMode>(&self) -> Storage<'a, T, A>
     where
         T: abi::Unsized,
         U: StorageBinding,
@@ -883,6 +883,7 @@ impl<'a, T, U> View<'a, [T], U> {
         MappedSlice {
             inner,
             range: start..end,
+            len: self.len,
             map_context: &self.buffer.map_context,
             _marker: Default::default(),
         }
@@ -900,12 +901,13 @@ impl<'a, T, U> View<'a, [T], U> {
         MappedSliceMut {
             inner,
             range: start..end,
+            len: self.len,
             map_context: &self.buffer.map_context,
             _marker: Default::default(),
         }
     }
 
-    pub fn storage<A: AccessMode>(&self) -> Storage<[T], A>
+    pub fn storage<A: AccessMode>(&self) -> Storage<'a, [T], A>
     where
         T: abi::Sized,
         U: StorageBinding,
@@ -1105,6 +1107,7 @@ impl<'a, T> Drop for Mapped<'a, T> {
 pub struct MappedSlice<'a, T> {
     inner: MappedInternal<'a>,
     range: Range<usize>,
+    len: usize,
     map_context: &'a Mutex<MapContext>,
     _marker: marker::PhantomData<T>,
 }
@@ -1114,12 +1117,11 @@ impl<'a, T> Deref for MappedSlice<'a, T> {
 
     fn deref(&self) -> &Self::Target {
         let bytes_ptr = self.inner.as_ref().as_ptr();
-        let len = self.range.len() as usize;
 
         // SAFETY: empa's buffer invariants ensure that the `bytes_ptr` is properly aligned for
         // a value of type `T` and the bytes slice is correctly sized for a slice of `len` values of
         // type `T`.
-        unsafe { slice::from_raw_parts(bytes_ptr as *const T, len) }
+        unsafe { slice::from_raw_parts(bytes_ptr as *const T, self.len) }
     }
 }
 
@@ -1167,6 +1169,7 @@ impl<'a, T> Drop for MappedMut<'a, T> {
 pub struct MappedSliceMut<'a, T> {
     inner: MappedMutInternal<'a>,
     range: Range<usize>,
+    len: usize,
     map_context: &'a Mutex<MapContext>,
     _marker: marker::PhantomData<T>,
 }
@@ -1176,23 +1179,21 @@ impl<'a, T> Deref for MappedSliceMut<'a, T> {
 
     fn deref(&self) -> &Self::Target {
         let bytes_ptr = self.inner.as_ref().as_ptr();
-        let len = self.range.len() as usize;
 
         // SAFETY: empa's buffer invariants ensure that the `bytes_ptr` is properly aligned for
         // a value of type `T` and the bytes slice is correctly sized for a slice of `len` values of
         // type `T`.
-        unsafe { slice::from_raw_parts(bytes_ptr as *const T, len) }
+        unsafe { slice::from_raw_parts(bytes_ptr as *const T, self.len) }
     }
 }
 impl<'a, T> DerefMut for MappedSliceMut<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         let bytes_ptr = self.inner.as_mut().as_mut_ptr();
-        let len = self.range.len() as usize;
 
         // SAFETY: empa's buffer invariants ensure that the `bytes_ptr` is properly aligned for
         // a value of type `T` and the bytes slice is correctly sized for a slice of `len` values of
         // type `T`.
-        unsafe { slice::from_raw_parts_mut(bytes_ptr as *mut T, len) }
+        unsafe { slice::from_raw_parts_mut(bytes_ptr as *mut T, self.len) }
     }
 }
 
@@ -1365,10 +1366,10 @@ pub struct Uniform<'a, T>
 where
     T: ?Sized,
 {
-    pub(crate) inner: BufferBinding<'a>,
+    pub(crate) inner: BufferBinding,
     pub(crate) _offset: usize,
     pub(crate) _size: usize,
-    _marker: marker::PhantomData<*const T>,
+    _marker: marker::PhantomData<&'a T>,
 }
 
 #[derive(Clone)]
@@ -1376,10 +1377,10 @@ pub struct Storage<'a, T, A = Read>
 where
     T: ?Sized,
 {
-    pub(crate) inner: BufferBinding<'a>,
+    pub(crate) inner: BufferBinding,
     pub(crate) _offset: usize,
     pub(crate) _size: usize,
-    _marker: marker::PhantomData<(*const T, A)>,
+    _marker: marker::PhantomData<(&'a T, A)>,
 }
 
 pub(crate) fn image_copy_buffer_validate(
