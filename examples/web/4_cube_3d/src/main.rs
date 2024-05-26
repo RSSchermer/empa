@@ -45,7 +45,7 @@ struct Uniforms {
 
 #[derive(empa::resource_binding::Resources)]
 struct MyResources<'a> {
-    #[resource(binding = 0, visibility = "VERTEX")]
+    #[resource(binding = 0, visibility = "VERTEX | FRAGMENT")]
     uniform_buffer: Uniform<'a, Uniforms>,
 }
 

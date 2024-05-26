@@ -7,9 +7,9 @@ use futures::FutureExt;
 
 use crate::device::{Device, ID_GEN};
 use crate::driver;
-use crate::driver::{Device as _, Driver, Dvr, ShaderStage};
+use crate::driver::{Device as _, Driver, Dvr, PrimitiveState, PrimitiveTopology, ShaderStage};
 use crate::render_pipeline::{
-    DepthStencilTest, FragmentStage, FragmentState, IndexAny, MultisampleState,
+    DepthStencilTest, FragmentStage, FragmentState, FrontFace, IndexAny, MultisampleState,
     PipelineIndexFormat, PrimitiveAssembly, TypedVertexLayout, VertexStage, VertexState,
 };
 use crate::render_target::{MultisampleRenderLayout, RenderLayout, TypedMultisampleColorLayout};
@@ -105,7 +105,7 @@ pub struct RenderPipelineDescriptorBuilder<
     vertex_state: Option<VertexState>,
     fragment_state: Option<FragmentState>,
     layout: Option<<Dvr as Driver>::PipelineLayoutHandle>,
-    primitive_state: Option<driver::PrimitiveState>,
+    primitive_state: driver::PrimitiveState,
     depth_stencil_state: Option<driver::DepthStencilState>,
     multisample_state: Option<driver::MultisampleState>,
     _marker: marker::PhantomData<(
@@ -133,7 +133,12 @@ impl
             vertex_state: None,
             fragment_state: None,
             layout: None,
-            primitive_state: None,
+            primitive_state: PrimitiveState {
+                topology: PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: FrontFace::CounterClockwise,
+                cull_mode: None,
+            },
             depth_stencil_state: None,
             multisample_state: None,
             _marker: Default::default(),
@@ -168,7 +173,7 @@ impl<M, L, V, F, D, P> RenderPipelineDescriptorBuilder<M, L, V, F, D, P> {
             vertex_state: self.vertex_state,
             fragment_state: self.fragment_state,
             layout: self.layout,
-            primitive_state: Some(primitive_assembly.inner),
+            primitive_state: primitive_assembly.inner,
             depth_stencil_state: self.depth_stencil_state,
             multisample_state: self.multisample_state,
             _marker: Default::default(),
@@ -386,7 +391,7 @@ impl<Layout, Vertex, Color, DepthStencil, Index>
         RenderPipelineDescriptor {
             vertex_state: self.vertex_state.unwrap(),
             layout: self.layout.unwrap(),
-            primitive_state: self.primitive_state.unwrap(),
+            primitive_state: self.primitive_state,
             fragment_state: self.fragment_state,
             depth_stencil_state: self.depth_stencil_state,
             multisample_state: self.multisample_state,
@@ -416,7 +421,7 @@ impl<Layout, Vertex, Color, DepthStencil, Index, const SAMPLES: u8>
         RenderPipelineDescriptor {
             vertex_state: self.vertex_state.unwrap(),
             layout: self.layout.unwrap(),
-            primitive_state: self.primitive_state.unwrap(),
+            primitive_state: self.primitive_state,
             fragment_state: self.fragment_state,
             depth_stencil_state: self.depth_stencil_state,
             multisample_state: self.multisample_state,

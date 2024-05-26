@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::marker;
 
 use empa_reflect::ShaderStage;
-use flagset::flags;
+use flagset::{flags, FlagSet};
 
 use crate::driver::{ColorTargetState, Driver, Dvr};
 use crate::pipeline_constants::PipelineConstants;
@@ -71,21 +71,23 @@ pub struct BlendState {
     pub alpha: BlendComponent,
 }
 
-pub struct ColorOutput<F>
+pub struct ColorOutput<F, W>
 where
     F: ColorRenderable,
+    W: Into<FlagSet<ColorWrite>> + Copy,
 {
     pub format: F,
-    pub write_mask: ColorWrite,
+    pub write_mask: W,
 }
 
-pub struct BlendedColorOutput<F>
+pub struct BlendedColorOutput<F, W>
 where
     F: Blendable,
+    W: Into<FlagSet<ColorWrite>> + Copy,
 {
     pub format: F,
     pub blend_state: BlendState,
-    pub write_mask: ColorWrite,
+    pub write_mask: W,
 }
 
 mod typed_color_output_seal {
@@ -98,10 +100,16 @@ pub trait TypedColorOutput: typed_color_output_seal::Seal {
     fn to_color_target_state(&self) -> ColorTargetState;
 }
 
-impl<F> typed_color_output_seal::Seal for ColorOutput<F> where F: ColorRenderable {}
-impl<F> TypedColorOutput for ColorOutput<F>
+impl<F, W> typed_color_output_seal::Seal for ColorOutput<F, W>
 where
     F: ColorRenderable,
+    W: Into<FlagSet<ColorWrite>> + Copy,
+{
+}
+impl<F, W> TypedColorOutput for ColorOutput<F, W>
+where
+    F: ColorRenderable,
+    W: Into<FlagSet<ColorWrite>> + Copy,
 {
     type Format = F;
 
@@ -109,15 +117,21 @@ where
         ColorTargetState {
             format: F::FORMAT_ID,
             blend: None,
-            write_mask: self.write_mask,
+            write_mask: self.write_mask.into(),
         }
     }
 }
 
-impl<F> typed_color_output_seal::Seal for BlendedColorOutput<F> where F: Blendable {}
-impl<F> TypedColorOutput for BlendedColorOutput<F>
+impl<F, W> typed_color_output_seal::Seal for BlendedColorOutput<F, W>
 where
     F: Blendable,
+    W: Into<FlagSet<ColorWrite>> + Copy,
+{
+}
+impl<F, W> TypedColorOutput for BlendedColorOutput<F, W>
+where
+    F: Blendable,
+    W: Into<FlagSet<ColorWrite>> + Copy,
 {
     type Format = F;
 
@@ -125,7 +139,7 @@ where
         ColorTargetState {
             format: F::FORMAT_ID,
             blend: Some(self.blend_state),
-            write_mask: self.write_mask,
+            write_mask: self.write_mask.into(),
         }
     }
 }

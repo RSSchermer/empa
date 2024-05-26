@@ -2005,7 +2005,7 @@ pub fn color_target_state_to_web_sys(
     let mut target =
         web_sys::GpuColorTargetState::new(texture_format_to_web_sys(&color_target_state.format));
 
-    target.write_mask(color_target_state.write_mask as u32);
+    target.write_mask(color_target_state.write_mask.bits());
 
     if let Some(blend) = &color_target_state.blend {
         target.blend(&blend_state_to_web_sys(blend));

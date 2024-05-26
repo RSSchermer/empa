@@ -1307,7 +1307,7 @@ where
         U: buffer::Indirect,
     {
         self.handle
-            .draw_indirect(&view.buffer.handle, view.offset_in_bytes());
+            .draw_indexed_indirect(&view.buffer.handle, view.offset_in_bytes());
 
         self
     }
@@ -1448,8 +1448,8 @@ impl<C> RenderBundleEncoderDescriptor<RenderLayout<C, ()>> {
             color_formats,
             depth_stencil_format: Some(Ds::FORMAT_ID),
             sample_count,
-            depth_read_only: false,
-            stencil_read_only: false,
+            depth_read_only: !Ds::HAS_DEPTH_COMPONENT,
+            stencil_read_only: !Ds::HAS_STENCIL_COMPONENT,
             _marker: Default::default(),
         }
     }
@@ -1789,7 +1789,7 @@ where
         U: buffer::Indirect,
     {
         self.handle
-            .draw_indirect(&view.buffer.handle, view.offset_in_bytes());
+            .draw_indexed_indirect(&view.buffer.handle, view.offset_in_bytes());
 
         self
     }

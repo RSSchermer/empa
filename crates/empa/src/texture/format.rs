@@ -789,14 +789,36 @@ impl UnsignedIntegerRenderable for r32uint {}
 impl UnsignedIntegerRenderable for rg32uint {}
 impl UnsignedIntegerRenderable for rgba32uint {}
 
-pub trait DepthStencilRenderable: Renderable {}
+pub trait DepthStencilRenderable: Renderable {
+    const HAS_DEPTH_COMPONENT: bool;
 
-impl DepthStencilRenderable for stencil8 {}
-impl DepthStencilRenderable for depth16unorm {}
-impl DepthStencilRenderable for depth24plus {}
-impl DepthStencilRenderable for depth24plus_stencil8 {}
-impl DepthStencilRenderable for depth32float {}
-impl DepthStencilRenderable for depth32float_stencil8 {}
+    const HAS_STENCIL_COMPONENT: bool;
+}
+
+impl DepthStencilRenderable for stencil8 {
+    const HAS_DEPTH_COMPONENT: bool = false;
+    const HAS_STENCIL_COMPONENT: bool = true;
+}
+impl DepthStencilRenderable for depth16unorm {
+    const HAS_DEPTH_COMPONENT: bool = true;
+    const HAS_STENCIL_COMPONENT: bool = false;
+}
+impl DepthStencilRenderable for depth24plus {
+    const HAS_DEPTH_COMPONENT: bool = true;
+    const HAS_STENCIL_COMPONENT: bool = false;
+}
+impl DepthStencilRenderable for depth24plus_stencil8 {
+    const HAS_DEPTH_COMPONENT: bool = true;
+    const HAS_STENCIL_COMPONENT: bool = true;
+}
+impl DepthStencilRenderable for depth32float {
+    const HAS_DEPTH_COMPONENT: bool = true;
+    const HAS_STENCIL_COMPONENT: bool = false;
+}
+impl DepthStencilRenderable for depth32float_stencil8 {
+    const HAS_DEPTH_COMPONENT: bool = true;
+    const HAS_STENCIL_COMPONENT: bool = true;
+}
 
 pub trait CombinedDepthStencilRenderable: DepthStencilRenderable {}
 

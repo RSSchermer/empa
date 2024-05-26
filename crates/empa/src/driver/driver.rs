@@ -676,7 +676,7 @@ where
 pub struct ColorTargetState {
     pub format: TextureFormatId,
     pub blend: Option<BlendState>,
-    pub write_mask: ColorWrite,
+    pub write_mask: FlagSet<ColorWrite>,
 }
 
 pub struct FragmentState<'a, D>
