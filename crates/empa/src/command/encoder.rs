@@ -1387,6 +1387,12 @@ pub struct RenderBundle<Target> {
     _marker: marker::PhantomData<Target>,
 }
 
+impl<T> AsRef<RenderBundle<T>> for RenderBundle<T> {
+    fn as_ref(&self) -> &RenderBundle<T> {
+        self
+    }
+}
+
 impl<T> AsRef<<Dvr as Driver>::RenderBundleHandle> for RenderBundle<T> {
     fn as_ref(&self) -> &<Dvr as Driver>::RenderBundleHandle {
         &self.handle
