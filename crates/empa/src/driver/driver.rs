@@ -245,19 +245,19 @@ where
 {
     type Map: Future<Output = Result<(), MapError>>;
 
-    type Mapped<'a>: AsRef<[u8]>
+    type Mapped<'a, E>: AsRef<[E]>
     where
         Self: 'a;
 
-    type MappedMut<'a>: AsMut<[u8]>
+    type MappedMut<'a, E>: AsMut<[E]>
     where
         Self: 'a;
 
     fn map(&self, mode: MapMode, range: Range<usize>) -> Self::Map;
 
-    fn mapped<'a>(&'a self, range: Range<usize>) -> Self::Mapped<'a>;
+    fn mapped<'a, E>(&'a self, offset_in_bytes: usize, len_in_elements: usize) -> Self::Mapped<'a, E>;
 
-    fn mapped_mut<'a>(&'a self, range: Range<usize>) -> Self::MappedMut<'a>;
+    fn mapped_mut<'a, E>(&'a self, offset_in_bytes: usize, len_in_elements: usize) -> Self::MappedMut<'a, E>;
 
     fn unmap(&self);
 

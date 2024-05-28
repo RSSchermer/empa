@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt;
+use std::{fmt, mem, slice};
 use std::future::Future;
 use std::ops::Range;
 use std::pin::Pin;
@@ -464,36 +464,43 @@ impl Future for Map {
     }
 }
 
-pub struct Mapped {
-    buffered: Box<[u8]>,
+pub struct Mapped<T> {
+    buffered: Box<[T]>,
 }
 
-impl AsRef<[u8]> for Mapped {
-    fn as_ref(&self) -> &[u8] {
+impl<T> AsRef<[T]> for Mapped<T> {
+    fn as_ref(&self) -> &[T] {
         &self.buffered
     }
 }
 
-pub struct MappedMut {
-    buffered: Box<[u8]>,
+pub struct MappedMut<T> {
+    buffered: Box<[T]>,
     mapped_bytes: Uint8Array,
 }
 
-impl AsRef<[u8]> for MappedMut {
-    fn as_ref(&self) -> &[u8] {
+impl<T> AsRef<[T]> for MappedMut<T> {
+    fn as_ref(&self) -> &[T] {
         &self.buffered
     }
 }
 
-impl AsMut<[u8]> for MappedMut {
-    fn as_mut(&mut self) -> &mut [u8] {
+impl<T> AsMut<[T]> for MappedMut<T> {
+    fn as_mut(&mut self) -> &mut [T] {
         &mut self.buffered
     }
 }
 
-impl Drop for MappedMut {
+impl<T> Drop for MappedMut<T> {
     fn drop(&mut self) {
-        self.mapped_bytes.copy_from(&self.buffered);
+        let size_in_bytes = self.buffered.len() * mem::size_of::<T>();
+        let ptr = self.buffered.as_ptr() as *const u8;
+
+        let bytes = unsafe {
+            slice::from_raw_parts(ptr, size_in_bytes)
+        };
+
+        self.mapped_bytes.copy_from(bytes);
     }
 }
 
@@ -509,8 +516,8 @@ pub struct BufferHandle {
 
 impl Buffer<Driver> for BufferHandle {
     type Map = Map;
-    type Mapped<'a> = Mapped;
-    type MappedMut<'a> = MappedMut;
+    type Mapped<'a, E> = Mapped<E>;
+    type MappedMut<'a, E> = MappedMut<E>;
 
     fn map(&self, mode: MapMode, range: Range<usize>) -> Map {
         let size = range.len() as u32;
@@ -526,38 +533,36 @@ impl Buffer<Driver> for BufferHandle {
         }
     }
 
-    fn mapped<'a>(&'a self, range: Range<usize>) -> Mapped {
-        let offset = range.start;
-        let size = range.len();
+    fn mapped<'a, E>(&'a self, offset_in_bytes: usize, size_in_elements: usize) -> Mapped<E> {
+        let size_in_bytes = (size_in_elements * mem::size_of::<E>()) as u32;
 
         let mapped_bytes = Uint8Array::new(
             &self
                 .inner
-                .get_mapped_range_with_u32_and_u32(offset as u32, size as u32),
+                .get_mapped_range_with_u32_and_u32(offset_in_bytes as u32, size_in_bytes),
         );
-        let mut buffered = Box::<[u8]>::new_uninit_slice(size);
+        let mut buffered = Box::<[E]>::new_uninit_slice(size_in_elements);
         let ptr = buffered.as_mut_ptr() as *mut ();
 
-        copy_buffer_to_memory(&mapped_bytes, 0, size as u32, &wasm_bindgen::memory(), ptr);
+        copy_buffer_to_memory(&mapped_bytes, 0, size_in_bytes, &wasm_bindgen::memory(), ptr);
 
         let buffered = unsafe { buffered.assume_init() };
 
         Mapped { buffered }
     }
 
-    fn mapped_mut<'a>(&'a self, range: Range<usize>) -> MappedMut {
-        let offset = range.start;
-        let size = range.len();
+    fn mapped_mut<'a, E>(&'a self, offset_in_bytes: usize, size_in_elements: usize) -> MappedMut<E> {
+        let size_in_bytes = (size_in_elements * mem::size_of::<E>()) as u32;
 
         let mapped_bytes = Uint8Array::new(
             &self
                 .inner
-                .get_mapped_range_with_u32_and_u32(offset as u32, size as u32),
+                .get_mapped_range_with_u32_and_u32(offset_in_bytes as u32, size_in_bytes),
         );
-        let mut buffered = Box::<[u8]>::new_uninit_slice(size);
+        let mut buffered = Box::<[E]>::new_uninit_slice(size_in_elements);
         let ptr = buffered.as_mut_ptr() as *mut ();
 
-        copy_buffer_to_memory(&mapped_bytes, 0, size as u32, &wasm_bindgen::memory(), ptr);
+        copy_buffer_to_memory(&mapped_bytes, 0, size_in_bytes, &wasm_bindgen::memory(), ptr);
 
         let buffered = unsafe { buffered.assume_init() };
 

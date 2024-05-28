@@ -22,8 +22,8 @@ use crate::texture::{ImageDataByteLayout, ImageDataLayout};
 use crate::{abi, driver};
 
 type BufferHandle = <Dvr as Driver>::BufferHandle;
-type MappedInternal<'a> = <BufferHandle as driver::Buffer<Dvr>>::Mapped<'a>;
-type MappedMutInternal<'a> = <BufferHandle as driver::Buffer<Dvr>>::MappedMut<'a>;
+type MappedInternal<'a, T> = <BufferHandle as driver::Buffer<Dvr>>::Mapped<'a, T>;
+type MappedMutInternal<'a, T> = <BufferHandle as driver::Buffer<Dvr>>::MappedMut<'a, T>;
 type BufferBinding = <Dvr as Driver>::BufferBinding;
 
 #[derive(Clone, Copy)]
@@ -102,7 +102,7 @@ where
             mapped_at_creation: true,
         });
 
-        let mut mapped = handle.mapped_mut(0..size_in_bytes);
+        let mut mapped = handle.mapped_mut(0, size_in_bytes);
         let data_bytes = unsafe { value_to_bytes(self.borrow()) };
 
         mapped.as_mut().copy_from_slice(data_bytes);
@@ -156,7 +156,7 @@ where
             mapped_at_creation: true,
         });
 
-        let mut mapped = handle.mapped_mut(0..size_in_bytes);
+        let mut mapped = handle.mapped_mut(0, size_in_bytes);
         let data_bytes = unsafe { slice_to_bytes(self.borrow()) };
 
         mapped.as_mut().copy_from_slice(data_bytes);
@@ -704,7 +704,7 @@ impl<'a, T, U> View<'a, T, U> {
 
         self.buffer.map_context.lock().unwrap().add(start..end);
 
-        let inner = self.buffer.handle.mapped(start..end);
+        let inner = self.buffer.handle.mapped(start, self.len);
 
         Mapped {
             inner,
@@ -721,7 +721,7 @@ impl<'a, T, U> View<'a, T, U> {
 
         self.buffer.map_context.lock().unwrap().add(start..end);
 
-        let inner = self.buffer.handle.mapped_mut(start..end);
+        let inner = self.buffer.handle.mapped_mut(start, self.len);
 
         MappedMut {
             inner,
@@ -878,12 +878,11 @@ impl<'a, T, U> View<'a, [T], U> {
 
         self.buffer.map_context.lock().unwrap().add(start..end);
 
-        let inner = self.buffer.handle.mapped(start..end);
+        let inner = self.buffer.handle.mapped(start, self.len);
 
         MappedSlice {
             inner,
             range: start..end,
-            len: self.len,
             map_context: &self.buffer.map_context,
             _marker: Default::default(),
         }
@@ -896,12 +895,11 @@ impl<'a, T, U> View<'a, [T], U> {
 
         self.buffer.map_context.lock().unwrap().add(start..end);
 
-        let inner = self.buffer.handle.mapped_mut(start..end);
+        let inner = self.buffer.handle.mapped_mut(start, self.len);
 
         MappedSliceMut {
             inner,
             range: start..end,
-            len: self.len,
             map_context: &self.buffer.map_context,
             _marker: Default::default(),
         }
@@ -1080,7 +1078,7 @@ where
 // exclusive; a type cannot be both).
 
 pub struct Mapped<'a, T> {
-    inner: MappedInternal<'a>,
+    inner: MappedInternal<'a, T>,
     range: Range<usize>,
     map_context: &'a Mutex<MapContext>,
     _marker: marker::PhantomData<T>,
@@ -1090,11 +1088,7 @@ impl<'a, T> Deref for Mapped<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        let bytes_ptr = self.inner.as_ref().as_ptr();
-
-        // SAFETY: empa's buffer invariants ensure that the `bytes_ptr` is properly aligned for
-        // a value of type `T` and the bytes slice is correctly sized for a value of type `T`.
-        unsafe { &*(bytes_ptr as *const T) }
+        &self.inner.as_ref()[0]
     }
 }
 
@@ -1105,9 +1099,8 @@ impl<'a, T> Drop for Mapped<'a, T> {
 }
 
 pub struct MappedSlice<'a, T> {
-    inner: MappedInternal<'a>,
+    inner: MappedInternal<'a, T>,
     range: Range<usize>,
-    len: usize,
     map_context: &'a Mutex<MapContext>,
     _marker: marker::PhantomData<T>,
 }
@@ -1116,12 +1109,7 @@ impl<'a, T> Deref for MappedSlice<'a, T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
-        let bytes_ptr = self.inner.as_ref().as_ptr();
-
-        // SAFETY: empa's buffer invariants ensure that the `bytes_ptr` is properly aligned for
-        // a value of type `T` and the bytes slice is correctly sized for a slice of `len` values of
-        // type `T`.
-        unsafe { slice::from_raw_parts(bytes_ptr as *const T, self.len) }
+        self.inner.as_ref()
     }
 }
 
@@ -1132,7 +1120,7 @@ impl<'a, T> Drop for MappedSlice<'a, T> {
 }
 
 pub struct MappedMut<'a, T> {
-    inner: MappedMutInternal<'a>,
+    inner: MappedMutInternal<'a, T>,
     range: Range<usize>,
     map_context: &'a Mutex<MapContext>,
     _marker: marker::PhantomData<T>,
@@ -1142,21 +1130,13 @@ impl<'a, T> Deref for MappedMut<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        let bytes_ptr = self.inner.as_ref().as_ptr();
-
-        // SAFETY: empa's buffer invariants ensure that the `bytes_ptr` is properly aligned for
-        // a value of type `T` and the bytes slice is correctly sized for a value of type `T`.
-        unsafe { &*(bytes_ptr as *const T) }
+        &self.inner.as_ref()[0]
     }
 }
 
 impl<'a, T> DerefMut for MappedMut<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        let bytes_ptr = self.inner.as_mut().as_mut_ptr();
-
-        // SAFETY: empa's buffer invariants ensure that the `bytes_ptr` is properly aligned for
-        // a value of type `T` and the bytes slice is correctly sized for a value of type `T`.
-        unsafe { &mut *(bytes_ptr as *mut T) }
+        &mut self.inner.as_mut()[0]
     }
 }
 
@@ -1167,9 +1147,8 @@ impl<'a, T> Drop for MappedMut<'a, T> {
 }
 
 pub struct MappedSliceMut<'a, T> {
-    inner: MappedMutInternal<'a>,
+    inner: MappedMutInternal<'a, T>,
     range: Range<usize>,
-    len: usize,
     map_context: &'a Mutex<MapContext>,
     _marker: marker::PhantomData<T>,
 }
@@ -1178,22 +1157,12 @@ impl<'a, T> Deref for MappedSliceMut<'a, T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
-        let bytes_ptr = self.inner.as_ref().as_ptr();
-
-        // SAFETY: empa's buffer invariants ensure that the `bytes_ptr` is properly aligned for
-        // a value of type `T` and the bytes slice is correctly sized for a slice of `len` values of
-        // type `T`.
-        unsafe { slice::from_raw_parts(bytes_ptr as *const T, self.len) }
+        self.inner.as_ref()
     }
 }
 impl<'a, T> DerefMut for MappedSliceMut<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        let bytes_ptr = self.inner.as_mut().as_mut_ptr();
-
-        // SAFETY: empa's buffer invariants ensure that the `bytes_ptr` is properly aligned for
-        // a value of type `T` and the bytes slice is correctly sized for a slice of `len` values of
-        // type `T`.
-        unsafe { slice::from_raw_parts_mut(bytes_ptr as *mut T, self.len) }
+        self.inner.as_mut()
     }
 }
 
