@@ -1,11 +1,11 @@
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::error::Error;
-use std::{fmt, mem, slice};
 use std::future::Future;
 use std::ops::Range;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::{fmt, mem, slice};
 
 use flagset::FlagSet;
 use js_sys::Uint8Array;
@@ -496,9 +496,7 @@ impl<T> Drop for MappedMut<T> {
         let size_in_bytes = self.buffered.len() * mem::size_of::<T>();
         let ptr = self.buffered.as_ptr() as *const u8;
 
-        let bytes = unsafe {
-            slice::from_raw_parts(ptr, size_in_bytes)
-        };
+        let bytes = unsafe { slice::from_raw_parts(ptr, size_in_bytes) };
 
         self.mapped_bytes.copy_from(bytes);
     }
@@ -516,8 +514,8 @@ pub struct BufferHandle {
 
 impl Buffer<Driver> for BufferHandle {
     type Map = Map;
-    type Mapped<'a, E> = Mapped<E>;
-    type MappedMut<'a, E> = MappedMut<E>;
+    type Mapped<'a, E: 'a> = Mapped<E>;
+    type MappedMut<'a, E: 'a> = MappedMut<E>;
 
     fn map(&self, mode: MapMode, range: Range<usize>) -> Map {
         let size = range.len() as u32;
@@ -544,14 +542,24 @@ impl Buffer<Driver> for BufferHandle {
         let mut buffered = Box::<[E]>::new_uninit_slice(size_in_elements);
         let ptr = buffered.as_mut_ptr() as *mut ();
 
-        copy_buffer_to_memory(&mapped_bytes, 0, size_in_bytes, &wasm_bindgen::memory(), ptr);
+        copy_buffer_to_memory(
+            &mapped_bytes,
+            0,
+            size_in_bytes,
+            &wasm_bindgen::memory(),
+            ptr,
+        );
 
         let buffered = unsafe { buffered.assume_init() };
 
         Mapped { buffered }
     }
 
-    fn mapped_mut<'a, E>(&'a self, offset_in_bytes: usize, size_in_elements: usize) -> MappedMut<E> {
+    fn mapped_mut<'a, E>(
+        &'a self,
+        offset_in_bytes: usize,
+        size_in_elements: usize,
+    ) -> MappedMut<E> {
         let size_in_bytes = (size_in_elements * mem::size_of::<E>()) as u32;
 
         let mapped_bytes = Uint8Array::new(
@@ -562,7 +570,13 @@ impl Buffer<Driver> for BufferHandle {
         let mut buffered = Box::<[E]>::new_uninit_slice(size_in_elements);
         let ptr = buffered.as_mut_ptr() as *mut ();
 
-        copy_buffer_to_memory(&mapped_bytes, 0, size_in_bytes, &wasm_bindgen::memory(), ptr);
+        copy_buffer_to_memory(
+            &mapped_bytes,
+            0,
+            size_in_bytes,
+            &wasm_bindgen::memory(),
+            ptr,
+        );
 
         let buffered = unsafe { buffered.assume_init() };
 
@@ -985,13 +999,13 @@ impl RenderEncoder<Driver> for RenderPassEncoderHandle {
 
             self.inner.set_vertex_buffer_with_u32_and_u32(
                 slot,
-                buffer_handle.map(|h| &h.inner),
+                Some(&buffer_handle.inner),
                 offset,
                 size,
             );
         } else {
             self.inner
-                .set_vertex_buffer(slot, buffer_handle.map(|h| &h.inner));
+                .set_vertex_buffer(slot, Some(&buffer_handle.inner));
         }
     }
 
@@ -1180,13 +1194,13 @@ impl RenderEncoder<Driver> for RenderBundleEncoderHandle {
 
             self.inner.set_vertex_buffer_with_u32_and_u32(
                 slot,
-                buffer_handle.map(|h| &h.inner),
+                Some(&buffer_handle.inner),
                 offset,
                 size,
             );
         } else {
             self.inner
-                .set_vertex_buffer(slot, buffer_handle.map(|h| &h.inner));
+                .set_vertex_buffer(slot, Some(&buffer_handle.inner));
         }
     }
 

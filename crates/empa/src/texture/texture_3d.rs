@@ -1,7 +1,7 @@
 use std::cmp::max;
 use std::marker;
 
-use staticvec::StaticVec;
+use arrayvec::ArrayVec;
 
 use crate::device::Device;
 use crate::driver;
@@ -66,7 +66,7 @@ pub struct Texture3D<F, Usage> {
     width: u32,
     height: u32,
     depth: u32,
-    view_formats: StaticVec<TextureFormatId, 8>,
+    view_formats: ArrayVec<TextureFormatId, 8>,
     usage: Usage,
     _format: FormatKind<F>,
 }
@@ -95,7 +95,7 @@ where
         assert!(*depth > 0, "depth must be greater than `0`");
 
         let mipmap_levels = mipmap_levels.to_u32(max(max(*width, *height), *depth));
-        let view_formats = view_formats.formats().collect::<StaticVec<_, 8>>();
+        let view_formats = view_formats.formats().collect::<ArrayVec<_, 8>>();
 
         let handle = device.handle.create_texture(&TextureDescriptor {
             size: (*width, *height, *depth),

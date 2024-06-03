@@ -25,7 +25,7 @@ use std::error::Error;
 use std::fmt;
 use std::ops::Rem;
 
-use staticvec::StaticVec;
+use arrayvec::ArrayVec;
 
 use crate::driver;
 use crate::texture::format::TextureFormatId;
@@ -39,7 +39,7 @@ enum FormatKind<F> {
 #[derive(Debug)]
 pub struct UnsupportedViewFormat {
     pub(crate) format: TextureFormatId,
-    pub(crate) supported_formats: StaticVec<TextureFormatId, 8>,
+    pub(crate) supported_formats: ArrayVec<TextureFormatId, 8>,
 }
 
 impl fmt::Display for UnsupportedViewFormat {

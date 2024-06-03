@@ -2,7 +2,7 @@ mod attachment;
 pub use self::attachment::*;
 
 mod multisample_attachment;
-pub use self::attachment::*;
+pub use self::multisample_attachment::*;
 
 mod render_layout;
 pub use self::render_layout::*;

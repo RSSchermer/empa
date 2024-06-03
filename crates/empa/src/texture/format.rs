@@ -1448,10 +1448,6 @@ impl SubImageCopyFormat for astc_12x10_unorm_srgb {}
 impl SubImageCopyFormat for astc_12x12_unorm {}
 impl SubImageCopyFormat for astc_12x12_unorm_srgb {}
 
-mod view_format_seal {
-    pub trait Seal {}
-}
-
 pub trait ViewFormat<F>: TextureFormat {}
 
 impl<F> ViewFormat<F> for F where F: TextureFormat {}

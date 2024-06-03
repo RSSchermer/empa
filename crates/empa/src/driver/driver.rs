@@ -245,19 +245,27 @@ where
 {
     type Map: Future<Output = Result<(), MapError>>;
 
-    type Mapped<'a, E>: AsRef<[E]>
+    type Mapped<'a, E: 'a>: AsRef<[E]>
     where
         Self: 'a;
 
-    type MappedMut<'a, E>: AsMut<[E]>
+    type MappedMut<'a, E: 'a>: AsMut<[E]>
     where
         Self: 'a;
 
     fn map(&self, mode: MapMode, range: Range<usize>) -> Self::Map;
 
-    fn mapped<'a, E>(&'a self, offset_in_bytes: usize, len_in_elements: usize) -> Self::Mapped<'a, E>;
+    fn mapped<'a, E>(
+        &'a self,
+        offset_in_bytes: usize,
+        len_in_elements: usize,
+    ) -> Self::Mapped<'a, E>;
 
-    fn mapped_mut<'a, E>(&'a self, offset_in_bytes: usize, len_in_elements: usize) -> Self::MappedMut<'a, E>;
+    fn mapped_mut<'a, E>(
+        &'a self,
+        offset_in_bytes: usize,
+        len_in_elements: usize,
+    ) -> Self::MappedMut<'a, E>;
 
     fn unmap(&self);
 
@@ -701,7 +709,7 @@ where
     pub multisample_state: Option<&'a MultisampleState>,
 }
 
-pub trait ProgrammablePassEncoder<D>: Clone + Sized
+pub trait ProgrammablePassEncoder<D>: Sized
 where
     D: Driver,
 {
@@ -737,7 +745,7 @@ where
     D: Driver,
 {
     pub slot: u32,
-    pub buffer_handle: Option<&'a D::BufferHandle>,
+    pub buffer_handle: &'a D::BufferHandle,
     pub range: Option<Range<usize>>,
 }
 

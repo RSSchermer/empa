@@ -3,11 +3,11 @@ use std::marker;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use arrayvec::ArrayVec;
 use arwa::html::HtmlCanvasElement;
 use arwa::image_bitmap::ImageBitmap;
 use arwa::window::WindowNavigator;
 use arwa::worker::WorkerNavigator;
-use staticvec::StaticVec;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -261,7 +261,7 @@ impl CanvasContext {
 pub struct ConfiguredCanvasContext<F, U> {
     inner: GpuCanvasContext,
     canvas: HtmlCanvasElement,
-    view_formats: StaticVec<TextureFormatId, 8>,
+    view_formats: ArrayVec<TextureFormatId, 8>,
     usage: U,
     _marker: marker::PhantomData<F>,
 }

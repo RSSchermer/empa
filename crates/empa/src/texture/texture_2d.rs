@@ -2,7 +2,7 @@ use std::cmp::max;
 use std::marker;
 use std::ops::Rem;
 
-use staticvec::StaticVec;
+use arrayvec::ArrayVec;
 
 use crate::device::Device;
 use crate::driver;
@@ -153,7 +153,7 @@ pub struct Texture2D<F, Usage> {
     pub(crate) height: u32,
     pub(crate) layers: u32,
     pub(crate) mip_level_count: u8,
-    view_formats: StaticVec<TextureFormatId, 8>,
+    view_formats: ArrayVec<TextureFormatId, 8>,
     usage: Usage,
     _format: FormatKind<F>,
 }
@@ -170,7 +170,7 @@ where
         view_formats: &[TextureFormatId],
         usage: U,
     ) -> Self {
-        let view_formats = StaticVec::from(view_formats);
+        let view_formats = view_formats.iter().copied().collect();
 
         Texture2D {
             handle,
@@ -222,7 +222,7 @@ where
         );
 
         let mip_level_count = mipmap_levels.to_u32(max(*width, *height));
-        let view_formats = view_formats.formats().collect::<StaticVec<_, 8>>();
+        let view_formats = view_formats.formats().collect::<ArrayVec<_, 8>>();
 
         let handle = device.handle.create_texture(&TextureDescriptor {
             size: (*width, *height, *layers),

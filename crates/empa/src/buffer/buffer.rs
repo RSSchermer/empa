@@ -102,10 +102,14 @@ where
             mapped_at_creation: true,
         });
 
+        #[allow(unused_mut)]
         let mut mapped = handle.mapped_mut(0, size_in_bytes);
+
         let data_bytes = unsafe { value_to_bytes(self.borrow()) };
 
         mapped.as_mut().copy_from_slice(data_bytes);
+
+        #[allow(dropping_references)]
         mem::drop(mapped);
 
         let mut map_context = MapContext::new();
@@ -156,10 +160,14 @@ where
             mapped_at_creation: true,
         });
 
+        #[allow(unused_mut)]
         let mut mapped = handle.mapped_mut(0, size_in_bytes);
+
         let data_bytes = unsafe { slice_to_bytes(self.borrow()) };
 
         mapped.as_mut().copy_from_slice(data_bytes);
+
+        #[allow(dropping_references)]
         mem::drop(mapped);
 
         let mut map_context = MapContext::new();
@@ -1077,7 +1085,7 @@ where
 // is `Copy`, hence there should be no drop-related concerns (`Copy` and `Drop` are mutually
 // exclusive; a type cannot be both).
 
-pub struct Mapped<'a, T> {
+pub struct Mapped<'a, T: 'a> {
     inner: MappedInternal<'a, T>,
     range: Range<usize>,
     map_context: &'a Mutex<MapContext>,
@@ -1098,7 +1106,7 @@ impl<'a, T> Drop for Mapped<'a, T> {
     }
 }
 
-pub struct MappedSlice<'a, T> {
+pub struct MappedSlice<'a, T: 'a> {
     inner: MappedInternal<'a, T>,
     range: Range<usize>,
     map_context: &'a Mutex<MapContext>,
@@ -1119,7 +1127,7 @@ impl<'a, T> Drop for MappedSlice<'a, T> {
     }
 }
 
-pub struct MappedMut<'a, T> {
+pub struct MappedMut<'a, T: 'a> {
     inner: MappedMutInternal<'a, T>,
     range: Range<usize>,
     map_context: &'a Mutex<MapContext>,
@@ -1146,7 +1154,7 @@ impl<'a, T> Drop for MappedMut<'a, T> {
     }
 }
 
-pub struct MappedSliceMut<'a, T> {
+pub struct MappedSliceMut<'a, T: 'a> {
     inner: MappedMutInternal<'a, T>,
     range: Range<usize>,
     map_context: &'a Mutex<MapContext>,

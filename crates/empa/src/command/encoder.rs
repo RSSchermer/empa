@@ -556,7 +556,7 @@ mod resource_binding_command_encoder_seal {
     pub trait Seal {}
 }
 
-pub trait ResourceBindingCommandEncoder {
+pub trait ResourceBindingCommandEncoder: resource_binding_command_encoder_seal::Seal {
     type WithResources<RNew>;
 
     fn set_bind_groups<RNew>(self, bind_groups: RNew) -> Self::WithResources<RNew>
@@ -1083,7 +1083,7 @@ impl<T, P, V, I, R, Q> RenderStateEncoder<T> for RenderPassEncoder<T, P, V, I, R
             if current_vertex_buffers[i] != Some(range_id.clone()) {
                 handle.set_vertex_buffer(SetVertexBuffer {
                     slot: i as u32,
-                    buffer_handle: Some(buffer),
+                    buffer_handle: buffer,
                     range: Some(range.clone()),
                 });
 
@@ -1686,7 +1686,7 @@ impl<T, P, V, I, R> RenderStateEncoder<T> for RenderBundleEncoder<T, P, V, I, R>
             if current_vertex_buffers[i] != Some(range_id.clone()) {
                 handle.set_vertex_buffer(SetVertexBuffer {
                     slot: i as u32,
-                    buffer_handle: Some(buffer),
+                    buffer_handle: buffer,
                     range: Some(range.clone()),
                 });
 

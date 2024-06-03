@@ -1,6 +1,6 @@
 use std::marker;
 
-use staticvec::StaticVec;
+use arrayvec::ArrayVec;
 
 use crate::access_mode::{AccessMode, Read};
 use crate::device::Device;
@@ -36,7 +36,7 @@ where
 pub struct Texture1D<F, Usage> {
     handle: <Dvr as Driver>::TextureHandle,
     size: u32,
-    view_formats: StaticVec<TextureFormatId, 8>,
+    view_formats: ArrayVec<TextureFormatId, 8>,
     usage: Usage,
     _format: FormatKind<F>,
 }
@@ -59,7 +59,7 @@ where
 
         assert!(*size > 0, "size must be greater than `0`");
 
-        let view_formats = view_formats.formats().collect::<StaticVec<_, 8>>();
+        let view_formats = view_formats.formats().collect::<ArrayVec<_, 8>>();
 
         let handle = device.handle.create_texture(&TextureDescriptor {
             size: (*size, 0, 0),
