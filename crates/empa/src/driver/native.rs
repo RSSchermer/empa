@@ -1,6 +1,4 @@
-use core::marker;
 use std::borrow::{Borrow, Cow};
-use std::convert::{AsMut, AsRef};
 use std::error::Error;
 use std::future::{ready, Future};
 use std::num::NonZeroU64;
@@ -17,24 +15,38 @@ use wgc::gfx_select;
 use wgc::global::Global;
 use wgc::id::{
     AdapterId, BindGroupId, BindGroupLayoutId, BufferId, CommandBufferId, CommandEncoderId,
-    ComputePipelineId, DeviceId, PipelineLayoutId, QuerySetId, QueueId,
-    RenderBundleEncoderId, RenderBundleId, RenderPassEncoderId, RenderPipelineId, SamplerId,
-    ShaderModuleId, TextureId, TextureViewId,
+    ComputePipelineId, DeviceId, PipelineLayoutId, QuerySetId, QueueId, RenderBundleId,
+    RenderPipelineId, SamplerId, ShaderModuleId, TextureId, TextureViewId,
 };
 
 use crate::adapter::{Feature, Limits};
 use crate::buffer::MapError;
 use crate::command::{BlendConstant, Draw, DrawIndexed, ScissorRect, Viewport};
 use crate::device::DeviceDescriptor;
-use crate::driver::{Adapter, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsage, ClearBuffer, ColorTargetState, CommandEncoder, ComputePassEncoder, ComputePipelineDescriptor, CopyBufferToBuffer, CopyBufferToTexture, CopyTextureToBuffer, CopyTextureToTexture, DepthStencilOperations, DepthStencilState, Device, ExecuteRenderBundlesEncoder, ImageCopyBuffer, ImageCopyTexture, ImageDataLayout, MapMode, MultisampleState, PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, ProgrammablePassEncoder, QuerySetDescriptor, QueryType, Queue, RenderBundleEncoder, RenderBundleEncoderDescriptor, RenderEncoder, RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor, RenderPassEncoder, RenderPipelineDescriptor, ResolveQuerySet, SamplerBindingType, SamplerDescriptor, SetIndexBuffer, SetVertexBuffer, ShaderStage, StencilFaceState, StencilOperation, StorageTextureAccess, Texture, TextureAspect, TextureDescriptor, TextureDimensions, TextureSampleType, TextureUsage, TextureViewDescriptor, TextureViewDimension, WriteBufferOperation, WriteTextureOperation};
+use crate::driver::{
+    Adapter, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
+    BindingResource, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsage,
+    ClearBuffer, ColorTargetState, CommandEncoder, ComputePassEncoder, ComputePipelineDescriptor,
+    CopyBufferToBuffer, CopyBufferToTexture, CopyTextureToBuffer, CopyTextureToTexture,
+    DepthStencilOperations, DepthStencilState, Device, ExecuteRenderBundlesEncoder,
+    ImageCopyBuffer, ImageCopyTexture, ImageDataLayout, MapMode, MultisampleState,
+    PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, ProgrammablePassEncoder,
+    QuerySetDescriptor, QueryType, Queue, RenderBundleEncoder, RenderBundleEncoderDescriptor,
+    RenderEncoder, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
+    RenderPassDescriptor, RenderPassEncoder, RenderPipelineDescriptor, ResolveQuerySet,
+    SamplerBindingType, SamplerDescriptor, SetIndexBuffer, SetVertexBuffer, ShaderStage,
+    StencilFaceState, StencilOperation, StorageTextureAccess, Texture, TextureAspect,
+    TextureDescriptor, TextureDimensions, TextureSampleType, TextureUsage, TextureViewDescriptor,
+    TextureViewDimension, WriteBufferOperation, WriteTextureOperation,
+};
 use crate::render_pipeline::{
     BlendComponent, BlendFactor, BlendState, ColorWrite, CullMode, FrontFace, IndexFormat,
     VertexAttribute, VertexBufferLayout, VertexFormat, VertexStepMode,
 };
+use crate::render_target::{LoadOp, StoreOp};
 use crate::sampler::{AddressMode, FilterMode};
 use crate::texture::format::TextureFormatId;
 use crate::{driver, CompareFunction};
-use crate::render_target::{LoadOp, StoreOp};
 
 pub struct Driver;
 
@@ -73,8 +85,7 @@ impl Adapter<Driver> for AdapterHandle {
     type RequestDevice = future::Ready<Result<DeviceHandle, Box<dyn Error>>>;
 
     fn supported_features(&self) -> FlagSet<Feature> {
-        let features: Result<_, wgc::instance::InvalidAdapter> =
-            gfx_select!(self.id => self.global.adapter_features(self.id));
+        let features = gfx_select!(self.id => self.global.adapter_features(self.id));
 
         match features {
             Ok(features) => features_from_wgc(features),
@@ -83,11 +94,10 @@ impl Adapter<Driver> for AdapterHandle {
     }
 
     fn supported_limits(&self) -> Limits {
-        let limits: Result<_, wgc::instance::InvalidAdapter> =
-            gfx_select!(self.id => self.global.adapter_limits(self.id));
+        let limits = gfx_select!(self.id => self.global.adapter_limits(self.id));
 
         match limits {
-            Ok(features) => limits_from_wgc(features),
+            Ok(features) => limits_from_wgc(&features),
             Err(err) => panic!("{}", err),
         }
     }
@@ -96,12 +106,12 @@ impl Adapter<Driver> for AdapterHandle {
     where
         Flags: Into<FlagSet<Feature>> + Copy,
     {
-        let (device_id, queue_id, error): (_, _, Option<wgc::instance::RequestDeviceError>) = gfx_select!(self.id => self.global.adapter_request_device(
+        let (device_id, queue_id, error) = gfx_select!(self.id => self.global.adapter_request_device(
             self.id,
             &wgc::device::DeviceDescriptor {
                 label: None,
-                required_features: features_to_wgc(&descriptor.features.into()),
-                required_limits: limits_to_wgc(&descriptor.limits.into()),
+                required_features: features_to_wgc(&descriptor.required_features.into()),
+                required_limits: limits_to_wgc(&descriptor.required_limits.into()),
             },
             None,
             None,
@@ -159,7 +169,7 @@ impl Device<Driver> for DeviceHandle {
             mapped_at_creation: descriptor.mapped_at_creation,
         };
 
-        let (id, err): (_, Option<wgc::resource::CreateBufferError>) = gfx_select!(self.device_id => self.0.device_create_buffer(
+        let (id, err) = gfx_select!(self.device_id => self.global.device_create_buffer(
             self.device_id,
             &descriptor,
             None
@@ -192,7 +202,7 @@ impl Device<Driver> for DeviceHandle {
             view_formats,
         };
 
-        let (id, err): (_, Option<wgc::resource::CreateTextureError>) = gfx_select!(self.device_id => self.0.device_create_texture(
+        let (id, err) = gfx_select!(self.device_id => self.global.device_create_texture(
             self.device_id,
             &descriptor,
             None
@@ -226,7 +236,7 @@ impl Device<Driver> for DeviceHandle {
             border_color: None,
         };
 
-        let (id, err): (_, Option<wgc::resource::CreateSamplerError>) = gfx_select!(self.device_id => self.0.device_create_sampler(
+        let (id, err) = gfx_select!(self.device_id => self.global.device_create_sampler(
             self.device_id,
             &descriptor,
             None
@@ -236,7 +246,10 @@ impl Device<Driver> for DeviceHandle {
             panic!("{}", err)
         }
 
-        SamplerHandle { global: self.global.clone(), id }
+        SamplerHandle {
+            global: self.global.clone(),
+            id,
+        }
     }
 
     fn create_bind_group_layout<I>(
@@ -256,15 +269,18 @@ impl Device<Driver> for DeviceHandle {
             entries: entries.into(),
         };
 
-        let (id, err): (_, Option<wgc::binding_model::CreateBindGroupLayoutError>) = gfx_select!(
-            self.device_id => self.0.device_create_bind_group_layout(self.device_id, &descriptor, None)
+        let (id, err) = gfx_select!(
+            self.device_id => self.global.device_create_bind_group_layout(self.device_id, &descriptor, None)
         );
 
         if let Some(err) = err {
             panic!("{}", err)
         }
 
-        BindGroupLayoutHandle { global: self.global.clone(), id }
+        BindGroupLayoutHandle {
+            global: self.global.clone(),
+            id,
+        }
     }
 
     fn create_pipeline_layout<I>(
@@ -287,7 +303,7 @@ impl Device<Driver> for DeviceHandle {
             push_constant_ranges: (&[]).into(),
         };
 
-        let (id, err): (_, Option<wgc::binding_model::CreatePipelineLayoutError>) = gfx_select!(self.device_id => self.global.device_create_pipeline_layout(
+        let (id, err) = gfx_select!(self.device_id => self.global.device_create_pipeline_layout(
             self.device_id,
             &descriptor,
             None
@@ -297,7 +313,10 @@ impl Device<Driver> for DeviceHandle {
             panic!("{}", err)
         }
 
-        PipelineLayoutHandle { global: self.global.clone(), id }
+        PipelineLayoutHandle {
+            global: self.global.clone(),
+            id,
+        }
     }
 
     fn create_bind_group<'a, E>(
@@ -319,7 +338,7 @@ impl Device<Driver> for DeviceHandle {
             entries: entries.into(),
         };
 
-        let (id, err): (_, Option<wgc::binding_model::CreatePipelineLayoutError>) = gfx_select!(self.device_id => self.global.device_create_bind_group(
+        let (id, err) = gfx_select!(self.device_id => self.global.device_create_bind_group(
             self.device_id,
             &descriptor,
             None
@@ -329,7 +348,10 @@ impl Device<Driver> for DeviceHandle {
             panic!("{}", err)
         }
 
-        BindGroupHandle { global: self.global.clone(), id }
+        BindGroupHandle {
+            global: self.global.clone(),
+            id,
+        }
     }
 
     fn create_query_set(&self, descriptor: &QuerySetDescriptor) -> QuerySetHandle {
@@ -339,7 +361,7 @@ impl Device<Driver> for DeviceHandle {
             count: descriptor.len as u32,
         };
 
-        let (id, err): (_, Option<wgc::resource::CreateQuerySetError>) = gfx_select!(self.device_id => self.global.device_create_bind_group(
+        let (id, err) = gfx_select!(self.device_id => self.global.device_create_query_set(
             self.device_id,
             &descriptor,
             None
@@ -349,16 +371,19 @@ impl Device<Driver> for DeviceHandle {
             panic!("{}", err)
         }
 
-        QuerySetHandle { global: self.global.clone(), id }
+        QuerySetHandle {
+            global: self.global.clone(),
+            id,
+        }
     }
 
     fn create_shader_module(&self, source: &str) -> ShaderModuleHandle {
         let descriptor = wgc::pipeline::ShaderModuleDescriptor {
             label: None,
-            shader_bound_checks: Default::default(),
+            shader_bound_checks: wgt::ShaderBoundChecks::new(),
         };
 
-        let (id, err): (_, Option<wgc::resource::CreateQuerySetError>) = gfx_select!(self.device_id => self.global.device_create_shader_module(
+        let (id, err) = gfx_select!(self.device_id => self.global.device_create_shader_module(
             self.device_id,
             &descriptor,
             wgc::pipeline::ShaderModuleSource::Wgsl(source.into()),
@@ -369,7 +394,10 @@ impl Device<Driver> for DeviceHandle {
             panic!("{}", err)
         }
 
-        ShaderModuleHandle { global: self.global.clone(), id }
+        ShaderModuleHandle {
+            global: self.global.clone(),
+            id,
+        }
     }
 
     fn create_compute_pipeline(
@@ -387,7 +415,7 @@ impl Device<Driver> for DeviceHandle {
             },
         };
 
-        let (id, err): (_, Option<wgc::pipeline::CreateComputePipelineError>) = gfx_select!(self.device_id => self.global.device_create_compute_pipeline(
+        let (id, err) = gfx_select!(self.device_id => self.global.device_create_compute_pipeline(
             self.device_id,
             &descriptor,
             None,
@@ -398,7 +426,10 @@ impl Device<Driver> for DeviceHandle {
             panic!("{}", err)
         }
 
-        ComputePipelineHandle { global: self.global.clone(),id }
+        ComputePipelineHandle {
+            global: self.global.clone(),
+            id,
+        }
     }
 
     fn create_compute_pipeline_async(
@@ -458,7 +489,7 @@ impl Device<Driver> for DeviceHandle {
             multiview: None,
         };
 
-        let (id, err): (_, Option<wgc::pipeline::CreateRenderPipelineError>) = gfx_select!(self.device_id => self.global.device_create_render_pipeline(
+        let (id, err) = gfx_select!(self.device_id => self.global.device_create_render_pipeline(
             self.device_id,
             &descriptor,
             None,
@@ -469,7 +500,10 @@ impl Device<Driver> for DeviceHandle {
             panic!("{}", err)
         }
 
-        RenderPipelineHandle { global: self.global.clone(),id }
+        RenderPipelineHandle {
+            global: self.global.clone(),
+            id,
+        }
     }
 
     fn create_render_pipeline_async(
@@ -480,9 +514,11 @@ impl Device<Driver> for DeviceHandle {
     }
 
     fn create_command_encoder(&self) -> CommandEncoderHandle {
-        let (id, err): (_, Option<wgc::device::DeviceError>) = gfx_select!(self.device_id => self.0.device_create_command_encoder(
+        let (id, err) = gfx_select!(self.device_id => self.global.device_create_command_encoder(
             self.device_id,
-            None,
+            &wgt::CommandEncoderDescriptor {
+                label: None,
+            },
             None
         ));
 
@@ -521,10 +557,11 @@ impl Device<Driver> for DeviceHandle {
             multiview: None,
         };
 
-        let encoder = match wgc::command::RenderBundleEncoder::new(&descriptor, self.device_id, None) {
-            Ok(encoder) => encoder,
-            Err(err) => panic!("{}", err),
-        };
+        let encoder =
+            match wgc::command::RenderBundleEncoder::new(&descriptor, self.device_id, None) {
+                Ok(encoder) => encoder,
+                Err(err) => panic!("{}", err),
+            };
 
         RenderBundleEncoderHandle {
             global: self.global.clone(),
@@ -542,7 +579,7 @@ impl Device<Driver> for DeviceHandle {
 
 impl Drop for DeviceHandle {
     fn drop(&mut self) {
-        let _ = wgc::gfx_select!(self.device_id => self.global.device_poll(self.device_id, wgt::Maintain::wait()));
+        let _ = gfx_select!(self.device_id => self.global.device_poll(self.device_id, wgt::Maintain::wait()));
 
         gfx_select!(self.device_id => self.global.device_drop(self.device_id));
     }
@@ -576,10 +613,10 @@ impl Buffer<Driver> for BufferHandle {
     fn mapped<'a, E>(&'a self, offset_in_bytes: usize, len_in_elements: usize) -> &[E] {
         let size = len_in_elements * mem::size_of::<E>();
 
-        let res: Result<(*mut u8, u64), wgc::resource::BufferAccessError> = gfx_select!(self.id => self.global.buffer_get_mapped_range(
+        let res = gfx_select!(self.id => self.global.buffer_get_mapped_range(
             self.id,
             offset_in_bytes as u64,
-            NoneZeroU64::new(size),
+            Some(size as u64),
         ));
 
         match res {
@@ -599,10 +636,10 @@ impl Buffer<Driver> for BufferHandle {
     fn mapped_mut<'a, E>(&'a self, offset_in_bytes: usize, len_in_elements: usize) -> &mut [E] {
         let size = len_in_elements * mem::size_of::<E>();
 
-        let res: Result<(*mut u8, u64), wgc::resource::BufferAccessError> = gfx_select!(self.id => self.global.buffer_get_mapped_range(
+        let res = gfx_select!(self.id => self.global.buffer_get_mapped_range(
             self.id,
             offset_in_bytes as u64,
-            NoneZeroU64::new(size),
+            Some(size as u64),
         ));
 
         match res {
@@ -620,8 +657,7 @@ impl Buffer<Driver> for BufferHandle {
     }
 
     fn unmap(&self) {
-        let res: wgc::resource::BufferAccessResult =
-            gfx_select!(self.id => self.global.buffer_unmap(self.id));
+        let res = gfx_select!(self.id => self.global.buffer_unmap(self.id));
 
         if let Err(err) = res {
             panic!("{}", err);
@@ -639,7 +675,7 @@ impl Buffer<Driver> for BufferHandle {
 
 impl Drop for BufferHandle {
     fn drop(&mut self) {
-        gfx_select!(self.id => self.global.buffer_drop(self.id));
+        gfx_select!(self.id => self.global.buffer_drop(self.id, false));
     }
 }
 
@@ -690,17 +726,21 @@ impl Future for Map {
                 }
             }));
 
-            gfx_select!(this.buffer_id =>
+            let res = gfx_select!(this.buffer_id =>
                 this.global.buffer_map_async(
                     this.buffer_id,
                     offset,
                     Some(size),
                     wgc::resource::BufferMapOperation {
-                        host: self.host,
+                        host: this.host,
                         callback: Some(callback),
                     },
                 )
             );
+
+            if let Err(_) = res {
+                return Poll::Ready(Err(MapError));
+            }
 
             return Poll::Pending;
         }
@@ -715,11 +755,6 @@ impl Future for Map {
             Poll::Pending
         }
     }
-}
-
-#[derive(Clone)]
-pub struct BufferBinding {
-    binding: wgc::binding_model::BufferBinding,
 }
 
 #[derive(Clone)]
@@ -742,7 +777,7 @@ impl Texture<Driver> for TextureHandle {
                 array_layer_count: Some(descriptor.layers.len() as u32),
             },
         };
-        let (id, err): (_, Option<wgc::resource::CreateTextureViewError>) = gfx_select!(
+        let (id, err) = gfx_select!(
             self.id => self.global.texture_create_view(self.id, &descriptor, None)
         );
 
@@ -751,6 +786,7 @@ impl Texture<Driver> for TextureHandle {
         }
 
         TextureView {
+            global: self.global.clone(),
             id,
         }
     }
@@ -758,18 +794,19 @@ impl Texture<Driver> for TextureHandle {
 
 impl Drop for TextureHandle {
     fn drop(&mut self) {
-        gfx_select!(self.id => self.global.texture_drop(self.id));
+        gfx_select!(self.id => self.global.texture_drop(self.id, false));
     }
 }
 
 #[derive(Clone)]
 pub struct TextureView {
+    global: Arc<Global>,
     id: TextureViewId,
 }
 
 impl Drop for TextureView {
     fn drop(&mut self) {
-        gfx_select!(self.id => self.global.texture_view_drop(self.id));
+        let _ = gfx_select!(self.id => self.global.texture_view_drop(self.id, false));
     }
 }
 
@@ -781,7 +818,7 @@ pub struct CommandEncoderHandle {
 
 impl CommandEncoder<Driver> for CommandEncoderHandle {
     fn copy_buffer_to_buffer(&mut self, op: CopyBufferToBuffer<Driver>) {
-         let res: Result<(), wgc::command::CopyError>= gfx_select!(self.id => self.global.command_encoder_copy_buffer_to_buffer(
+        let res = gfx_select!(self.id => self.global.command_encoder_copy_buffer_to_buffer(
             self.id,
             op.source.id,
             op.source_offset as u64,
@@ -796,11 +833,11 @@ impl CommandEncoder<Driver> for CommandEncoderHandle {
     }
 
     fn copy_buffer_to_texture(&mut self, op: CopyBufferToTexture<Driver>) {
-        let res: Result<(), wgc::command::CopyError>= gfx_select!(self.id => self.global.command_encoder_copy_buffer_to_texture(
+        let res = gfx_select!(self.id => self.global.command_encoder_copy_buffer_to_texture(
             self.id,
             &image_copy_buffer_to_wgc(&op.source),
             &image_copy_texture_to_wgc(&op.destination),
-            &size_3d_to_wgc(&op.size)
+            &size_3d_to_wgc(&op.copy_size)
         ));
 
         if let Err(err) = res {
@@ -809,11 +846,11 @@ impl CommandEncoder<Driver> for CommandEncoderHandle {
     }
 
     fn copy_texture_to_buffer(&mut self, op: CopyTextureToBuffer<Driver>) {
-        let res: Result<(), wgc::command::CopyError>= gfx_select!(self.id => self.global.command_encoder_copy_texture_to_buffer(
+        let res = gfx_select!(self.id => self.global.command_encoder_copy_texture_to_buffer(
             self.id,
             &image_copy_texture_to_wgc(&op.source),
             &image_copy_buffer_to_wgc(&op.destination),
-            &size_3d_to_wgc(&op.size)
+            &size_3d_to_wgc(&op.copy_size)
         ));
 
         if let Err(err) = res {
@@ -822,11 +859,11 @@ impl CommandEncoder<Driver> for CommandEncoderHandle {
     }
 
     fn copy_texture_to_texture(&mut self, op: CopyTextureToTexture<Driver>) {
-        let res: Result<(), wgc::command::CopyError>= gfx_select!(self.id => self.global.command_encoder_copy_texture_to_texture(
+        let res = gfx_select!(self.id => self.global.command_encoder_copy_texture_to_texture(
             self.id,
             &image_copy_texture_to_wgc(&op.source),
             &image_copy_texture_to_wgc(&op.destination),
-            &size_3d_to_wgc(&op.size)
+            &size_3d_to_wgc(&op.copy_size)
         ));
 
         if let Err(err) = res {
@@ -835,7 +872,7 @@ impl CommandEncoder<Driver> for CommandEncoderHandle {
     }
 
     fn clear_buffer(&mut self, op: ClearBuffer<Driver>) {
-        let res: Result<(), wgc::command::ClearError>= gfx_select!(self.id => self.global.command_encoder_clear_buffer(
+        let res = gfx_select!(self.id => self.global.command_encoder_clear_buffer(
             self.id,
             op.buffer.id,
             op.range.start as u64,
@@ -850,10 +887,13 @@ impl CommandEncoder<Driver> for CommandEncoderHandle {
     fn begin_compute_pass(&mut self) -> ComputePassEncoderHandle {
         ComputePassEncoderHandle {
             global: self.global.clone(),
-            compute_pass: wgc::command::ComputePass::new(self.id, &wgc::command::ComputePassDescriptor {
-                label: None,
-                timestamp_writes: None,
-            }),
+            compute_pass: wgc::command::ComputePass::new(
+                self.id,
+                &wgc::command::ComputePassDescriptor {
+                    label: None,
+                    timestamp_writes: None,
+                },
+            ),
         }
     }
 
@@ -864,22 +904,33 @@ impl CommandEncoder<Driver> for CommandEncoderHandle {
     where
         I: IntoIterator<Item = Option<RenderPassColorAttachment<Driver>>>,
     {
-        let color_attachments: ArrayVec<_, {wgc::MAX_COLOR_ATTACHMENTS}> = descriptor.color_attachments.into_iter().map(|a| a.map(render_pass_color_attachment_to_wgc)).collect();
+        let color_attachments: ArrayVec<_, { wgc::MAX_COLOR_ATTACHMENTS }> = descriptor
+            .color_attachments
+            .into_iter()
+            .map(|a| a.map(render_pass_color_attachment_to_wgc))
+            .collect();
 
         RenderPassEncoderHandle {
             global: self.global.clone(),
-            render_pass: wgc::command::RenderPass::new(self.id, &wgc::command::RenderPassDescriptor {
-                label: None,
-                color_attachments: color_attachments.as_slice().into(),
-                depth_stencil_attachment: descriptor.depth_stencil_attachment.as_ref().map(render_pass_depth_stencil_attachment_to_wgc).as_ref(),
-                timestamp_writes: None,
-                occlusion_query_set: descriptor.occlusion_query_set.map(|s| s.id),
-            }),
+            render_pass: wgc::command::RenderPass::new(
+                self.id,
+                &wgc::command::RenderPassDescriptor {
+                    label: None,
+                    color_attachments: color_attachments.as_slice().into(),
+                    depth_stencil_attachment: descriptor
+                        .depth_stencil_attachment
+                        .as_ref()
+                        .map(render_pass_depth_stencil_attachment_to_wgc)
+                        .as_ref(),
+                    timestamp_writes: None,
+                    occlusion_query_set: descriptor.occlusion_query_set.map(|s| s.id),
+                },
+            ),
         }
     }
 
     fn write_timestamp(&mut self, query_set: &QuerySetHandle, index: usize) {
-        let res: Result<(), wgc::command::QueryError>= gfx_select!(self.id => self.global.command_encoder_write_timestamp(
+        let res = gfx_select!(self.id => self.global.command_encoder_write_timestamp(
             self.id,
             query_set.id,
             index as u32,
@@ -891,7 +942,7 @@ impl CommandEncoder<Driver> for CommandEncoderHandle {
     }
 
     fn resolve_query_set(&mut self, op: ResolveQuerySet<Driver>) {
-        let res: Result<(), wgc::command::QueryError>= gfx_select!(self.id => self.global.command_encoder_resolve_query_set(
+        let res = gfx_select!(self.id => self.global.command_encoder_resolve_query_set(
             self.id,
             op.query_set.id,
             op.query_range.start as u32,
@@ -906,21 +957,20 @@ impl CommandEncoder<Driver> for CommandEncoderHandle {
     }
 
     fn finish(self) -> CommandBufferHandle {
-        let res: Result<CommandBufferId, wgc::command::CommandEncoderError>= gfx_select!(self.id => self.global.command_encoder_finish(
+        let (id, err) = gfx_select!(self.id => self.global.command_encoder_finish(
             self.id,
             &wgt::CommandBufferDescriptor {
                 label: None
             }
         ));
 
-        match res {
-            Ok(id) => CommandBufferHandle {
-                global: self.global.clone(),
-                id,
-            },
-            Err(err) => {
-                panic!("{}", err)
-            }
+        if let Some(err) = err {
+            panic!("{}", err)
+        }
+
+        CommandBufferHandle {
+            global: self.global.clone(),
+            id,
         }
     }
 }
@@ -938,7 +988,12 @@ pub struct ComputePassEncoderHandle {
 
 impl ProgrammablePassEncoder<Driver> for ComputePassEncoderHandle {
     fn set_bind_group(&mut self, index: u32, handle: &BindGroupHandle) {
-        compute_commands::wgpu_compute_pass_set_bind_group(&mut self.compute_pass, index, handle.id, &[]);
+        compute_commands::wgpu_compute_pass_set_bind_group(
+            &mut self.compute_pass,
+            index,
+            handle.id,
+            &[],
+        );
     }
 }
 
@@ -948,22 +1003,21 @@ impl ComputePassEncoder<Driver> for ComputePassEncoderHandle {
     }
 
     fn dispatch_workgroups(&mut self, x: u32, y: u32, z: u32) {
-        compute_commands::wgpu_compute_pass_dispatch_workgroups(
-            &mut self.compute_pass,
-            x,
-            y,
-            z
-        );
+        compute_commands::wgpu_compute_pass_dispatch_workgroups(&mut self.compute_pass, x, y, z);
     }
 
     fn dispatch_workgroups_indirect(&mut self, buffer_handle: &BufferHandle, offset: usize) {
-        compute_commands::wgpu_compute_pass_dispatch_workgroups_indirect(&mut self.compute_pass, buffer_handle.id, offset as u64);
+        compute_commands::wgpu_compute_pass_dispatch_workgroups_indirect(
+            &mut self.compute_pass,
+            buffer_handle.id,
+            offset as u64,
+        );
     }
 
     fn end(self) {
         let encoder_id = self.compute_pass.parent_id();
 
-        let res: Result<(), wgc::command::ComputePassError>= gfx_select!(encoder_id => self.global.command_encoder_run_compute_pass(
+        let res = gfx_select!(encoder_id => self.global.command_encoder_run_compute_pass(
             encoder_id,
             &self.compute_pass,
         ));
@@ -981,7 +1035,12 @@ pub struct RenderPassEncoderHandle {
 
 impl ProgrammablePassEncoder<Driver> for RenderPassEncoderHandle {
     fn set_bind_group(&mut self, index: u32, handle: &BindGroupHandle) {
-        render_commands::wgpu_render_pass_set_bind_group(&mut self.render_pass, index, handle.id, &[]);
+        render_commands::wgpu_render_pass_set_bind_group(
+            &mut self.render_pass,
+            index,
+            handle.id,
+            &[],
+        );
     }
 }
 
@@ -996,7 +1055,9 @@ impl RenderEncoder<Driver> for RenderPassEncoderHandle {
             op.buffer_handle.id,
             index_format_to_wgc(&op.index_format),
             op.range.as_ref().map(|r| r.start).unwrap_or(0) as u64,
-            op.range.as_ref().and_then(|r| NonZeroU64::new(r.len() as u64))
+            op.range
+                .as_ref()
+                .and_then(|r| NonZeroU64::new(r.len() as u64)),
         );
     }
 
@@ -1006,47 +1067,90 @@ impl RenderEncoder<Driver> for RenderPassEncoderHandle {
             op.slot,
             op.buffer_handle.id,
             op.range.as_ref().map(|r| r.start).unwrap_or(0) as u64,
-            op.range.as_ref().and_then(|r| NonZeroU64::new(r.len() as u64))
+            op.range
+                .as_ref()
+                .and_then(|r| NonZeroU64::new(r.len() as u64)),
         );
     }
 
     fn draw(&mut self, op: Draw) {
-        render_commands::wgpu_render_pass_draw(&mut self.render_pass, op.vertex_count, op.instance_count, op.first_vertex, op.first_instance);
+        render_commands::wgpu_render_pass_draw(
+            &mut self.render_pass,
+            op.vertex_count,
+            op.instance_count,
+            op.first_vertex,
+            op.first_instance,
+        );
     }
 
     fn draw_indexed(&mut self, op: DrawIndexed) {
-        render_commands::wgpu_render_pass_draw_indexed(&mut self.render_pass, op.index_count, op.instance_count, op.first_index, op.base_vertex as i32, op.first_instance);
+        render_commands::wgpu_render_pass_draw_indexed(
+            &mut self.render_pass,
+            op.index_count,
+            op.instance_count,
+            op.first_index,
+            op.base_vertex as i32,
+            op.first_instance,
+        );
     }
 
     fn draw_indirect(&mut self, buffer_handle: &BufferHandle, offset: usize) {
-        render_commands::wgpu_render_pass_draw_indirect(&mut self.render_pass, buffer_handle.id, offset as u64);
+        render_commands::wgpu_render_pass_draw_indirect(
+            &mut self.render_pass,
+            buffer_handle.id,
+            offset as u64,
+        );
     }
 
     fn draw_indexed_indirect(&mut self, buffer_handle: &BufferHandle, offset: usize) {
-        render_commands::wgpu_render_pass_draw_indexed_indirect(&mut self.render_pass, buffer_handle.id, offset as u64);
+        render_commands::wgpu_render_pass_draw_indexed_indirect(
+            &mut self.render_pass,
+            buffer_handle.id,
+            offset as u64,
+        );
     }
 }
 
 impl RenderPassEncoder<Driver> for RenderPassEncoderHandle {
     fn set_viewport(&mut self, viewport: &Viewport) {
-        render_commands::wgpu_render_pass_set_viewport(&mut self.render_pass, viewport.x, viewport.y, viewport.width, viewport.height, viewport.min_depth, viewport.max_depth);
+        render_commands::wgpu_render_pass_set_viewport(
+            &mut self.render_pass,
+            viewport.x,
+            viewport.y,
+            viewport.width,
+            viewport.height,
+            viewport.min_depth,
+            viewport.max_depth,
+        );
     }
 
     fn set_scissor_rect(&mut self, scissor_rect: &ScissorRect) {
-        render_commands::wgpu_render_pass_set_scissor_rect(&mut self.render_pass, scissor_rect.x, scissor_rect.y, scissor_rect.width, scissor_rect.height);
+        render_commands::wgpu_render_pass_set_scissor_rect(
+            &mut self.render_pass,
+            scissor_rect.x,
+            scissor_rect.y,
+            scissor_rect.width,
+            scissor_rect.height,
+        );
     }
 
     fn set_blend_constant(&mut self, blend_constant: &BlendConstant) {
-        render_commands::wgpu_render_pass_set_blend_constant(&mut self.render_pass, &wgt::Color {
-            r: blend_constant.r as f64,
-            g: blend_constant.g as f64,
-            b: blend_constant.b as f64,
-            a: blend_constant.a as f64,
-        });
+        render_commands::wgpu_render_pass_set_blend_constant(
+            &mut self.render_pass,
+            &wgt::Color {
+                r: blend_constant.r as f64,
+                g: blend_constant.g as f64,
+                b: blend_constant.b as f64,
+                a: blend_constant.a as f64,
+            },
+        );
     }
 
     fn set_stencil_reference(&mut self, stencil_reference: u32) {
-        render_commands::wgpu_render_pass_set_stencil_reference(&mut self.render_pass, stencil_reference);
+        render_commands::wgpu_render_pass_set_stencil_reference(
+            &mut self.render_pass,
+            stencil_reference,
+        );
     }
 
     fn begin_occlusion_query(&mut self, query_index: u32) {
@@ -1067,7 +1171,7 @@ impl RenderPassEncoder<Driver> for RenderPassEncoderHandle {
     fn end(self) {
         let encoder_id = self.render_pass.parent_id();
 
-        let res: Result<(), wgc::command::RenderPassError>= gfx_select!(encoder_id => self.global.command_encoder_run_render_pass(
+        let res = gfx_select!(encoder_id => self.global.command_encoder_run_render_pass(
             encoder_id,
             &self.render_pass,
         ));
@@ -1101,7 +1205,13 @@ pub struct RenderBundleEncoderHandle {
 impl ProgrammablePassEncoder<Driver> for RenderBundleEncoderHandle {
     fn set_bind_group(&mut self, index: u32, handle: &BindGroupHandle) {
         unsafe {
-            bundle_ffi::wgpu_render_bundle_set_bind_group(&mut self.bundle, index, handle.id, ptr::null(), 0);
+            bundle_ffi::wgpu_render_bundle_set_bind_group(
+                &mut self.bundle,
+                index,
+                handle.id,
+                ptr::null(),
+                0,
+            );
         }
     }
 }
@@ -1117,7 +1227,9 @@ impl RenderEncoder<Driver> for RenderBundleEncoderHandle {
             op.buffer_handle.id,
             index_format_to_wgc(&op.index_format),
             op.range.as_ref().map(|r| r.start).unwrap_or(0) as u64,
-            op.range.as_ref().and_then(|r| NonZeroU64::new(r.len() as u64))
+            op.range
+                .as_ref()
+                .and_then(|r| NonZeroU64::new(r.len() as u64)),
         );
     }
 
@@ -1127,30 +1239,53 @@ impl RenderEncoder<Driver> for RenderBundleEncoderHandle {
             op.slot,
             op.buffer_handle.id,
             op.range.as_ref().map(|r| r.start).unwrap_or(0) as u64,
-            op.range.as_ref().and_then(|r| NonZeroU64::new(r.len() as u64))
+            op.range
+                .as_ref()
+                .and_then(|r| NonZeroU64::new(r.len() as u64)),
         );
     }
 
     fn draw(&mut self, op: Draw) {
-        bundle_ffi::wgpu_render_bundle_draw(&mut self.bundle, op.vertex_count, op.instance_count, op.first_vertex, op.first_instance);
+        bundle_ffi::wgpu_render_bundle_draw(
+            &mut self.bundle,
+            op.vertex_count,
+            op.instance_count,
+            op.first_vertex,
+            op.first_instance,
+        );
     }
 
     fn draw_indexed(&mut self, op: DrawIndexed) {
-        bundle_ffi::wgpu_render_bundle_draw_indexed(&mut self.bundle, op.index_count, op.instance_count, op.first_index, op.base_vertex as i32, op.first_instance);
+        bundle_ffi::wgpu_render_bundle_draw_indexed(
+            &mut self.bundle,
+            op.index_count,
+            op.instance_count,
+            op.first_index,
+            op.base_vertex as i32,
+            op.first_instance,
+        );
     }
 
     fn draw_indirect(&mut self, buffer_handle: &BufferHandle, offset: usize) {
-        bundle_ffi::wgpu_render_bundle_draw_indirect(&mut self.bundle, buffer_handle.id, offset as u64);
+        bundle_ffi::wgpu_render_bundle_draw_indirect(
+            &mut self.bundle,
+            buffer_handle.id,
+            offset as u64,
+        );
     }
 
     fn draw_indexed_indirect(&mut self, buffer_handle: &BufferHandle, offset: usize) {
-        bundle_ffi::wgpu_render_bundle_draw_indexed_indirect(&mut self.bundle, buffer_handle.id, offset as u64);
+        bundle_ffi::wgpu_render_bundle_draw_indexed_indirect(
+            &mut self.bundle,
+            buffer_handle.id,
+            offset as u64,
+        );
     }
 }
 
 impl RenderBundleEncoder<Driver> for RenderBundleEncoderHandle {
     fn finish(self) -> RenderBundleHandle {
-        let res: Result<_, wgc::command::RenderBundleError> = gfx_select!(self.bundle.parent() => self.global.render_bundle_encoder_finish(
+        let (id, err) = gfx_select!(self.bundle.parent() => self.global.render_bundle_encoder_finish(
             self.bundle,
             &wgc::command::RenderBundleDescriptor {
                 label: None
@@ -1158,12 +1293,13 @@ impl RenderBundleEncoder<Driver> for RenderBundleEncoderHandle {
             None,
         ));
 
-        match res {
-            Ok(id) => RenderBundleHandle {
-                global: self.global.clone(),
-                id
-            },
-            Err(err)  => panic!("{}", err)
+        if let Some(err) = err {
+            panic!("{}", err);
+        }
+
+        RenderBundleHandle {
+            global: self.global.clone(),
+            id,
         }
     }
 }
@@ -1200,7 +1336,7 @@ pub struct QueueHandle {
 
 impl Queue<Driver> for QueueHandle {
     fn submit(&self, command_buffer: &CommandBufferHandle) {
-        let res: Result<wgc::device::queue::WrappedSubmissionIndex, wgc::device::queue::QueueSubmitError> = gfx_select!(self.id => self.global.queue_submit(
+        let res = gfx_select!(self.id => self.global.queue_submit(
             self.id,
             &[command_buffer.id],
         ));
@@ -1211,7 +1347,7 @@ impl Queue<Driver> for QueueHandle {
     }
 
     fn write_buffer(&self, operation: WriteBufferOperation<Driver>) {
-        let res: Result<(), wgc::device::queue::QueueWriteError> = gfx_select!(self.id => self.global.queue_write_buffer(
+        let res = gfx_select!(self.id => self.global.queue_write_buffer(
             self.id,
             operation.buffer_handle.id,
             operation.offset as u64,
@@ -1224,7 +1360,7 @@ impl Queue<Driver> for QueueHandle {
     }
 
     fn write_texture(&self, operation: WriteTextureOperation<Driver>) {
-        let res: Result<(), wgc::device::queue::QueueWriteError> = gfx_select!(self.id => self.global.queue_write_texture(
+        let res = gfx_select!(self.id => self.global.queue_write_texture(
             self.id,
             &image_copy_texture_to_wgc(&operation.image_copy_texture),
             operation.data,
@@ -1370,6 +1506,48 @@ fn features_from_wgc(raw: wgt::Features) -> FlagSet<Feature> {
     features
 }
 
+pub fn features_to_wgc(features: &FlagSet<Feature>) -> wgt::Features {
+    let mut out = wgt::Features::empty();
+
+    if features.contains(Feature::DepthClipControl) {
+        out |= wgt::Features::DEPTH_CLIP_CONTROL;
+    }
+
+    if features.contains(Feature::Depth32FloatStencil8) {
+        out |= wgt::Features::DEPTH32FLOAT_STENCIL8;
+    }
+
+    if features.contains(Feature::TextureCompressionBc) {
+        out |= wgt::Features::TEXTURE_COMPRESSION_BC;
+    }
+
+    if features.contains(Feature::TextureComporessionEtc2) {
+        out |= wgt::Features::TEXTURE_COMPRESSION_ETC2;
+    }
+
+    if features.contains(Feature::TextureCompressionAstc) {
+        out |= wgt::Features::TEXTURE_COMPRESSION_ASTC;
+    }
+
+    if features.contains(Feature::TimestampQuery) {
+        out |= wgt::Features::TIMESTAMP_QUERY;
+    }
+
+    if features.contains(Feature::IndirectFirstInstance) {
+        out |= wgt::Features::INDIRECT_FIRST_INSTANCE;
+    }
+
+    if features.contains(Feature::ShaderF16) {
+        out |= wgt::Features::SHADER_F16;
+    }
+
+    if features.contains(Feature::Bgra8UNormStorage) {
+        out |= wgt::Features::BGRA8UNORM_STORAGE;
+    }
+
+    out
+}
+
 pub fn limits_from_wgc(limits: &wgt::Limits) -> Limits {
     Limits {
         max_texture_dimension_1d: limits.max_texture_dimension_1d,
@@ -1377,6 +1555,7 @@ pub fn limits_from_wgc(limits: &wgt::Limits) -> Limits {
         max_texture_dimension_3d: limits.max_texture_dimension_3d,
         max_texture_array_layers: limits.max_texture_array_layers,
         max_bind_groups: limits.max_bind_groups,
+        max_bindings_per_bind_group: limits.max_bindings_per_bind_group,
         max_dynamic_uniform_buffers_per_pipeline_layout: limits
             .max_dynamic_uniform_buffers_per_pipeline_layout,
         max_dynamic_storage_buffers_per_pipeline_layout: limits
@@ -1391,15 +1570,56 @@ pub fn limits_from_wgc(limits: &wgt::Limits) -> Limits {
         min_uniform_buffer_offset_alignment: limits.min_uniform_buffer_offset_alignment,
         min_storage_buffer_offset_alignment: limits.min_storage_buffer_offset_alignment,
         max_vertex_buffers: limits.max_vertex_buffers,
+        max_buffer_size: limits.max_buffer_size,
         max_vertex_attributes: limits.max_vertex_attributes,
         max_vertex_buffer_array_stride: limits.max_vertex_buffer_array_stride,
         max_inter_stage_shader_components: limits.max_inter_stage_shader_components,
+        max_color_attachments: limits.max_color_attachments,
+        max_color_attachment_bytes_per_sample: limits.max_color_attachment_bytes_per_sample,
         max_compute_workgroup_storage_size: limits.max_compute_workgroup_storage_size,
         max_compute_invocations_per_workgroup: limits.max_compute_invocations_per_workgroup,
         max_compute_workgroup_size_x: limits.max_compute_workgroup_size_x,
         max_compute_workgroup_size_y: limits.max_compute_workgroup_size_y,
         max_compute_workgroup_size_z: limits.max_compute_workgroup_size_z,
         max_compute_workgroups_per_dimension: limits.max_compute_workgroups_per_dimension,
+    }
+}
+
+pub fn limits_to_wgc(limits: &Limits) -> wgt::Limits {
+    wgt::Limits {
+        max_texture_dimension_1d: limits.max_texture_dimension_1d,
+        max_texture_dimension_2d: limits.max_texture_dimension_2d,
+        max_texture_dimension_3d: limits.max_texture_dimension_3d,
+        max_texture_array_layers: limits.max_texture_array_layers,
+        max_bind_groups: limits.max_bind_groups,
+        max_bindings_per_bind_group: limits.max_bindings_per_bind_group,
+        max_dynamic_uniform_buffers_per_pipeline_layout: limits
+            .max_dynamic_uniform_buffers_per_pipeline_layout,
+        max_dynamic_storage_buffers_per_pipeline_layout: limits
+            .max_dynamic_storage_buffers_per_pipeline_layout,
+        max_sampled_textures_per_shader_stage: limits.max_sampled_textures_per_shader_stage,
+        max_samplers_per_shader_stage: limits.max_samplers_per_shader_stage,
+        max_storage_buffers_per_shader_stage: limits.max_storage_buffers_per_shader_stage,
+        max_storage_textures_per_shader_stage: limits.max_storage_textures_per_shader_stage,
+        max_uniform_buffers_per_shader_stage: limits.max_uniform_buffers_per_shader_stage,
+        max_uniform_buffer_binding_size: limits.max_uniform_buffer_binding_size as u32,
+        max_storage_buffer_binding_size: limits.max_storage_buffer_binding_size as u32,
+        min_uniform_buffer_offset_alignment: limits.min_uniform_buffer_offset_alignment,
+        min_storage_buffer_offset_alignment: limits.min_storage_buffer_offset_alignment,
+        max_vertex_buffers: limits.max_vertex_buffers,
+        max_buffer_size: limits.max_buffer_size,
+        max_vertex_attributes: limits.max_vertex_attributes,
+        max_vertex_buffer_array_stride: limits.max_vertex_buffer_array_stride,
+        max_inter_stage_shader_components: limits.max_inter_stage_shader_components,
+        max_color_attachments: limits.max_color_attachments,
+        max_color_attachment_bytes_per_sample: limits.max_color_attachment_bytes_per_sample,
+        max_compute_workgroup_storage_size: limits.max_compute_workgroup_storage_size,
+        max_compute_invocations_per_workgroup: limits.max_compute_invocations_per_workgroup,
+        max_compute_workgroup_size_x: limits.max_compute_workgroup_size_x,
+        max_compute_workgroup_size_y: limits.max_compute_workgroup_size_y,
+        max_compute_workgroup_size_z: limits.max_compute_workgroup_size_z,
+        max_compute_workgroups_per_dimension: limits.max_compute_workgroups_per_dimension,
+        ..wgt::Limits::default()
     }
 }
 
@@ -1702,7 +1922,7 @@ pub fn storage_texture_access_to_wgc(
 pub fn binding_type_to_wgc(binding_type: &BindingType) -> wgt::BindingType {
     match binding_type {
         BindingType::Buffer(binding_type) => wgt::BindingType::Buffer {
-            ty: Default::default(),
+            ty: buffer_binding_type_to_wgc(&binding_type),
             has_dynamic_offset: false,
             min_binding_size: None,
         },
@@ -2021,7 +2241,9 @@ pub fn texture_aspect_to_wgc(texture_aspect: &TextureAspect) -> wgt::TextureAspe
     }
 }
 
-pub fn image_copy_buffer_to_wgc(image_copy_buffer: &ImageCopyBuffer<Driver>) -> wgc::command::ImageCopyBuffer {
+pub fn image_copy_buffer_to_wgc(
+    image_copy_buffer: &ImageCopyBuffer<Driver>,
+) -> wgc::command::ImageCopyBuffer {
     let bytes_per_row = image_copy_buffer.bytes_per_block * image_copy_buffer.blocks_per_row;
 
     wgc::command::ImageCopyBuffer {
@@ -2042,7 +2264,9 @@ pub fn origin_3d_to_wgc(origin: &(u32, u32, u32)) -> wgt::Origin3d {
     }
 }
 
-pub fn image_copy_texture_to_wgc(image_copy_texture: &ImageCopyTexture<Driver>) -> wgc::command::ImageCopyTexture {
+pub fn image_copy_texture_to_wgc(
+    image_copy_texture: &ImageCopyTexture<Driver>,
+) -> wgc::command::ImageCopyTexture {
     wgc::command::ImageCopyTexture {
         texture: image_copy_texture.texture_handle.id,
         mip_level: image_copy_texture.mip_level,
@@ -2073,7 +2297,7 @@ pub fn load_op_color_to_wgc(load_op: &LoadOp<[f64; 4]>) -> wgt::Color {
 pub fn load_op_clear_value<T: Copy + Default>(load_op: &LoadOp<T>) -> T {
     match load_op {
         LoadOp::Load => T::default(),
-        LoadOp::Clear(v) => *v
+        LoadOp::Clear(v) => *v,
     }
 }
 
@@ -2084,10 +2308,15 @@ pub fn store_op_to_wgc(store_op: &StoreOp) -> wgc::command::StoreOp {
     }
 }
 
-pub fn render_pass_color_attachment_to_wgc(render_pass_color_attachment: RenderPassColorAttachment<Driver>) -> wgc::command::RenderPassColorAttachment {
+pub fn render_pass_color_attachment_to_wgc(
+    render_pass_color_attachment: RenderPassColorAttachment<Driver>,
+) -> wgc::command::RenderPassColorAttachment {
     wgc::command::RenderPassColorAttachment {
         view: render_pass_color_attachment.view.id,
-        resolve_target: render_pass_color_attachment.resolve_target.as_ref().map(|t| t.id),
+        resolve_target: render_pass_color_attachment
+            .resolve_target
+            .as_ref()
+            .map(|t| t.id),
         channel: wgc::command::PassChannel {
             load_op: load_op_to_wgc(&render_pass_color_attachment.load_op),
             store_op: store_op_to_wgc(&render_pass_color_attachment.store_op),
@@ -2097,7 +2326,9 @@ pub fn render_pass_color_attachment_to_wgc(render_pass_color_attachment: RenderP
     }
 }
 
-pub fn depth_stencil_operations_to_wgc<T: Copy + Default>(depth_stencil_operations: &Option<DepthStencilOperations<T>>) -> wgc::command::PassChannel<T> {
+pub fn depth_stencil_operations_to_wgc<T: Copy + Default>(
+    depth_stencil_operations: &Option<DepthStencilOperations<T>>,
+) -> wgc::command::PassChannel<T> {
     if let Some(depth_stencil_operations) = depth_stencil_operations {
         wgc::command::PassChannel {
             load_op: load_op_to_wgc(&depth_stencil_operations.load_op),
@@ -2115,11 +2346,17 @@ pub fn depth_stencil_operations_to_wgc<T: Copy + Default>(depth_stencil_operatio
     }
 }
 
-pub fn render_pass_depth_stencil_attachment_to_wgc(render_pass_depth_stencil_attachment: &RenderPassDepthStencilAttachment<Driver>) -> wgc::command::RenderPassDepthStencilAttachment {
+pub fn render_pass_depth_stencil_attachment_to_wgc(
+    render_pass_depth_stencil_attachment: &RenderPassDepthStencilAttachment<Driver>,
+) -> wgc::command::RenderPassDepthStencilAttachment {
     wgc::command::RenderPassDepthStencilAttachment {
         view: render_pass_depth_stencil_attachment.view.id,
-        depth: depth_stencil_operations_to_wgc(&render_pass_depth_stencil_attachment.depth_operations),
-        stencil: depth_stencil_operations_to_wgc(&render_pass_depth_stencil_attachment.stencil_operations),
+        depth: depth_stencil_operations_to_wgc(
+            &render_pass_depth_stencil_attachment.depth_operations,
+        ),
+        stencil: depth_stencil_operations_to_wgc(
+            &render_pass_depth_stencil_attachment.stencil_operations,
+        ),
     }
 }
 

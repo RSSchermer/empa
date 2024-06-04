@@ -2283,6 +2283,7 @@ pub fn limits_from_web_sys(limits: &web_sys::GpuSupportedLimits) -> Limits {
         max_texture_dimension_3d: limits.max_texture_dimension_3d(),
         max_texture_array_layers: limits.max_texture_array_layers(),
         max_bind_groups: limits.max_bind_groups(),
+        max_bindings_per_bind_group: limits.max_bindings_per_bind_group(),
         max_dynamic_uniform_buffers_per_pipeline_layout: limits
             .max_dynamic_uniform_buffers_per_pipeline_layout(),
         max_dynamic_storage_buffers_per_pipeline_layout: limits
@@ -2297,9 +2298,12 @@ pub fn limits_from_web_sys(limits: &web_sys::GpuSupportedLimits) -> Limits {
         min_uniform_buffer_offset_alignment: limits.min_uniform_buffer_offset_alignment(),
         min_storage_buffer_offset_alignment: limits.min_storage_buffer_offset_alignment(),
         max_vertex_buffers: limits.max_vertex_buffers(),
+        max_buffer_size: limits.max_buffer_size() as u64,
         max_vertex_attributes: limits.max_vertex_attributes(),
         max_vertex_buffer_array_stride: limits.max_vertex_buffer_array_stride(),
         max_inter_stage_shader_components: limits.max_inter_stage_shader_components(),
+        max_color_attachments: limits.max_color_attachments(),
+        max_color_attachment_bytes_per_sample: limits.max_color_attachment_bytes_per_sample(),
         max_compute_workgroup_storage_size: limits.max_compute_workgroup_storage_size(),
         max_compute_invocations_per_workgroup: limits.max_compute_invocations_per_workgroup(),
         max_compute_workgroup_size_x: limits.max_compute_workgroup_size_x(),

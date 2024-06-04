@@ -9,5 +9,5 @@ repository = "https://github.com/RSSchermer/empa"
 license = "MIT"
 
 [dependencies.naga]
-version = "0.14.2"
+workspace = true
 features = ["wgsl-in", "span"]

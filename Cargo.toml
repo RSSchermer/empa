@@ -16,3 +16,31 @@ members = [
     "examples/web/8_persistent_threads",
     "examples/web/9_timestamp"
 ]
+
+[workspace.dependencies]
+arrayvec = "0.7.4"
+arwa = { path = "../rudo/arwa" }
+atomic-counter = "1.0.1"
+codespan-reporting = "0.11.1"
+compiletest_rs = "0.9"
+bytemuck = "1.14.0"
+empa = { version = "0.1.0", path = "crates/empa" }
+empa-macros = { version = "0.1.0", path = "crates/empa_macros" }
+empa-reflect = { version = "0.1.0", path = "crates/empa_reflect" }
+flagset = "^0.4"
+futures = "0.3.21"
+glam = "^0.24"
+include-preprocessor = { version = "0.1.0", path = "../include_preprocessor/include_preprocessor" }
+js-sys = "0.3.69"
+lazy_static = "1.4.0"
+memoffset = "0.6"
+naga = "0.14.2"
+quote = "1.0.2"
+pin-project = "1"
+proc-macro2 = "1.0.69"
+syn = "1.0.5"
+wasm-bindgen = "0.2.81"
+wasm-bindgen-futures = "0.4.31"
+web-sys = "0.3.69"
+wgc = { package = "wgpu-core", version = "0.20" }
+wgt = { package = "wgpu-types", version = "0.20" }

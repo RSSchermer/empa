@@ -9,5 +9,5 @@ repository = "https://github.com/RSSchermer/empa"
 license = "MIT"
 
 [dependencies]
-empa = { version = "0.1.0", path = "../empa" }
-glam = "^0.24"
+empa = { workspace = true }
+glam = { workspace = true }
