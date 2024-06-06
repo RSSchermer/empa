@@ -57,17 +57,12 @@ impl NavigatorExt for WorkerNavigator {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum PowerPreference {
+    #[default]
     DontCare,
     LowPower,
     HighPerformance,
-}
-
-impl Default for PowerPreference {
-    fn default() -> Self {
-        PowerPreference::DontCare
-    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

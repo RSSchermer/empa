@@ -25,6 +25,9 @@ pub mod type_flag;
 #[cfg(all(target_arch = "wasm32", feature = "arwa"))]
 pub mod arwa;
 
+#[cfg(not(target_arch = "wasm32"))]
+pub mod native;
+
 #[doc(hidden)]
 pub struct Untyped {}
 

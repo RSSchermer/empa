@@ -77,8 +77,8 @@ impl driver::Driver for Driver {
 
 #[derive(Clone)]
 pub struct AdapterHandle {
-    global: Arc<Global>,
-    id: AdapterId,
+    pub global: Arc<Global>,
+    pub id: AdapterId,
 }
 
 impl Adapter<Driver> for AdapterHandle {
@@ -153,7 +153,7 @@ impl Drop for BindGroupHandle {
 #[derive(Clone)]
 pub struct DeviceHandle {
     global: Arc<Global>,
-    device_id: DeviceId,
+    pub device_id: DeviceId,
     queue_id: QueueId,
 }
 
@@ -759,8 +759,8 @@ impl Future for Map {
 
 #[derive(Clone)]
 pub struct TextureHandle {
-    global: Arc<Global>,
-    id: TextureId,
+    pub global: Arc<Global>,
+    pub id: TextureId,
 }
 
 impl Texture<Driver> for TextureHandle {
