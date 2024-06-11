@@ -22,7 +22,7 @@ where
         let bind_group_layouts = bind_group_layouts.encodings().into_iter().map(|l| l.handle);
 
         let handle = device
-            .handle
+            .device_handle
             .create_pipeline_layout(PipelineLayoutDescriptor { bind_group_layouts });
 
         PipelineLayout {

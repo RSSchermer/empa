@@ -42,7 +42,7 @@ where
         R: Resources<Layout = T>,
     {
         let id = ID_GEN.get();
-        let handle = device.handle.create_bind_group(BindGroupDescriptor {
+        let handle = device.device_handle.create_bind_group(BindGroupDescriptor {
             layout: &layout.handle,
             entries: resources
                 .to_entries()

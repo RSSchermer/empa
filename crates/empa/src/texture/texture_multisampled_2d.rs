@@ -41,7 +41,7 @@ where
         assert!(width > 0, "width must be greater than `0`");
         assert!(height > 0, "height must be greater than `0`");
 
-        let handle = device.handle.create_texture(&TextureDescriptor {
+        let handle = device.device_handle.create_texture(&TextureDescriptor {
             size: (width, height, 1),
             mipmap_levels: 1,
             sample_count: SAMPLES as u32,

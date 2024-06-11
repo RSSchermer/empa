@@ -96,7 +96,7 @@ where
         let id = ID_GEN.get();
         let size_in_bytes = mem::size_of::<T>();
 
-        let handle = device.handle.create_buffer(&BufferDescriptor {
+        let handle = device.device_handle.create_buffer(&BufferDescriptor {
             size: size_in_bytes,
             usage_flags: Usage::FLAG_SET,
             mapped_at_creation: true,
@@ -154,7 +154,7 @@ where
         let slice_len = data.len();
         let size_in_bytes = mem::size_of::<T>() * slice_len;
 
-        let handle = device.handle.create_buffer(&BufferDescriptor {
+        let handle = device.device_handle.create_buffer(&BufferDescriptor {
             size: size_in_bytes,
             usage_flags: Usage::FLAG_SET,
             mapped_at_creation: true,
@@ -264,7 +264,7 @@ where
         let id = ID_GEN.get();
         let size_in_bytes = mem::size_of::<T>();
 
-        let handle = device.handle.create_buffer(&BufferDescriptor {
+        let handle = device.device_handle.create_buffer(&BufferDescriptor {
             size: size_in_bytes,
             usage_flags: U::FLAG_SET,
             mapped_at_creation,
@@ -319,7 +319,7 @@ where
         let id = ID_GEN.get();
         let size_in_bytes = mem::size_of::<T>() * len;
 
-        let handle = device.handle.create_buffer(&BufferDescriptor {
+        let handle = device.device_handle.create_buffer(&BufferDescriptor {
             size: size_in_bytes,
             usage_flags: U::FLAG_SET,
             mapped_at_creation,

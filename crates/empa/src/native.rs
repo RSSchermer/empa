@@ -11,14 +11,15 @@ use raw_window_handle::{
 };
 use wgc::gfx_select;
 use wgc::global::Global;
-use wgc::id::SurfaceId;
+use wgc::id::{DeviceId, SurfaceId};
 use wgc::present::SurfaceOutput;
 use wgt::SurfaceStatus;
 
 use crate::adapter::Adapter;
 use crate::device::Device;
 use crate::driver::native::{texture_format_to_wgc, texture_usage_to_wgc};
-use crate::texture::format::{TextureFormat, TextureFormatId, ViewFormats};
+use crate::driver::{Driver, Dvr};
+use crate::texture::format::{texture_format_seal, TextureFormat, TextureFormatId, ViewFormats};
 use crate::texture::Texture2D;
 use crate::{driver, texture};
 
@@ -94,11 +95,12 @@ impl Instance {
     pub fn enabled_backends() -> FlagSet<Backend> {
         let mut backends = FlagSet::from(Backend::None);
 
-        if cfg!(metal) {
-            backends |= Backend::Metal;
-        }
-        if cfg!(dx12) {
+        if cfg!(feature = "dx12") {
             backends |= Backend::Dx12;
+        }
+
+        if cfg!(feature = "metal") {
+            backends |= Backend::Metal;
         }
 
         // Windows, Android, Linux currently always enable Vulkan.
@@ -200,10 +202,7 @@ impl Instance {
                 wgc::instance::AdapterInputs::Mask(wgt::Backends::all(), |_| None),
             )
             .map(|id| {
-                Adapter::from_handle(driver::native::AdapterHandle {
-                    global: self.global.clone(),
-                    id,
-                })
+                Adapter::from_handle(driver::native::AdapterHandle::new(self.global.clone(), id))
             })
             .map_err(|inner| GetAdapterError { inner })
     }
@@ -271,6 +270,8 @@ impl error::Error for CreateSurfaceError {}
 
 pub trait WindowHandle: HasWindowHandle + HasDisplayHandle {}
 
+impl<T> WindowHandle for T where T: HasWindowHandle + HasDisplayHandle {}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum PresentMode {
     AutoVsync,
@@ -316,11 +317,11 @@ impl<'a> Surface<'a> {
         config: &SurfaceConfiguration<F, U, V>,
     ) -> ConfiguredSurface<'a, F, U>
     where
-        F: TextureFormat,
+        F: TextureFormat + Copy,
         U: texture::UsageFlags,
         V: ViewFormats<F>,
     {
-        let err = gfx_select!(self.id => self.global.surface_configure(self.id, device.handle.device_id, &surface_configuration_to_wgc(config)));
+        let err = gfx_select!(device.device_handle.id() => self.global.surface_configure(self.id, device.device_handle.id(), &surface_configuration_to_wgc(config)));
 
         if let Some(err) = err {
             panic!("{}", err);
@@ -328,22 +329,30 @@ impl<'a> Surface<'a> {
 
         ConfiguredSurface {
             surface: self,
+            device: device.clone(),
             width: config.width,
             height: config.height,
+            present_mode: config.present_mode,
+            desired_maximum_frame_latency: config.desired_maximum_frame_latency,
+            alpha_mode: config.alpha_mode,
             view_formats: config.view_formats.formats().collect(),
+            format: config.format,
             usage: config.usage,
-            _marker: Default::default(),
         }
     }
 }
 
 pub struct ConfiguredSurface<'a, F, U> {
+    device: Device,
     surface: Surface<'a>,
     width: u32,
     height: u32,
+    present_mode: PresentMode,
+    desired_maximum_frame_latency: u32,
+    alpha_mode: AlphaMode,
     view_formats: ArrayVec<TextureFormatId, 8>,
+    format: F,
     usage: U,
-    _marker: marker::PhantomData<(F, U)>,
 }
 
 impl<'a, F, U> ConfiguredSurface<'a, F, U>
@@ -351,9 +360,40 @@ where
     F: TextureFormat,
     U: texture::UsageFlags,
 {
+    pub fn resize(&mut self, width: u32, height: u32) {
+        let ConfiguredSurface {
+            device,
+            surface,
+            present_mode,
+            desired_maximum_frame_latency,
+            alpha_mode,
+            view_formats,
+            format,
+            usage,
+            ..
+        } = self;
+
+        let view_formats = view_formats.iter().map(texture_format_to_wgc).collect();
+
+        let err = gfx_select!(device.device_handle.id() => surface.global.surface_configure(surface.id, device.device_handle.id(), &wgt::SurfaceConfiguration {
+            usage: texture_usage_to_wgc(&U::FLAG_SET),
+            format: texture_format_to_wgc(&F::FORMAT_ID),
+            width,
+            height,
+            present_mode: present_mode_to_wgc(present_mode),
+            desired_maximum_frame_latency: *desired_maximum_frame_latency,
+            alpha_mode: alpha_mode_to_wgc(alpha_mode),
+            view_formats,
+        }));
+
+        if let Some(err) = err {
+            panic!("{}", err);
+        }
+    }
+
     pub fn get_current_texture(&self) -> Result<SurfaceTexture<F, U>, SurfaceError> {
         let surface = &self.surface;
-        let res = gfx_select!(surface.id => surface.global.surface_get_current_texture(self.surface.id, None));
+        let res = gfx_select!(self.device.device_handle.id() => surface.global.surface_get_current_texture(self.surface.id, None));
 
         match res {
             Ok(SurfaceOutput { status, texture_id }) => {
@@ -372,10 +412,10 @@ where
                 };
 
                 let texture = Texture2D::from_swap_chain_texture(
-                    driver::native::TextureHandle {
-                        global: self.surface.global.clone(),
-                        id: texture_id,
-                    },
+                    driver::native::TextureHandle::swap_chain(
+                        self.surface.global.clone(),
+                        texture_id,
+                    ),
                     self.width,
                     self.height,
                     self.view_formats.as_slice(),
@@ -419,7 +459,7 @@ impl<F, U> SurfaceTexture<F, U> {
 
     pub fn present(self) {
         let res =
-            gfx_select!(self.texture.handle.id => self.global.surface_present(self.surface_id));
+            gfx_select!(self.texture.handle.id() => self.global.surface_present(self.surface_id));
 
         if let Err(err) = res {
             panic!("{}", err);

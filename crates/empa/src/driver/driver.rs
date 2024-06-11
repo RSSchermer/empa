@@ -47,7 +47,7 @@ pub trait Adapter<D>: Clone + Sized
 where
     D: Driver,
 {
-    type RequestDevice: Future<Output = Result<D::DeviceHandle, Box<dyn Error>>>;
+    type RequestDevice: Future<Output = Result<(D::DeviceHandle, D::QueueHandle), Box<dyn Error>>>;
 
     fn supported_features(&self) -> FlagSet<Feature>;
 
@@ -121,8 +121,6 @@ where
         &self,
         descriptor: &RenderBundleEncoderDescriptor,
     ) -> D::RenderBundleEncoderHandle;
-
-    fn queue_handle(&self) -> D::QueueHandle;
 }
 
 flags! {

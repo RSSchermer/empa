@@ -1,7 +1,7 @@
 cargo-features = ["per-package-target"]
 
 [package]
-name = "triangle-example"
+name = "triangle-example-web"
 version = "0.1.0"
 authors = ["Roland Schermer <roland0507@gmail.com>"]
 edition = "2021"

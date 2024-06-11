@@ -223,7 +223,7 @@ impl CanvasContext {
         } = configuration;
 
         let mut config = GpuCanvasConfiguration::new(
-            &device.handle.inner,
+            &device.device_handle.inner,
             texture_format_to_web_sys(&F::FORMAT_ID),
         );
 

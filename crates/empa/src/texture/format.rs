@@ -162,7 +162,7 @@ impl TextureFormatId {
     }
 }
 
-mod texture_format_seal {
+pub(crate) mod texture_format_seal {
     pub trait Seal {}
 }
 
@@ -174,6 +174,7 @@ pub trait TextureFormat: texture_format_seal::Seal {
 
 macro_rules! typed_texture_format {
     ($format:ident, $block_width:literal, $block_height:literal) => {
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         pub struct $format;
 
         impl texture_format_seal::Seal for $format {}

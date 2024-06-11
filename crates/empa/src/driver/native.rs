@@ -4,7 +4,10 @@ use std::future::{ready, Future};
 use std::num::NonZeroU64;
 use std::ops::Range;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::ptr::NonNull;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
+use std::sync::{atomic, Arc};
 use std::task::{Context, Poll};
 use std::{future, mem, ptr, slice};
 
@@ -48,6 +51,61 @@ use crate::sampler::{AddressMode, FilterMode};
 use crate::texture::format::TextureFormatId;
 use crate::{driver, CompareFunction};
 
+// External reference counting based on the `Arc` implementation
+
+struct DropTracker {
+    inner: NonNull<DropTrackerInner>,
+}
+
+impl DropTracker {
+    fn new() -> Self {
+        let boxed = Box::new(DropTrackerInner {
+            count: AtomicUsize::new(1),
+        });
+
+        DropTracker {
+            inner: Box::leak(boxed).into(),
+        }
+    }
+
+    fn inner(&self) -> &DropTrackerInner {
+        unsafe { self.inner.as_ref() }
+    }
+
+    fn maybe_drop_with<F>(&self, f: F)
+    where
+        F: FnOnce(),
+    {
+        if self.inner().count.fetch_sub(1, Release) != 1 {
+            return;
+        }
+
+        atomic::fence(Acquire);
+
+        f();
+    }
+}
+
+impl Clone for DropTracker {
+    fn clone(&self) -> Self {
+        self.inner().count.fetch_add(1, Relaxed);
+
+        DropTracker { inner: self.inner }
+    }
+}
+
+impl Drop for DropTracker {
+    fn drop(&mut self) {
+        unsafe {
+            ptr::drop_in_place(self.inner.as_ptr());
+        }
+    }
+}
+
+struct DropTrackerInner {
+    count: AtomicUsize,
+}
+
 pub struct Driver;
 
 impl driver::Driver for Driver {
@@ -77,12 +135,31 @@ impl driver::Driver for Driver {
 
 #[derive(Clone)]
 pub struct AdapterHandle {
-    pub global: Arc<Global>,
-    pub id: AdapterId,
+    global: Arc<Global>,
+    id: AdapterId,
+    drop_tracker: DropTracker,
+}
+
+impl AdapterHandle {
+    pub fn new(global: Arc<Global>, id: AdapterId) -> Self {
+        AdapterHandle {
+            global,
+            id,
+            drop_tracker: DropTracker::new(),
+        }
+    }
+}
+
+impl Drop for AdapterHandle {
+    fn drop(&mut self) {
+        self.drop_tracker.maybe_drop_with(|| {
+            gfx_select!(self.id => self.global.adapter_drop(self.id));
+        });
+    }
 }
 
 impl Adapter<Driver> for AdapterHandle {
-    type RequestDevice = future::Ready<Result<DeviceHandle, Box<dyn Error>>>;
+    type RequestDevice = future::Ready<Result<(DeviceHandle, QueueHandle), Box<dyn Error>>>;
 
     fn supported_features(&self) -> FlagSet<Feature> {
         let features = gfx_select!(self.id => self.global.adapter_features(self.id));
@@ -124,17 +201,16 @@ impl Adapter<Driver> for AdapterHandle {
 
         let device_handle = DeviceHandle {
             global: self.global.clone(),
-            device_id,
-            queue_id,
+            id: device_id,
+            drop_tracker: DropTracker::new(),
+        };
+        let primary_queue_handle = QueueHandle {
+            global: self.global.clone(),
+            id: queue_id,
+            drop_tracker: DropTracker::new(),
         };
 
-        ready(Ok(device_handle))
-    }
-}
-
-impl Drop for AdapterHandle {
-    fn drop(&mut self) {
-        gfx_select!(self.id => self.global.adapter_drop(self.id));
+        ready(Ok((device_handle, primary_queue_handle)))
     }
 }
 
@@ -142,19 +218,28 @@ impl Drop for AdapterHandle {
 pub struct BindGroupHandle {
     global: Arc<Global>,
     id: BindGroupId,
+    drop_tracker: DropTracker,
 }
 
 impl Drop for BindGroupHandle {
     fn drop(&mut self) {
-        gfx_select!(self.id => self.global.bind_group_drop(self.id));
+        self.drop_tracker.maybe_drop_with(|| {
+            gfx_select!(self.id => self.global.bind_group_drop(self.id));
+        });
     }
 }
 
 #[derive(Clone)]
 pub struct DeviceHandle {
     global: Arc<Global>,
-    pub device_id: DeviceId,
-    queue_id: QueueId,
+    id: DeviceId,
+    drop_tracker: DropTracker,
+}
+
+impl DeviceHandle {
+    pub fn id(&self) -> DeviceId {
+        self.id
+    }
 }
 
 impl Device<Driver> for DeviceHandle {
@@ -169,8 +254,8 @@ impl Device<Driver> for DeviceHandle {
             mapped_at_creation: descriptor.mapped_at_creation,
         };
 
-        let (id, err) = gfx_select!(self.device_id => self.global.device_create_buffer(
-            self.device_id,
+        let (id, err) = gfx_select!(self.id => self.global.device_create_buffer(
+            self.id,
             &descriptor,
             None
         ));
@@ -182,6 +267,7 @@ impl Device<Driver> for DeviceHandle {
         BufferHandle {
             global: self.global.clone(),
             id,
+            drop_tracker: DropTracker::new(),
         }
     }
 
@@ -202,8 +288,8 @@ impl Device<Driver> for DeviceHandle {
             view_formats,
         };
 
-        let (id, err) = gfx_select!(self.device_id => self.global.device_create_texture(
-            self.device_id,
+        let (id, err) = gfx_select!(self.id => self.global.device_create_texture(
+            self.id,
             &descriptor,
             None
         ));
@@ -215,6 +301,7 @@ impl Device<Driver> for DeviceHandle {
         TextureHandle {
             global: self.global.clone(),
             id,
+            drop_tracker: Some(DropTracker::new()),
         }
     }
 
@@ -236,8 +323,8 @@ impl Device<Driver> for DeviceHandle {
             border_color: None,
         };
 
-        let (id, err) = gfx_select!(self.device_id => self.global.device_create_sampler(
-            self.device_id,
+        let (id, err) = gfx_select!(self.id => self.global.device_create_sampler(
+            self.id,
             &descriptor,
             None
         ));
@@ -249,6 +336,7 @@ impl Device<Driver> for DeviceHandle {
         SamplerHandle {
             global: self.global.clone(),
             id,
+            drop_tracker: DropTracker::new(),
         }
     }
 
@@ -270,7 +358,7 @@ impl Device<Driver> for DeviceHandle {
         };
 
         let (id, err) = gfx_select!(
-            self.device_id => self.global.device_create_bind_group_layout(self.device_id, &descriptor, None)
+            self.id => self.global.device_create_bind_group_layout(self.id, &descriptor, None)
         );
 
         if let Some(err) = err {
@@ -280,6 +368,7 @@ impl Device<Driver> for DeviceHandle {
         BindGroupLayoutHandle {
             global: self.global.clone(),
             id,
+            drop_tracker: DropTracker::new(),
         }
     }
 
@@ -303,8 +392,8 @@ impl Device<Driver> for DeviceHandle {
             push_constant_ranges: (&[]).into(),
         };
 
-        let (id, err) = gfx_select!(self.device_id => self.global.device_create_pipeline_layout(
-            self.device_id,
+        let (id, err) = gfx_select!(self.id => self.global.device_create_pipeline_layout(
+            self.id,
             &descriptor,
             None
         ));
@@ -316,6 +405,7 @@ impl Device<Driver> for DeviceHandle {
         PipelineLayoutHandle {
             global: self.global.clone(),
             id,
+            drop_tracker: DropTracker::new(),
         }
     }
 
@@ -338,8 +428,8 @@ impl Device<Driver> for DeviceHandle {
             entries: entries.into(),
         };
 
-        let (id, err) = gfx_select!(self.device_id => self.global.device_create_bind_group(
-            self.device_id,
+        let (id, err) = gfx_select!(self.id => self.global.device_create_bind_group(
+            self.id,
             &descriptor,
             None
         ));
@@ -351,6 +441,7 @@ impl Device<Driver> for DeviceHandle {
         BindGroupHandle {
             global: self.global.clone(),
             id,
+            drop_tracker: DropTracker::new(),
         }
     }
 
@@ -361,8 +452,8 @@ impl Device<Driver> for DeviceHandle {
             count: descriptor.len as u32,
         };
 
-        let (id, err) = gfx_select!(self.device_id => self.global.device_create_query_set(
-            self.device_id,
+        let (id, err) = gfx_select!(self.id => self.global.device_create_query_set(
+            self.id,
             &descriptor,
             None
         ));
@@ -374,6 +465,7 @@ impl Device<Driver> for DeviceHandle {
         QuerySetHandle {
             global: self.global.clone(),
             id,
+            drop_tracker: DropTracker::new(),
         }
     }
 
@@ -383,8 +475,8 @@ impl Device<Driver> for DeviceHandle {
             shader_bound_checks: wgt::ShaderBoundChecks::new(),
         };
 
-        let (id, err) = gfx_select!(self.device_id => self.global.device_create_shader_module(
-            self.device_id,
+        let (id, err) = gfx_select!(self.id => self.global.device_create_shader_module(
+            self.id,
             &descriptor,
             wgc::pipeline::ShaderModuleSource::Wgsl(source.into()),
             None
@@ -397,6 +489,7 @@ impl Device<Driver> for DeviceHandle {
         ShaderModuleHandle {
             global: self.global.clone(),
             id,
+            drop_tracker: DropTracker::new(),
         }
     }
 
@@ -415,8 +508,8 @@ impl Device<Driver> for DeviceHandle {
             },
         };
 
-        let (id, err) = gfx_select!(self.device_id => self.global.device_create_compute_pipeline(
-            self.device_id,
+        let (id, err) = gfx_select!(self.id => self.global.device_create_compute_pipeline(
+            self.id,
             &descriptor,
             None,
             None
@@ -429,6 +522,7 @@ impl Device<Driver> for DeviceHandle {
         ComputePipelineHandle {
             global: self.global.clone(),
             id,
+            drop_tracker: DropTracker::new(),
         }
     }
 
@@ -489,8 +583,8 @@ impl Device<Driver> for DeviceHandle {
             multiview: None,
         };
 
-        let (id, err) = gfx_select!(self.device_id => self.global.device_create_render_pipeline(
-            self.device_id,
+        let (id, err) = gfx_select!(self.id => self.global.device_create_render_pipeline(
+            self.id,
             &descriptor,
             None,
             None
@@ -503,6 +597,7 @@ impl Device<Driver> for DeviceHandle {
         RenderPipelineHandle {
             global: self.global.clone(),
             id,
+            drop_tracker: DropTracker::new(),
         }
     }
 
@@ -514,8 +609,8 @@ impl Device<Driver> for DeviceHandle {
     }
 
     fn create_command_encoder(&self) -> CommandEncoderHandle {
-        let (id, err) = gfx_select!(self.device_id => self.global.device_create_command_encoder(
-            self.device_id,
+        let (id, err) = gfx_select!(self.id => self.global.device_create_command_encoder(
+            self.id,
             &wgt::CommandEncoderDescriptor {
                 label: None,
             },
@@ -529,6 +624,7 @@ impl Device<Driver> for DeviceHandle {
         CommandEncoderHandle {
             global: self.global.clone(),
             id,
+            drop_tracker: DropTracker::new(),
         }
     }
 
@@ -557,31 +653,25 @@ impl Device<Driver> for DeviceHandle {
             multiview: None,
         };
 
-        let encoder =
-            match wgc::command::RenderBundleEncoder::new(&descriptor, self.device_id, None) {
-                Ok(encoder) => encoder,
-                Err(err) => panic!("{}", err),
-            };
+        let encoder = match wgc::command::RenderBundleEncoder::new(&descriptor, self.id, None) {
+            Ok(encoder) => encoder,
+            Err(err) => panic!("{}", err),
+        };
 
         RenderBundleEncoderHandle {
             global: self.global.clone(),
             bundle: encoder,
         }
     }
-
-    fn queue_handle(&self) -> QueueHandle {
-        QueueHandle {
-            global: self.global.clone(),
-            id: self.queue_id,
-        }
-    }
 }
 
 impl Drop for DeviceHandle {
     fn drop(&mut self) {
-        let _ = gfx_select!(self.device_id => self.global.device_poll(self.device_id, wgt::Maintain::wait()));
+        self.drop_tracker.maybe_drop_with(|| {
+            let _ = gfx_select!(self.id => self.global.device_poll(self.id, wgt::Maintain::wait()));
 
-        gfx_select!(self.device_id => self.global.device_drop(self.device_id));
+            gfx_select!(self.id => self.global.device_drop(self.id));
+        });
     }
 }
 
@@ -589,6 +679,7 @@ impl Drop for DeviceHandle {
 pub struct BufferHandle {
     global: Arc<Global>,
     id: BufferId,
+    drop_tracker: DropTracker,
 }
 
 impl Buffer<Driver> for BufferHandle {
@@ -675,7 +766,9 @@ impl Buffer<Driver> for BufferHandle {
 
 impl Drop for BufferHandle {
     fn drop(&mut self) {
-        gfx_select!(self.id => self.global.buffer_drop(self.id, false));
+        self.drop_tracker.maybe_drop_with(|| {
+            gfx_select!(self.id => self.global.buffer_drop(self.id, false));
+        });
     }
 }
 
@@ -759,8 +852,23 @@ impl Future for Map {
 
 #[derive(Clone)]
 pub struct TextureHandle {
-    pub global: Arc<Global>,
-    pub id: TextureId,
+    global: Arc<Global>,
+    id: TextureId,
+    drop_tracker: Option<DropTracker>,
+}
+
+impl TextureHandle {
+    pub fn swap_chain(global: Arc<Global>, id: TextureId) -> Self {
+        TextureHandle {
+            global,
+            id,
+            drop_tracker: None,
+        }
+    }
+
+    pub fn id(&self) -> TextureId {
+        self.id
+    }
 }
 
 impl Texture<Driver> for TextureHandle {
@@ -788,13 +896,18 @@ impl Texture<Driver> for TextureHandle {
         TextureView {
             global: self.global.clone(),
             id,
+            drop_tracker: DropTracker::new(),
         }
     }
 }
 
 impl Drop for TextureHandle {
     fn drop(&mut self) {
-        gfx_select!(self.id => self.global.texture_drop(self.id, false));
+        if let Some(drop_tracker) = self.drop_tracker.as_ref() {
+            drop_tracker.maybe_drop_with(|| {
+                gfx_select!(self.id => self.global.texture_drop(self.id, false));
+            });
+        }
     }
 }
 
@@ -802,11 +915,14 @@ impl Drop for TextureHandle {
 pub struct TextureView {
     global: Arc<Global>,
     id: TextureViewId,
+    drop_tracker: DropTracker,
 }
 
 impl Drop for TextureView {
     fn drop(&mut self) {
-        let _ = gfx_select!(self.id => self.global.texture_view_drop(self.id, false));
+        self.drop_tracker.maybe_drop_with(|| {
+            let _ = gfx_select!(self.id => self.global.texture_view_drop(self.id, false));
+        });
     }
 }
 
@@ -814,6 +930,7 @@ impl Drop for TextureView {
 pub struct CommandEncoderHandle {
     global: Arc<Global>,
     id: CommandEncoderId,
+    drop_tracker: DropTracker,
 }
 
 impl CommandEncoder<Driver> for CommandEncoderHandle {
@@ -969,7 +1086,7 @@ impl CommandEncoder<Driver> for CommandEncoderHandle {
         }
 
         CommandBufferHandle {
-            global: self.global.clone(),
+            _command_encoder_handle: self,
             id,
         }
     }
@@ -977,7 +1094,9 @@ impl CommandEncoder<Driver> for CommandEncoderHandle {
 
 impl Drop for CommandEncoderHandle {
     fn drop(&mut self) {
-        gfx_select!(self.id => self.global.command_encoder_drop(self.id));
+        self.drop_tracker.maybe_drop_with(|| {
+            gfx_select!(self.id => self.global.command_encoder_drop(self.id));
+        });
     }
 }
 
@@ -1300,31 +1419,33 @@ impl RenderBundleEncoder<Driver> for RenderBundleEncoderHandle {
         RenderBundleHandle {
             global: self.global.clone(),
             id,
+            drop_tracker: DropTracker::new(),
         }
     }
 }
 
 #[derive(Clone)]
 pub struct CommandBufferHandle {
-    global: Arc<Global>,
     id: CommandBufferId,
-}
-
-impl Drop for CommandBufferHandle {
-    fn drop(&mut self) {
-        gfx_select!(self.id => self.global.command_buffer_drop(self.id));
-    }
+    // It seems that though wgpu_core has a CommandBuffer concept and an associated "drop"
+    // operation, this drop operation forwards to dropping the CommandEncoder that encoded the
+    // CommandBuffer. To drop this CommandBufferHandle it is therefor sufficient to simply drop
+    // it's associated CommandEncoderHandle
+    _command_encoder_handle: CommandEncoderHandle,
 }
 
 #[derive(Clone)]
 pub struct RenderBundleHandle {
     global: Arc<Global>,
     id: RenderBundleId,
+    drop_tracker: DropTracker,
 }
 
 impl Drop for RenderBundleHandle {
     fn drop(&mut self) {
-        gfx_select!(self.id => self.global.render_bundle_drop(self.id));
+        self.drop_tracker.maybe_drop_with(|| {
+            gfx_select!(self.id => self.global.render_bundle_drop(self.id));
+        });
     }
 }
 
@@ -1332,6 +1453,7 @@ impl Drop for RenderBundleHandle {
 pub struct QueueHandle {
     global: Arc<Global>,
     id: QueueId,
+    drop_tracker: DropTracker,
 }
 
 impl Queue<Driver> for QueueHandle {
@@ -1376,7 +1498,9 @@ impl Queue<Driver> for QueueHandle {
 
 impl Drop for QueueHandle {
     fn drop(&mut self) {
-        gfx_select!(self.id => self.global.queue_drop(self.id));
+        self.drop_tracker.maybe_drop_with(|| {
+            gfx_select!(self.id => self.global.queue_drop(self.id));
+        });
     }
 }
 
@@ -1384,11 +1508,14 @@ impl Drop for QueueHandle {
 pub struct SamplerHandle {
     global: Arc<Global>,
     id: SamplerId,
+    drop_tracker: DropTracker,
 }
 
 impl Drop for SamplerHandle {
     fn drop(&mut self) {
-        gfx_select!(self.id => self.global.sampler_drop(self.id));
+        self.drop_tracker.maybe_drop_with(|| {
+            gfx_select!(self.id => self.global.sampler_drop(self.id));
+        });
     }
 }
 
@@ -1396,11 +1523,14 @@ impl Drop for SamplerHandle {
 pub struct BindGroupLayoutHandle {
     global: Arc<Global>,
     id: BindGroupLayoutId,
+    drop_tracker: DropTracker,
 }
 
 impl Drop for BindGroupLayoutHandle {
     fn drop(&mut self) {
-        gfx_select!(self.id => self.global.bind_group_layout_drop(self.id));
+        self.drop_tracker.maybe_drop_with(|| {
+            gfx_select!(self.id => self.global.bind_group_layout_drop(self.id));
+        });
     }
 }
 
@@ -1408,11 +1538,14 @@ impl Drop for BindGroupLayoutHandle {
 pub struct PipelineLayoutHandle {
     global: Arc<Global>,
     id: PipelineLayoutId,
+    drop_tracker: DropTracker,
 }
 
 impl Drop for PipelineLayoutHandle {
     fn drop(&mut self) {
-        gfx_select!(self.id => self.global.pipeline_layout_drop(self.id));
+        self.drop_tracker.maybe_drop_with(|| {
+            gfx_select!(self.id => self.global.pipeline_layout_drop(self.id));
+        });
     }
 }
 
@@ -1420,11 +1553,14 @@ impl Drop for PipelineLayoutHandle {
 pub struct ComputePipelineHandle {
     global: Arc<Global>,
     id: ComputePipelineId,
+    drop_tracker: DropTracker,
 }
 
 impl Drop for ComputePipelineHandle {
     fn drop(&mut self) {
-        gfx_select!(self.id => self.global.compute_pipeline_drop(self.id));
+        self.drop_tracker.maybe_drop_with(|| {
+            gfx_select!(self.id => self.global.compute_pipeline_drop(self.id));
+        });
     }
 }
 
@@ -1432,11 +1568,14 @@ impl Drop for ComputePipelineHandle {
 pub struct RenderPipelineHandle {
     global: Arc<Global>,
     id: RenderPipelineId,
+    drop_tracker: DropTracker,
 }
 
 impl Drop for RenderPipelineHandle {
     fn drop(&mut self) {
-        gfx_select!(self.id => self.global.render_pipeline_drop(self.id));
+        self.drop_tracker.maybe_drop_with(|| {
+            gfx_select!(self.id => self.global.render_pipeline_drop(self.id));
+        });
     }
 }
 
@@ -1444,11 +1583,14 @@ impl Drop for RenderPipelineHandle {
 pub struct QuerySetHandle {
     global: Arc<Global>,
     id: QuerySetId,
+    drop_tracker: DropTracker,
 }
 
 impl Drop for QuerySetHandle {
     fn drop(&mut self) {
-        gfx_select!(self.id => self.global.query_set_drop(self.id));
+        self.drop_tracker.maybe_drop_with(|| {
+            gfx_select!(self.id => self.global.query_set_drop(self.id));
+        });
     }
 }
 
@@ -1456,11 +1598,14 @@ impl Drop for QuerySetHandle {
 pub struct ShaderModuleHandle {
     global: Arc<Global>,
     id: ShaderModuleId,
+    drop_tracker: DropTracker,
 }
 
 impl Drop for ShaderModuleHandle {
     fn drop(&mut self) {
-        gfx_select!(self.id => self.global.shader_module_drop(self.id));
+        self.drop_tracker.maybe_drop_with(|| {
+            gfx_select!(self.id => self.global.shader_module_drop(self.id));
+        });
     }
 }
 

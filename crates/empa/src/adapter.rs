@@ -136,7 +136,10 @@ impl Adapter {
     {
         self.handle
             .request_device(descriptor)
-            .map_ok(|handle| Device { handle })
+            .map_ok(|(device_handle, primary_queue_handle)| Device {
+                device_handle,
+                primary_queue_handle,
+            })
             .map_err(|inner| RequestDeviceError { inner })
     }
 }

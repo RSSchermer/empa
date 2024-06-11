@@ -364,7 +364,9 @@ pub struct ShaderModule {
 
 impl ShaderModule {
     pub(crate) fn new(device: &Device, source: &ShaderSource) -> Self {
-        let handle = device.handle.create_shader_module(source.inner.source());
+        let handle = device
+            .device_handle
+            .create_shader_module(source.inner.source());
 
         ShaderModule {
             handle,

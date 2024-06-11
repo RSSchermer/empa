@@ -39,7 +39,7 @@ pub struct CommandEncoder {
 impl CommandEncoder {
     pub(crate) fn new(device: &Device) -> Self {
         CommandEncoder {
-            handle: device.handle.create_command_encoder(),
+            handle: device.device_handle.create_command_encoder(),
         }
     }
 
@@ -1559,7 +1559,7 @@ pub struct RenderBundleEncoder<Target, Pipeline, Vertex, Index, Resources> {
 impl<T, P, V, I, R> RenderBundleEncoder<T, P, V, I, R> {
     pub fn new(device: &Device, descriptor: &RenderBundleEncoderDescriptor<T>) -> Self {
         let handle = device
-            .handle
+            .device_handle
             .create_render_bundle_encoder(&descriptor.to_driver());
 
         RenderBundleEncoder {

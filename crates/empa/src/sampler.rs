@@ -23,7 +23,7 @@ pub struct Sampler {
 
 impl Sampler {
     pub(crate) fn new(device: &Device, descriptor: &SamplerDescriptor) -> Self {
-        let handle = device.handle.create_sampler(&descriptor.to_driver());
+        let handle = device.device_handle.create_sampler(&descriptor.to_driver());
 
         Sampler { handle }
     }
@@ -33,7 +33,7 @@ impl Sampler {
             panic!("`max_anisotropy` must be set to a value greater than `1`")
         }
 
-        let handle = device.handle.create_sampler(&descriptor.to_driver());
+        let handle = device.device_handle.create_sampler(&descriptor.to_driver());
 
         Sampler { handle }
     }
@@ -140,7 +140,7 @@ pub struct ComparisonSampler {
 
 impl ComparisonSampler {
     pub(crate) fn new(device: &Device, descriptor: &ComparisonSamplerDescriptor) -> Self {
-        let handle = device.handle.create_sampler(&descriptor.to_driver());
+        let handle = device.device_handle.create_sampler(&descriptor.to_driver());
 
         ComparisonSampler { handle }
     }
@@ -209,7 +209,7 @@ pub struct NonFilteringSampler {
 
 impl NonFilteringSampler {
     pub(crate) fn new(device: &Device, descriptor: &NonFilteringSamplerDescriptor) -> Self {
-        let handle = device.handle.create_sampler(&descriptor.to_driver());
+        let handle = device.device_handle.create_sampler(&descriptor.to_driver());
 
         NonFilteringSampler { handle }
     }

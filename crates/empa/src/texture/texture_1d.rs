@@ -61,7 +61,7 @@ where
 
         let view_formats = view_formats.formats().collect::<ArrayVec<_, 8>>();
 
-        let handle = device.handle.create_texture(&TextureDescriptor {
+        let handle = device.device_handle.create_texture(&TextureDescriptor {
             size: (*size, 0, 0),
             mipmap_levels: 1,
             sample_count: 1,

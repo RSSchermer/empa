@@ -57,7 +57,8 @@ impl Default for DeviceDescriptor<Feature> {
 
 #[derive(Clone)]
 pub struct Device {
-    pub(crate) handle: <Dvr as Driver>::DeviceHandle,
+    pub(crate) device_handle: <Dvr as Driver>::DeviceHandle,
+    pub(crate) primary_queue_handle: <Dvr as Driver>::QueueHandle,
 }
 
 impl Device {
@@ -304,7 +305,7 @@ impl Device {
 
     pub fn queue(&self) -> Queue {
         Queue {
-            handle: self.handle.queue_handle(),
+            handle: self.primary_queue_handle.clone(),
         }
     }
 }

@@ -38,7 +38,7 @@ impl<T> BindGroupLayout<T> {
             });
 
         let handle = device
-            .handle
+            .device_handle
             .create_bind_group_layout(driver::BindGroupLayoutDescriptor { entries });
 
         BindGroupLayout {

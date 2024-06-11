@@ -126,13 +126,20 @@ pub struct RequestDevice {
 }
 
 impl Future for RequestDevice {
-    type Output = Result<DeviceHandle, Box<dyn Error>>;
+    type Output = Result<(DeviceHandle, QueueHandle), Box<dyn Error>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         Pin::new(&mut self.get_mut().inner)
             .poll(cx)
-            .map_ok(|device| DeviceHandle {
-                inner: device.unchecked_into(),
+            .map_ok(|device| {
+                let device_handle = DeviceHandle {
+                    inner: device.unchecked_into(),
+                };
+                let primary_queue_handle = QueueHandle {
+                    inner: device_handle.inner.queue(),
+                };
+
+                (device_handle, primary_queue_handle)
             })
             .map_err(|err| {
                 RequestDeviceError {
@@ -437,12 +444,6 @@ impl Device<Driver> for DeviceHandle {
         let inner = self.inner.create_render_bundle_encoder(&desc);
 
         RenderBundleEncoderHandle { inner }
-    }
-
-    fn queue_handle(&self) -> QueueHandle {
-        let inner = self.inner.queue();
-
-        QueueHandle { inner }
     }
 }
 

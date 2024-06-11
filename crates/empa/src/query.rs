@@ -10,7 +10,7 @@ impl OcclusionQuerySet {
     pub(crate) fn new(device: &Device, len: usize) -> Self {
         assert!(len < 8192, "query set len must be less than `8192`");
 
-        let handle = device.handle.create_query_set(&QuerySetDescriptor {
+        let handle = device.device_handle.create_query_set(&QuerySetDescriptor {
             query_type: QueryType::Occlusion,
             len,
         });
@@ -32,7 +32,7 @@ impl TimestampQuerySet {
     pub(crate) fn new(device: &Device, len: usize) -> Self {
         assert!(len < 8192, "query set len must be less than `8192`");
 
-        let handle = device.handle.create_query_set(&QuerySetDescriptor {
+        let handle = device.device_handle.create_query_set(&QuerySetDescriptor {
             query_type: QueryType::Timestamp,
             len,
         });

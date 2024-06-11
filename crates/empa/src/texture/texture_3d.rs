@@ -97,7 +97,7 @@ where
         let mipmap_levels = mipmap_levels.to_u32(max(max(*width, *height), *depth));
         let view_formats = view_formats.formats().collect::<ArrayVec<_, 8>>();
 
-        let handle = device.handle.create_texture(&TextureDescriptor {
+        let handle = device.device_handle.create_texture(&TextureDescriptor {
             size: (*width, *height, *depth),
             mipmap_levels,
             sample_count: 1,

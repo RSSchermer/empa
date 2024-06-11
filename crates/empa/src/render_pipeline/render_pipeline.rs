@@ -28,7 +28,7 @@ impl<O, V, I, R> RenderPipeline<O, V, I, R> {
     ) -> Self {
         let id = ID_GEN.get();
         let handle = device
-            .handle
+            .device_handle
             .create_render_pipeline(&descriptor.to_driver());
 
         RenderPipeline {
@@ -43,7 +43,7 @@ impl<O, V, I, R> RenderPipeline<O, V, I, R> {
         descriptor: &RenderPipelineDescriptor<O, V, I, R>,
     ) -> impl Future<Output = Self> {
         device
-            .handle
+            .device_handle
             .create_render_pipeline_async(&descriptor.to_driver())
             .map(|handle| {
                 let id = ID_GEN.get();

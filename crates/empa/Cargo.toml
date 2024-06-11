@@ -8,9 +8,11 @@ homepage = "https://github.com/RSSchermer/empa"
 repository = "https://github.com/RSSchermer/empa"
 license = "MIT"
 
+[lib]
+
 [dependencies]
 arrayvec = { workspace = true }
-arwa = { workspace = true }
+arwa = { workspace = true, optional = true }
 atomic-counter = { workspace = true }
 bytemuck = { workspace = true, optional = true }
 empa-macros = { workspace = true }
@@ -141,4 +143,8 @@ features = [
 ]
 
 [features]
-arwa = []
+arwa = ["dep:arwa"]
+dx12 = ["wgc/dx12"]
+metal = ["wgc/metal"]
+
+default = ["dx12", "metal"]

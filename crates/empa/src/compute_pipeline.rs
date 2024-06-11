@@ -29,7 +29,7 @@ impl<L> ComputePipeline<L> {
         };
 
         let id = ID_GEN.get();
-        let handle = device.handle.create_compute_pipeline(&desc);
+        let handle = device.device_handle.create_compute_pipeline(&desc);
 
         ComputePipeline {
             handle,
@@ -50,7 +50,7 @@ impl<L> ComputePipeline<L> {
         };
 
         device
-            .handle
+            .device_handle
             .create_compute_pipeline_async(&desc)
             .map(|handle| {
                 let id = ID_GEN.get();
