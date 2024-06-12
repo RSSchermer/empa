@@ -1,0 +1,16 @@
+[package]
+name = "cube-3d-example-native"
+version = "0.1.0"
+authors = ["Roland Schermer <roland0507@gmail.com>"]
+edition = "2021"
+license = "MIT"
+publish = false
+
+[dependencies]
+empa = { version = "0.1.0", path = "../../../crates/empa" }
+empa-glam = { version = "0.1.0", path = "../../../crates/empa_glam" }
+futures = "0.3.21"
+glam = "^0.24"
+pollster = "0.3.0"
+winit = "0.30.0"
+getrandom = { version = "0.2.15", features = ["js"] }

@@ -396,6 +396,9 @@ where
         if let Some(err) = err {
             panic!("{}", err);
         }
+
+        self.width = width;
+        self.height = height;
     }
 
     pub fn get_current_texture(&self) -> Result<SurfaceTexture<F, U>, SurfaceError> {

@@ -1427,12 +1427,14 @@ pub struct RenderBundleEncoderHandle {
 
 impl ProgrammablePassEncoder<Driver> for RenderBundleEncoderHandle {
     fn set_bind_group(&mut self, index: u32, handle: &BindGroupHandle) {
+        let offsets: &[wgt::DynamicOffset] = &[];
+
         unsafe {
             bundle_ffi::wgpu_render_bundle_set_bind_group(
                 &mut self.bundle,
                 index,
                 handle.id,
-                ptr::null(),
+                offsets.as_ptr(),
                 0,
             );
         }
