@@ -11,9 +11,7 @@ use crate::command::{
     CommandBuffer, CommandEncoder, RenderBundleEncoder, RenderBundleEncoderDescriptor,
 };
 use crate::compute_pipeline::{ComputePipeline, ComputePipelineDescriptor};
-use crate::driver::{
-    Device as _, Driver, Dvr, Queue as _, WriteBufferOperation, WriteTextureOperation,
-};
+use crate::driver::{Driver, Dvr, Queue as _, WriteBufferOperation, WriteTextureOperation};
 use crate::query::{OcclusionQuerySet, TimestampQuerySet};
 use crate::render_pipeline::{RenderPipeline, RenderPipelineDescriptor};
 use crate::resource_binding::{

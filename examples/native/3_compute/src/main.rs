@@ -1,47 +1,40 @@
 use std::error::Error;
 use std::mem;
 
-use arwa::console;
-use arwa::window::window;
 use empa::access_mode::ReadWrite;
-use empa::arwa::{NavigatorExt, RequestAdapterOptions};
 use empa::buffer;
 use empa::buffer::{Buffer, Storage};
 use empa::command::{DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{ComputePipelineDescriptorBuilder, ComputeStageBuilder};
 use empa::device::DeviceDescriptor;
-use empa::resource_binding::Resources;
+use empa::native::Instance;
 use empa::shader_module::{shader_source, ShaderSource};
 use futures::FutureExt;
 
 #[derive(empa::resource_binding::Resources)]
-struct MyResources<'a> {
+struct Resources<'a> {
     #[resource(binding = 0, visibility = "COMPUTE")]
     data: Storage<'a, [u32], ReadWrite>,
 }
+
+type ResourceLayout = <Resources<'static> as empa::resource_binding::Resources>::Layout;
 
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 const WORKGROUP_SIZE: u32 = 64;
 
 fn main() {
-    arwa::spawn_local(render().map(|res| res.unwrap()));
+    pollster::block_on(run().map(|res| res.unwrap()));
 }
 
-async fn render() -> Result<(), Box<dyn Error>> {
-    let window = window();
-    let empa = window.navigator().empa();
+async fn run() -> Result<(), Box<dyn Error>> {
+    let instance = Instance::default();
 
-    let adapter = empa
-        .request_adapter(&RequestAdapterOptions::default())
-        .await
-        .ok_or("adapter not found")?;
+    let adapter = instance.get_adapter(Default::default())?;
     let device = adapter.request_device(&DeviceDescriptor::default()).await?;
 
     let shader = device.create_shader_module(&SHADER);
 
-    type BindGroupLayout<'a> = <MyResources<'a> as Resources>::Layout;
-
-    let bind_group_layout = device.create_bind_group_layout::<BindGroupLayout>();
+    let bind_group_layout = device.create_bind_group_layout::<ResourceLayout>();
     let pipeline_layout = device.create_pipeline_layout(&bind_group_layout);
 
     let pipeline = device
@@ -62,7 +55,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
 
     let bind_group = device.create_bind_group(
         &bind_group_layout,
-        MyResources {
+        Resources {
             data: data_buffer.storage(),
         },
     );
@@ -89,24 +82,21 @@ async fn render() -> Result<(), Box<dyn Error>> {
 
     let mapped = readback_buffer.mapped();
 
-    console::log!("Asserting that the results are correct...");
+    println!("Asserting that the results are correct...");
 
     for i in 0..mapped.len() {
         assert_eq!(mapped[i], (i * i) as u32);
     }
 
-    console::log!("...successfully!");
+    println!("...successfully!");
 
-    console::log!(
-        "First 10 numbers squared on the GPU:",
-        format!("{:#?}", &mapped[..10])
-    );
-    console::log!(
-        "Last 10 numbers squared on the GPU:",
-        format!("{:#?}", &mapped[mapped.len() - 10..])
+    println!("First 10 numbers squared on the GPU: {:#?}", &mapped[..10]);
+    println!(
+        "Last 10 numbers squared on the GPU: {:#?}",
+        &mapped[mapped.len() - 10..]
     );
 
-    // Make sure we drop the mapped data before unmapping, otherwise unmapping will panic.
+    // Make sure we the mapped data is dropped before unmapping, otherwise unmapping will panic.
     mem::drop(mapped);
 
     readback_buffer.unmap();

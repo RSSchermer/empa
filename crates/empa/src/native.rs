@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::{error, fmt, marker};
+use std::{error, fmt};
 
 use arrayvec::ArrayVec;
 use flagset::{flags, FlagSet};
@@ -11,15 +11,14 @@ use raw_window_handle::{
 };
 use wgc::gfx_select;
 use wgc::global::Global;
-use wgc::id::{DeviceId, SurfaceId};
+use wgc::id::SurfaceId;
 use wgc::present::SurfaceOutput;
 use wgt::SurfaceStatus;
 
 use crate::adapter::Adapter;
 use crate::device::Device;
 use crate::driver::native::{texture_format_to_wgc, texture_usage_to_wgc};
-use crate::driver::{Driver, Dvr};
-use crate::texture::format::{texture_format_seal, TextureFormat, TextureFormatId, ViewFormats};
+use crate::texture::format::{TextureFormat, TextureFormatId, ViewFormats};
 use crate::texture::Texture2D;
 use crate::{driver, texture};
 
@@ -85,6 +84,16 @@ pub struct AdapterOptions<'a, 'b> {
     pub power_preference: PowerPreference,
     pub force_fallback_adapter: bool,
     pub compatible_surface: Option<&'a Surface<'b>>,
+}
+
+impl Default for AdapterOptions<'_, '_> {
+    fn default() -> Self {
+        AdapterOptions {
+            power_preference: Default::default(),
+            force_fallback_adapter: false,
+            compatible_surface: None,
+        }
+    }
 }
 
 pub struct Instance {
@@ -336,7 +345,7 @@ impl<'a> Surface<'a> {
             desired_maximum_frame_latency: config.desired_maximum_frame_latency,
             alpha_mode: config.alpha_mode,
             view_formats: config.view_formats.formats().collect(),
-            format: config.format,
+            _format: config.format,
             usage: config.usage,
         }
     }
@@ -351,7 +360,7 @@ pub struct ConfiguredSurface<'a, F, U> {
     desired_maximum_frame_latency: u32,
     alpha_mode: AlphaMode,
     view_formats: ArrayVec<TextureFormatId, 8>,
-    format: F,
+    _format: F,
     usage: U,
 }
 
@@ -368,8 +377,6 @@ where
             desired_maximum_frame_latency,
             alpha_mode,
             view_formats,
-            format,
-            usage,
             ..
         } = self;
 

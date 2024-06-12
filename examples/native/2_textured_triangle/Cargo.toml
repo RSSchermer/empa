@@ -1,0 +1,16 @@
+[package]
+name = "textured-triangle-example-native"
+version = "0.1.0"
+authors = ["Roland Schermer <roland0507@gmail.com>"]
+edition = "2021"
+license = "MIT"
+publish = false
+
+[dependencies]
+bytemuck = "1.14"
+empa = { version = "0.1.0", path = "../../../crates/empa" }
+futures = "0.3"
+png = "0.17"
+pollster = "0.3"
+winit = "0.30"
+getrandom = { version = "0.2.15", features = ["js"] }

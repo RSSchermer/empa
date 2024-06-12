@@ -5,11 +5,12 @@ use std::num::NonZeroU64;
 use std::ops::Range;
 use std::pin::Pin;
 use std::ptr::NonNull;
-use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{atomic, Arc};
 use std::task::{Context, Poll};
-use std::{future, mem, ptr, slice};
+use std::thread::JoinHandle;
+use std::{future, mem, ptr, slice, thread};
 
 use arrayvec::ArrayVec;
 use flagset::FlagSet;
@@ -21,6 +22,7 @@ use wgc::id::{
     ComputePipelineId, DeviceId, PipelineLayoutId, QuerySetId, QueueId, RenderBundleId,
     RenderPipelineId, SamplerId, ShaderModuleId, TextureId, TextureViewId,
 };
+use wgt::Maintain;
 
 use crate::adapter::{Feature, Limits};
 use crate::buffer::MapError;
@@ -104,6 +106,76 @@ impl Drop for DropTracker {
 
 struct DropTrackerInner {
     count: AtomicUsize,
+}
+
+struct PollToken {
+    wait_count: Arc<AtomicUsize>,
+}
+
+impl Drop for PollToken {
+    fn drop(&mut self) {
+        self.wait_count.fetch_sub(1, Release);
+    }
+}
+
+struct PollRunner {
+    done: Arc<AtomicBool>,
+    wait_count: Arc<AtomicUsize>,
+    thread_handle: Option<JoinHandle<()>>,
+}
+
+impl PollRunner {
+    fn new(global: Arc<Global>, device_id: DeviceId) -> Self {
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let wait_count = Arc::new(AtomicUsize::new(0));
+        let wait_count_clone = wait_count.clone();
+
+        let thread_handle = thread::spawn(move || {
+            while !done_clone.load(Acquire) {
+                while wait_count_clone.load(Acquire) > 0 {
+                    gfx_select!(device_id =>
+                    global.device_poll(device_id, Maintain::Wait))
+                    .expect("device timed out");
+                }
+
+                thread::park();
+            }
+        });
+
+        PollRunner {
+            done,
+            wait_count,
+            thread_handle: Some(thread_handle),
+        }
+    }
+
+    fn wait(&self) -> PollToken {
+        let wait_count = self.wait_count.clone();
+
+        wait_count.fetch_add(1, Release);
+
+        self.thread_handle
+            .as_ref()
+            .expect("cannot call wait on a dropped PollRunner")
+            .thread()
+            .unpark();
+
+        PollToken { wait_count }
+    }
+}
+
+impl Drop for PollRunner {
+    fn drop(&mut self) {
+        if let Some(thread_handle) = self.thread_handle.take() {
+            self.done.store(true, Release);
+
+            thread_handle.thread().unpark();
+            thread_handle
+                .join()
+                .expect("failed to join poll-runner thread");
+        }
+    }
 }
 
 pub struct Driver;
@@ -203,6 +275,7 @@ impl Adapter<Driver> for AdapterHandle {
             global: self.global.clone(),
             id: device_id,
             drop_tracker: DropTracker::new(),
+            poll_runner: Arc::new(PollRunner::new(self.global.clone(), device_id)),
         };
         let primary_queue_handle = QueueHandle {
             global: self.global.clone(),
@@ -234,6 +307,7 @@ pub struct DeviceHandle {
     global: Arc<Global>,
     id: DeviceId,
     drop_tracker: DropTracker,
+    poll_runner: Arc<PollRunner>,
 }
 
 impl DeviceHandle {
@@ -268,6 +342,7 @@ impl Device<Driver> for DeviceHandle {
             global: self.global.clone(),
             id,
             drop_tracker: DropTracker::new(),
+            poll_runner: self.poll_runner.clone(),
         }
     }
 
@@ -680,6 +755,7 @@ pub struct BufferHandle {
     global: Arc<Global>,
     id: BufferId,
     drop_tracker: DropTracker,
+    poll_runner: Arc<PollRunner>,
 }
 
 impl Buffer<Driver> for BufferHandle {
@@ -690,10 +766,11 @@ impl Buffer<Driver> for BufferHandle {
     fn map(&self, mode: MapMode, range: Range<usize>) -> Map {
         Map {
             global: self.global.clone(),
+            poll_runner: self.poll_runner.clone(),
             buffer_id: self.id,
             host: map_mode_to_wgc(&mode),
             range: Some(range),
-            status: None,
+            state: MapState::new(),
         }
     }
 
@@ -772,20 +849,35 @@ impl Drop for BufferHandle {
     }
 }
 
+struct MapState {
+    status: Option<wgc::resource::BufferAccessResult>,
+    poll_token: Option<PollToken>,
+}
+
+impl MapState {
+    fn new() -> Self {
+        MapState {
+            status: None,
+            poll_token: None,
+        }
+    }
+}
+
 /// Helper type to facilitate sending a pointer across threads.
-struct StatusPtr(*mut Option<wgc::resource::BufferAccessResult>);
+struct MapStatePtr(*mut MapState);
 
 // SAFETY: private type only used in the `Future` implementation for `Map` (see below).
-unsafe impl Sync for StatusPtr {}
-unsafe impl Send for StatusPtr {}
+unsafe impl Sync for MapStatePtr {}
+unsafe impl Send for MapStatePtr {}
 
 #[must_use = "futures do nothing if they are not polled"]
 pub struct Map {
     global: Arc<Global>,
+    poll_runner: Arc<PollRunner>,
     buffer_id: BufferId,
     host: wgc::device::HostMap,
     range: Option<Range<usize>>,
-    status: Option<wgc::resource::BufferAccessResult>,
+    state: MapState,
 }
 
 impl Future for Map {
@@ -799,21 +891,25 @@ impl Future for Map {
 
             let offset = range.start as u64;
             let size = range.len() as u64;
-            let status_ptr = StatusPtr(&mut this.status as *mut _);
+            let state_ptr = MapStatePtr(&mut this.state as *mut _);
 
             let mut waker = Some(cx.waker().clone());
 
             let callback = wgc::resource::BufferMapCallback::from_rust(Box::new(move |status| {
-                if let Some(waker) = waker.take() {
-                    // Move the entire wrapper into into the closure, otherwise a partial move happens of only the
-                    // pointer (and the compiler will complain about the pointer not being `Send` and `Sync`).
-                    let status_ptr = status_ptr;
+                // Move the entire wrapper into into the closure, otherwise a partial move happens of only the
+                // pointer (and the compiler will complain about the pointer not being `Send` and `Sync`).
+                let state_ptr = state_ptr;
 
-                    unsafe {
-                        // SAFETY: safe because `self` is pinned so the pointer will be valid, and the callback only
-                        // runs once, so we will not alias the address.
-                        *status_ptr.0 = Some(status);
-                    }
+                // SAFETY: safe because `self` is pinned so the pointer will be valid, and the callback only
+                // runs once, so we will not alias the address.
+                let state = unsafe { &mut *state_ptr.0 };
+
+                if let Some(token) = state.poll_token.take() {
+                    mem::drop(token);
+                }
+
+                if let Some(waker) = waker.take() {
+                    state.status = Some(status);
 
                     waker.wake();
                 }
@@ -835,10 +931,18 @@ impl Future for Map {
                 return Poll::Ready(Err(MapError));
             }
 
+            this.state.poll_token = Some(this.poll_runner.wait());
+
             return Poll::Pending;
         }
 
-        if let Some(status) = this.status.as_ref() {
+        if let Some(status) = this.state.status.as_ref() {
+            // It's unclear if this case can ever happen as the callback should have already dropped
+            // the token, but just in case: make sure the PollRunner will not run indefinitely.
+            if let Some(token) = this.state.poll_token.take() {
+                mem::drop(token);
+            }
+
             if status.is_err() {
                 Poll::Ready(Err(MapError))
             } else {
