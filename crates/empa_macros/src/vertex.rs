@@ -87,12 +87,9 @@ pub fn expand_derive_vertex(input: &DeriveInput) -> Result<TokenStream, String> 
             }
         };
 
-        let suffix = struct_name.to_string().trim_start_matches("r#").to_owned();
-        let dummy_const = Ident::new(&format!("_IMPL_VERTEX_FOR_{}", suffix), Span::call_site());
-
         let generated = quote! {
             #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
-            const #dummy_const: () = {
+            const _: () = {
                 #[allow(unknown_lints)]
                 #[cfg_attr(feature = "cargo-clippy", allow(useless_attribute))]
                 use #mod_path::vertex_attribute::*;

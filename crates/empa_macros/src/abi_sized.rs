@@ -1,7 +1,7 @@
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::spanned::Spanned;
-use syn::{Data, DeriveInput, Ident};
+use syn::{Data, DeriveInput};
 
 pub fn expand_derive_sized(input: &DeriveInput) -> Result<TokenStream, String> {
     if let Data::Struct(data) = &input.data {
@@ -45,12 +45,6 @@ pub fn expand_derive_sized(input: &DeriveInput) -> Result<TokenStream, String> {
             }
         });
 
-        let suffix = struct_name.to_string().trim_start_matches("r#").to_owned();
-        let dummy_const = Ident::new(
-            &format!("_IMPL_SIZED_BLOCK_FOR_{}", suffix),
-            Span::call_site(),
-        );
-
         let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
         let impl_block = quote! {
@@ -76,7 +70,7 @@ pub fn expand_derive_sized(input: &DeriveInput) -> Result<TokenStream, String> {
 
         let generated = quote! {
             #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
-            const #dummy_const: () = {
+            const _: () = {
                 #[allow(unknown_lints)]
                 #[cfg_attr(feature = "cargo-clippy", allow(useless_attribute))]
                 #[allow(rust_2018_idioms)]

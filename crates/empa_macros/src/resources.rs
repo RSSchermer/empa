@@ -113,15 +113,9 @@ pub fn expand_derive_resources(input: &DeriveInput) -> Result<TokenStream, Strin
             }
         };
 
-        let suffix = struct_name.to_string().trim_start_matches("r#").to_owned();
-        let dummy_const = Ident::new(
-            &format!("_IMPL_RESOURCES_FOR_{}", suffix),
-            Span::call_site(),
-        );
-
         let generated = quote! {
             #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
-            const #dummy_const: () = {
+            const _: () = {
                 #[allow(unknown_lints)]
                 #[cfg_attr(feature = "cargo-clippy", allow(useless_attribute))]
                 #[allow(rust_2018_idioms)]
