@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fs::File;
 
-use empa::buffer::Buffer;
+use empa::buffer::{Buffer, BufferUsages};
 use empa::command::{
     Draw, DrawCommandEncoder, RenderPassDescriptor, RenderStateEncoder,
     ResourceBindingCommandEncoder,
@@ -21,6 +21,7 @@ use empa::shader_module::{shader_source, ShaderSource};
 use empa::texture::format::{bgra8unorm, rgba8unorm_srgb};
 use empa::texture::{
     AttachableImageDescriptor, ImageDataLayout, MipmapLevels, Sampled2DFloat, Texture2DDescriptor,
+    TextureUsages,
 };
 use empa::type_flag::{O, X};
 use empa::{buffer, texture};
@@ -53,8 +54,8 @@ struct AppState {
     device: Device,
     pipeline: RenderPipeline<RenderLayout<bgra8unorm, ()>, Vertex, IndexAny, (ResourceLayout,)>,
     bind_group: BindGroup<ResourceLayout>,
-    vertex_buffer: Buffer<[Vertex], buffer::Usages<O, O, O, O, X, O, O, O, O, O>>,
-    surface: ConfiguredSurface<'static, bgra8unorm, texture::Usages<X, O, O, O, O>>,
+    vertex_buffer: Buffer<[Vertex], BufferUsages!(Vertex)>,
+    surface: ConfiguredSurface<'static, bgra8unorm, TextureUsages!(RenderAttachment)>,
 }
 
 impl AppState {

@@ -1,16 +1,30 @@
 #![feature(proc_macro_span, track_path)]
 
 mod abi_sized;
+mod buffer_usage;
 mod error_log;
 mod pipeline_constants;
 mod resources;
 mod shader_source;
+mod texture_usage;
 mod vertex;
 
 use proc_macro::TokenStream;
 use proc_macro2;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
+
+#[proc_macro]
+#[allow(nonstandard_style)]
+pub fn BufferUsages(input: TokenStream) -> TokenStream {
+    buffer_usage::expand_buffer_usages(input)
+}
+
+#[proc_macro]
+#[allow(nonstandard_style)]
+pub fn TextureUsages(input: TokenStream) -> TokenStream {
+    texture_usage::expand_texture_usages(input)
+}
 
 #[proc_macro]
 pub fn shader_source(input: TokenStream) -> TokenStream {

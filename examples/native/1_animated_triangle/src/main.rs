@@ -2,7 +2,7 @@ use std::error::Error;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use empa::buffer::{Buffer, Uniform};
+use empa::buffer::{Buffer, BufferUsages, Uniform};
 use empa::command::{
     Draw, DrawCommandEncoder, RenderPassDescriptor, RenderStateEncoder,
     ResourceBindingCommandEncoder,
@@ -19,7 +19,7 @@ use empa::render_target::{FloatAttachment, LoadOp, RenderLayout, RenderTarget, S
 use empa::resource_binding::BindGroup;
 use empa::shader_module::{shader_source, ShaderSource};
 use empa::texture::format::bgra8unorm;
-use empa::texture::AttachableImageDescriptor;
+use empa::texture::{AttachableImageDescriptor, TextureUsages};
 use empa::type_flag::{O, X};
 use empa::{buffer, texture};
 use winit::application::ApplicationHandler;
@@ -48,11 +48,11 @@ const SHADER: ShaderSource = shader_source!("shader.wgsl");
 struct AppState {
     device: Device,
     pipeline: RenderPipeline<RenderLayout<bgra8unorm, ()>, Vertex, IndexAny, (ResourceLayout,)>,
-    uniform_buffer: Buffer<f32, buffer::Usages<O, O, O, X, O, O, X, O, O, O>>,
+    uniform_buffer: Buffer<f32, BufferUsages!(UniformBinding | CopyDst)>,
     bind_group: BindGroup<ResourceLayout>,
-    vertex_buffer: Buffer<[Vertex], buffer::Usages<O, O, O, O, X, O, O, O, O, O>>,
+    vertex_buffer: Buffer<[Vertex], BufferUsages!(Vertex)>,
     window: Arc<Window>,
-    surface: ConfiguredSurface<'static, bgra8unorm, texture::Usages<X, O, O, O, O>>,
+    surface: ConfiguredSurface<'static, bgra8unorm, TextureUsages!(RenderAttachment)>,
 }
 
 impl AppState {

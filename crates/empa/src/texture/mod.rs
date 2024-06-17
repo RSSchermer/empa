@@ -26,6 +26,7 @@ use std::fmt;
 use std::ops::Rem;
 
 use arrayvec::ArrayVec;
+pub use empa_macros::TextureUsages;
 
 use crate::driver;
 use crate::texture::format::TextureFormatId;

@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use empa::buffer::{Buffer, Uniform};
+use empa::buffer::{Buffer, BufferUsages, Uniform};
 use empa::command::{
     DrawIndexed, DrawIndexedCommandEncoder, RenderBundle, RenderBundleEncoderDescriptor,
     RenderPassDescriptor, RenderStateEncoder, ResourceBindingCommandEncoder,
@@ -19,7 +19,9 @@ use empa::render_target::{
 };
 use empa::shader_module::{shader_source, ShaderSource};
 use empa::texture::format::{bgra8unorm, depth24plus};
-use empa::texture::{AttachableImageDescriptor, MipmapLevels, Texture2D, Texture2DDescriptor};
+use empa::texture::{
+    AttachableImageDescriptor, MipmapLevels, Texture2D, Texture2DDescriptor, TextureUsages,
+};
 use empa::type_flag::{O, X};
 use empa::{abi, buffer, texture, CompareFunction};
 use empa_glam::ToAbi;
@@ -57,11 +59,11 @@ struct AppState {
     device: Device,
     view: abi::Mat4x4,
     projection: abi::Mat4x4,
-    uniform_buffer: Buffer<Uniforms, buffer::Usages<O, O, O, X, O, O, X, O, O, O>>,
-    depth_texture: Texture2D<depth24plus, texture::Usages<X, O, O, O, O>>,
+    uniform_buffer: Buffer<Uniforms, BufferUsages!(UniformBinding | CopyDst)>,
+    depth_texture: Texture2D<depth24plus, TextureUsages!(RenderAttachment)>,
     render_bundle: RenderBundle<RenderLayout<bgra8unorm, depth24plus>>,
     window: Arc<Window>,
-    surface: ConfiguredSurface<'static, bgra8unorm, texture::Usages<X, O, O, O, O>>,
+    surface: ConfiguredSurface<'static, bgra8unorm, TextureUsages!(RenderAttachment)>,
 }
 
 impl AppState {

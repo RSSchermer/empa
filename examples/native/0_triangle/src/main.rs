@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use empa::buffer::Buffer;
+use empa::buffer::{Buffer, BufferUsages};
 use empa::command::{Draw, DrawCommandEncoder, RenderPassDescriptor, RenderStateEncoder};
 use empa::device::{Device, DeviceDescriptor};
 use empa::native::{
@@ -13,7 +13,7 @@ use empa::render_pipeline::{
 use empa::render_target::{FloatAttachment, LoadOp, RenderLayout, RenderTarget, StoreOp};
 use empa::shader_module::{shader_source, ShaderSource};
 use empa::texture::format::bgra8unorm;
-use empa::texture::AttachableImageDescriptor;
+use empa::texture::{AttachableImageDescriptor, TextureUsages};
 use empa::type_flag::{O, X};
 use empa::{buffer, texture};
 use winit::application::ApplicationHandler;
@@ -34,8 +34,8 @@ const SHADER: ShaderSource = shader_source!("shader.wgsl");
 struct AppState {
     device: Device,
     pipeline: RenderPipeline<RenderLayout<bgra8unorm, ()>, Vertex, IndexAny, ()>,
-    vertex_buffer: Buffer<[Vertex], buffer::Usages<O, O, O, O, X, O, O, O, O, O>>,
-    surface: ConfiguredSurface<'static, bgra8unorm, texture::Usages<X, O, O, O, O>>,
+    vertex_buffer: Buffer<[Vertex], BufferUsages!(Vertex)>,
+    surface: ConfiguredSurface<'static, bgra8unorm, TextureUsages!(RenderAttachment)>,
 }
 
 impl AppState {

@@ -8,6 +8,7 @@ use std::sync::Mutex;
 use std::{error, fmt, marker, mem, slice};
 
 use atomic_counter::AtomicCounter;
+pub use empa_macros::BufferUsages;
 
 use crate::access_mode::{AccessMode, Read};
 use crate::buffer::{
