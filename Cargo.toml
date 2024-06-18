@@ -39,7 +39,7 @@ include-preprocessor = { version = "0.1.0", path = "../include_preprocessor/incl
 js-sys = "0.3.69"
 lazy_static = "1.4.0"
 memoffset = "0.6"
-naga = "0.14.2"
+naga = "0.20"
 quote = "1.0.2"
 pin-project = "1"
 proc-macro2 = "1.0.69"

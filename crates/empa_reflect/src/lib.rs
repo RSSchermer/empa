@@ -343,7 +343,9 @@ impl TryFrom<naga::ScalarKind> for TexelType {
             naga::ScalarKind::Sint => Ok(TexelType::Integer),
             naga::ScalarKind::Uint => Ok(TexelType::UnsignedInteger),
             naga::ScalarKind::Float => Ok(TexelType::Float),
-            naga::ScalarKind::Bool => Err(()),
+            naga::ScalarKind::Bool
+            | naga::ScalarKind::AbstractInt
+            | naga::ScalarKind::AbstractFloat => Err(()),
         }
     }
 }
@@ -668,60 +670,96 @@ impl TryFrom<&'_ naga::TypeInner> for EntryPointBindingType {
     fn try_from(value: &naga::TypeInner) -> Result<Self, Self::Error> {
         // TODO: half-float not currently in naga
         match value {
-            naga::TypeInner::Scalar {
+            naga::TypeInner::Scalar(naga::Scalar {
                 kind: naga::ScalarKind::Float,
                 ..
-            } => Ok(EntryPointBindingType::Float),
-            naga::TypeInner::Scalar {
+            }) => Ok(EntryPointBindingType::Float),
+            naga::TypeInner::Scalar(naga::Scalar {
                 kind: naga::ScalarKind::Sint,
                 ..
-            } => Ok(EntryPointBindingType::SignedInteger),
-            naga::TypeInner::Scalar {
+            }) => Ok(EntryPointBindingType::SignedInteger),
+            naga::TypeInner::Scalar(naga::Scalar {
                 kind: naga::ScalarKind::Uint,
                 ..
-            } => Ok(EntryPointBindingType::UnsignedInteger),
+            }) => Ok(EntryPointBindingType::UnsignedInteger),
             naga::TypeInner::Vector {
-                kind: naga::ScalarKind::Float,
+                scalar:
+                    naga::Scalar {
+                        kind: naga::ScalarKind::Float,
+                        ..
+                    },
                 size: naga::VectorSize::Bi,
                 ..
             } => Ok(EntryPointBindingType::FloatVector2),
             naga::TypeInner::Vector {
-                kind: naga::ScalarKind::Float,
+                scalar:
+                    naga::Scalar {
+                        kind: naga::ScalarKind::Float,
+                        ..
+                    },
                 size: naga::VectorSize::Tri,
                 ..
             } => Ok(EntryPointBindingType::FloatVector3),
             naga::TypeInner::Vector {
-                kind: naga::ScalarKind::Float,
+                scalar:
+                    naga::Scalar {
+                        kind: naga::ScalarKind::Float,
+                        ..
+                    },
                 size: naga::VectorSize::Quad,
                 ..
             } => Ok(EntryPointBindingType::FloatVector4),
             naga::TypeInner::Vector {
-                kind: naga::ScalarKind::Sint,
+                scalar:
+                    naga::Scalar {
+                        kind: naga::ScalarKind::Sint,
+                        ..
+                    },
                 size: naga::VectorSize::Bi,
                 ..
             } => Ok(EntryPointBindingType::SignedIntegerVector2),
             naga::TypeInner::Vector {
-                kind: naga::ScalarKind::Sint,
+                scalar:
+                    naga::Scalar {
+                        kind: naga::ScalarKind::Sint,
+                        ..
+                    },
                 size: naga::VectorSize::Tri,
                 ..
             } => Ok(EntryPointBindingType::SignedIntegerVector3),
             naga::TypeInner::Vector {
-                kind: naga::ScalarKind::Sint,
+                scalar:
+                    naga::Scalar {
+                        kind: naga::ScalarKind::Sint,
+                        ..
+                    },
                 size: naga::VectorSize::Quad,
                 ..
             } => Ok(EntryPointBindingType::SignedIntegerVector4),
             naga::TypeInner::Vector {
-                kind: naga::ScalarKind::Uint,
+                scalar:
+                    naga::Scalar {
+                        kind: naga::ScalarKind::Uint,
+                        ..
+                    },
                 size: naga::VectorSize::Bi,
                 ..
             } => Ok(EntryPointBindingType::UnsignedIntegerVector2),
             naga::TypeInner::Vector {
-                kind: naga::ScalarKind::Uint,
+                scalar:
+                    naga::Scalar {
+                        kind: naga::ScalarKind::Uint,
+                        ..
+                    },
                 size: naga::VectorSize::Tri,
                 ..
             } => Ok(EntryPointBindingType::UnsignedIntegerVector3),
             naga::TypeInner::Vector {
-                kind: naga::ScalarKind::Uint,
+                scalar:
+                    naga::Scalar {
+                        kind: naga::ScalarKind::Uint,
+                        ..
+                    },
                 size: naga::VectorSize::Quad,
                 ..
             } => Ok(EntryPointBindingType::UnsignedIntegerVector4),
@@ -836,29 +874,33 @@ fn collect_units(
     let ty = module.types.get_handle(type_handle).unwrap();
 
     match &ty.inner {
-        naga::TypeInner::Scalar {
+        naga::TypeInner::Scalar(naga::Scalar {
             kind: naga::ScalarKind::Float,
             ..
-        } => head.push(MemoryUnit {
+        }) => head.push(MemoryUnit {
             offset,
             layout: MemoryUnitLayout::Float,
         }),
-        naga::TypeInner::Scalar {
+        naga::TypeInner::Scalar(naga::Scalar {
             kind: naga::ScalarKind::Sint,
             ..
-        } => head.push(MemoryUnit {
+        }) => head.push(MemoryUnit {
             offset,
             layout: MemoryUnitLayout::Integer,
         }),
-        naga::TypeInner::Scalar {
+        naga::TypeInner::Scalar(naga::Scalar {
             kind: naga::ScalarKind::Uint,
             ..
-        } => head.push(MemoryUnit {
+        }) => head.push(MemoryUnit {
             offset,
             layout: MemoryUnitLayout::UnsignedInteger,
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Float,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Float,
+                    ..
+                },
             size: naga::VectorSize::Bi,
             ..
         } => head.push(MemoryUnit {
@@ -866,7 +908,11 @@ fn collect_units(
             layout: MemoryUnitLayout::FloatVector2,
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Float,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Float,
+                    ..
+                },
             size: naga::VectorSize::Tri,
             ..
         } => head.push(MemoryUnit {
@@ -874,7 +920,11 @@ fn collect_units(
             layout: MemoryUnitLayout::FloatVector3,
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Float,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Float,
+                    ..
+                },
             size: naga::VectorSize::Quad,
             ..
         } => head.push(MemoryUnit {
@@ -882,7 +932,11 @@ fn collect_units(
             layout: MemoryUnitLayout::FloatVector4,
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Sint,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Sint,
+                    ..
+                },
             size: naga::VectorSize::Bi,
             ..
         } => head.push(MemoryUnit {
@@ -890,7 +944,11 @@ fn collect_units(
             layout: MemoryUnitLayout::IntegerVector2,
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Sint,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Sint,
+                    ..
+                },
             size: naga::VectorSize::Tri,
             ..
         } => head.push(MemoryUnit {
@@ -898,7 +956,11 @@ fn collect_units(
             layout: MemoryUnitLayout::IntegerVector3,
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Sint,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Sint,
+                    ..
+                },
             size: naga::VectorSize::Quad,
             ..
         } => head.push(MemoryUnit {
@@ -906,7 +968,11 @@ fn collect_units(
             layout: MemoryUnitLayout::IntegerVector4,
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Uint,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Uint,
+                    ..
+                },
             size: naga::VectorSize::Bi,
             ..
         } => head.push(MemoryUnit {
@@ -914,7 +980,11 @@ fn collect_units(
             layout: MemoryUnitLayout::UnsignedIntegerVector2,
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Uint,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Uint,
+                    ..
+                },
             size: naga::VectorSize::Tri,
             ..
         } => head.push(MemoryUnit {
@@ -922,7 +992,11 @@ fn collect_units(
             layout: MemoryUnitLayout::UnsignedIntegerVector3,
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Uint,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Uint,
+                    ..
+                },
             size: naga::VectorSize::Quad,
             ..
         } => head.push(MemoryUnit {
@@ -1001,17 +1075,17 @@ fn collect_units(
             offset,
             layout: MemoryUnitLayout::Matrix4x4,
         }),
-        naga::TypeInner::Atomic {
+        naga::TypeInner::Atomic(naga::Scalar {
             kind: naga::ScalarKind::Sint,
             ..
-        } => head.push(MemoryUnit {
+        }) => head.push(MemoryUnit {
             offset,
             layout: MemoryUnitLayout::Integer,
         }),
-        naga::TypeInner::Atomic {
+        naga::TypeInner::Atomic(naga::Scalar {
             kind: naga::ScalarKind::Uint,
             ..
-        } => head.push(MemoryUnit {
+        }) => head.push(MemoryUnit {
             offset,
             layout: MemoryUnitLayout::UnsignedInteger,
         }),
@@ -1056,29 +1130,33 @@ fn collect_array_units(
     let ty = module.types.get_handle(type_handle).unwrap();
 
     match &ty.inner {
-        naga::TypeInner::Scalar {
+        naga::TypeInner::Scalar(naga::Scalar {
             kind: naga::ScalarKind::Float,
             ..
-        } => head.push(MemoryUnit {
+        }) => head.push(MemoryUnit {
             offset,
             layout: MemoryUnitLayout::FloatArray(len),
         }),
-        naga::TypeInner::Scalar {
+        naga::TypeInner::Scalar(naga::Scalar {
             kind: naga::ScalarKind::Sint,
             ..
-        } => head.push(MemoryUnit {
+        }) => head.push(MemoryUnit {
             offset,
             layout: MemoryUnitLayout::IntegerArray(len),
         }),
-        naga::TypeInner::Scalar {
+        naga::TypeInner::Scalar(naga::Scalar {
             kind: naga::ScalarKind::Uint,
             ..
-        } => head.push(MemoryUnit {
+        }) => head.push(MemoryUnit {
             offset,
             layout: MemoryUnitLayout::UnsignedIntegerArray(len),
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Float,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Float,
+                    ..
+                },
             size: naga::VectorSize::Bi,
             ..
         } => head.push(MemoryUnit {
@@ -1086,7 +1164,11 @@ fn collect_array_units(
             layout: MemoryUnitLayout::FloatVector2Array(len),
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Float,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Float,
+                    ..
+                },
             size: naga::VectorSize::Tri,
             ..
         } => head.push(MemoryUnit {
@@ -1094,7 +1176,11 @@ fn collect_array_units(
             layout: MemoryUnitLayout::FloatVector3Array(len),
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Float,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Float,
+                    ..
+                },
             size: naga::VectorSize::Quad,
             ..
         } => head.push(MemoryUnit {
@@ -1102,7 +1188,11 @@ fn collect_array_units(
             layout: MemoryUnitLayout::FloatVector4Array(len),
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Sint,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Sint,
+                    ..
+                },
             size: naga::VectorSize::Bi,
             ..
         } => head.push(MemoryUnit {
@@ -1110,7 +1200,11 @@ fn collect_array_units(
             layout: MemoryUnitLayout::IntegerVector2Array(len),
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Sint,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Sint,
+                    ..
+                },
             size: naga::VectorSize::Tri,
             ..
         } => head.push(MemoryUnit {
@@ -1118,7 +1212,11 @@ fn collect_array_units(
             layout: MemoryUnitLayout::IntegerVector3Array(len),
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Sint,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Sint,
+                    ..
+                },
             size: naga::VectorSize::Quad,
             ..
         } => head.push(MemoryUnit {
@@ -1126,7 +1224,11 @@ fn collect_array_units(
             layout: MemoryUnitLayout::IntegerVector4Array(len),
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Uint,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Uint,
+                    ..
+                },
             size: naga::VectorSize::Bi,
             ..
         } => head.push(MemoryUnit {
@@ -1134,7 +1236,11 @@ fn collect_array_units(
             layout: MemoryUnitLayout::UnsignedIntegerVector2Array(len),
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Uint,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Uint,
+                    ..
+                },
             size: naga::VectorSize::Tri,
             ..
         } => head.push(MemoryUnit {
@@ -1142,7 +1248,11 @@ fn collect_array_units(
             layout: MemoryUnitLayout::UnsignedIntegerVector3Array(len),
         }),
         naga::TypeInner::Vector {
-            kind: naga::ScalarKind::Uint,
+            scalar:
+                naga::Scalar {
+                    kind: naga::ScalarKind::Uint,
+                    ..
+                },
             size: naga::VectorSize::Quad,
             ..
         } => head.push(MemoryUnit {
@@ -1221,17 +1331,17 @@ fn collect_array_units(
             offset,
             layout: MemoryUnitLayout::Matrix4x4Array(len),
         }),
-        naga::TypeInner::Atomic {
+        naga::TypeInner::Atomic(naga::Scalar {
             kind: naga::ScalarKind::Sint,
             ..
-        } => head.push(MemoryUnit {
+        }) => head.push(MemoryUnit {
             offset,
             layout: MemoryUnitLayout::IntegerArray(len),
         }),
-        naga::TypeInner::Atomic {
+        naga::TypeInner::Atomic(naga::Scalar {
             kind: naga::ScalarKind::Uint,
             ..
-        } => head.push(MemoryUnit {
+        }) => head.push(MemoryUnit {
             offset,
             layout: MemoryUnitLayout::UnsignedIntegerArray(len),
         }),

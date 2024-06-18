@@ -10,4 +10,4 @@ license = "MIT"
 
 [dependencies.naga]
 workspace = true
-features = ["wgsl-in", "span"]
+features = ["wgsl-in"]

@@ -1754,6 +1754,10 @@ fn features_from_wgc(raw: wgt::Features) -> FlagSet<Feature> {
         features |= Feature::Bgra8UNormStorage;
     }
 
+    if raw.contains(wgt::Features::TIMESTAMP_QUERY_INSIDE_ENCODERS) {
+        features |= Feature::TimestampQueryInsideEncoders
+    }
+
     features
 }
 
@@ -1794,6 +1798,10 @@ pub fn features_to_wgc(features: &FlagSet<Feature>) -> wgt::Features {
 
     if features.contains(Feature::Bgra8UNormStorage) {
         out |= wgt::Features::BGRA8UNORM_STORAGE;
+    }
+
+    if features.contains(Feature::TimestampQueryInsideEncoders) {
+        out |= wgt::Features::TIMESTAMP_QUERY_INSIDE_ENCODERS;
     }
 
     out

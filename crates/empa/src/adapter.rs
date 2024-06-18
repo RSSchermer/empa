@@ -22,6 +22,7 @@ flags! {
         IndirectFirstInstance = 1 << 7,
         ShaderF16 = 1 << 8,
         Bgra8UNormStorage = 1 << 9,
+        TimestampQueryInsideEncoders = 1 << 10,
     }
 }
 
