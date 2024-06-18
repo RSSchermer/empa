@@ -93,7 +93,7 @@ fn main(
         partial_sums[group_index] = shared_data[511] + shared_data[255];
 
         shared_data[511] = shared_data[255];
-        shared_data[255] = 0;
+        shared_data[255] = 0u;
     }
     workgroupBarrier();
 

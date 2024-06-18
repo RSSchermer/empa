@@ -1,6 +1,7 @@
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::env;
+use std::error::Error as _;
 use std::hash::{Hash, Hasher};
 use std::ops::Range;
 use std::path::Path;
@@ -17,6 +18,7 @@ use empa_reflect::{
 use include_preprocessor::{
     preprocess, Error as IppError, OutputSink, SearchPaths, SourceMappedChunk, SourceTracker,
 };
+use naga::valid::{Capabilities, ValidationFlags, Validator};
 use proc_macro::{tracked_path, Span, TokenStream};
 use quote::quote;
 use syn::{parse_macro_input, LitStr};
@@ -274,6 +276,35 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
             panic!("failed to compile shader source");
         }
     };
+
+    let mut validator = Validator::new(ValidationFlags::all(), Capabilities::all());
+
+    if let Err(err) = validator.validate(shader_source.module()) {
+        let mut diagnostic = Diagnostic::error().with_message(err.as_inner().to_string());
+
+        if let Some(location) = err.location(shader_source.raw_str()) {
+            let start = location.offset as usize;
+            let end = start + location.length as usize;
+
+            let mapped_span = output.source_map.mapped_span(start..end).unwrap();
+
+            let mut label = Label::primary(mapped_span.file_id, mapped_span.range.clone());
+
+            if let Some(source) = err.source() {
+                label = label.with_message(source.to_string())
+            }
+
+            diagnostic = diagnostic.with_labels(vec![label])
+        }
+
+        let config = codespan_reporting::term::Config::default();
+        let writer = StandardStream::stderr(ColorChoice::Auto);
+
+        term::emit(&mut writer.lock(), &config, &source_files, &diagnostic)
+            .expect("cannot write error");
+
+        panic!("failed to validate shader source");
+    }
 
     let mod_path = quote!(empa::shader_module);
 

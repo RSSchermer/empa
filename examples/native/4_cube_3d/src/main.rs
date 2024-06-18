@@ -22,7 +22,6 @@ use empa::texture::format::{bgra8unorm, depth24plus};
 use empa::texture::{
     AttachableImageDescriptor, MipmapLevels, Texture2D, Texture2DDescriptor, TextureUsages,
 };
-use empa::type_flag::{O, X};
 use empa::{abi, buffer, texture, CompareFunction};
 use empa_glam::ToAbi;
 use winit::application::ApplicationHandler;

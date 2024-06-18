@@ -20,7 +20,6 @@ use empa::resource_binding::BindGroup;
 use empa::shader_module::{shader_source, ShaderSource};
 use empa::texture::format::bgra8unorm;
 use empa::texture::{AttachableImageDescriptor, TextureUsages};
-use empa::type_flag::{O, X};
 use empa::{buffer, texture};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;

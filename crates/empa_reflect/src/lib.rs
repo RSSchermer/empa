@@ -3,12 +3,13 @@ use std::ops::Deref;
 
 use naga::front::wgsl;
 use naga::proc::IndexableLength;
-use naga::AddressSpace;
+use naga::{AddressSpace, Module};
 pub use wgsl::ParseError;
 
 #[derive(Clone, Debug)]
 pub struct ShaderSource {
     source: String,
+    module: Module,
     resource_bindings: Vec<ShaderResourceBinding>,
     constants: Vec<Constant>,
     entry_points: Vec<EntryPoint>,
@@ -42,6 +43,7 @@ impl ShaderSource {
 
         Ok(ShaderSource {
             source,
+            module,
             resource_bindings,
             constants: vec![],
             entry_points,
@@ -50,6 +52,10 @@ impl ShaderSource {
 
     pub fn raw_str(&self) -> &str {
         &self.source
+    }
+
+    pub fn module(&self) -> &Module {
+        &self.module
     }
 
     pub fn resource_bindings(&self) -> &[ShaderResourceBinding] {

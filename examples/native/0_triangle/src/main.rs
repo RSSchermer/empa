@@ -14,7 +14,6 @@ use empa::render_target::{FloatAttachment, LoadOp, RenderLayout, RenderTarget, S
 use empa::shader_module::{shader_source, ShaderSource};
 use empa::texture::format::bgra8unorm;
 use empa::texture::{AttachableImageDescriptor, TextureUsages};
-use empa::type_flag::{O, X};
 use empa::{buffer, texture};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;

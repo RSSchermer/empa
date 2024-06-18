@@ -15,6 +15,7 @@ proc-macro = true
 codespan-reporting = { workspace = true }
 empa-reflect = { workspace = true }
 include-preprocessor = { workspace = true }
+naga = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 

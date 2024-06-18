@@ -22,15 +22,15 @@ fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>, @builtin(local_invocatio
                 job = JOB_ADD_2;
             }
 
-            iterations += 1;
+            iterations += 1u;
         }
 
         workgroupBarrier();
 
         if job == JOB_ADD_1 {
-            atomicAdd(&count, 1);
+            atomicAdd(&count, 1u);
         } else if job == JOB_ADD_2 {
-            atomicAdd(&count, 2);
+            atomicAdd(&count, 2u);
         } else {
             return;
         }

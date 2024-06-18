@@ -23,7 +23,6 @@ use empa::texture::{
     AttachableImageDescriptor, ImageDataLayout, MipmapLevels, Sampled2DFloat, Texture2DDescriptor,
     TextureUsages,
 };
-use empa::type_flag::{O, X};
 use empa::{buffer, texture};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
