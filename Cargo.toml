@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
     "crates/empa",
     "crates/empa_glam",
@@ -20,6 +21,18 @@ members = [
     "examples/web/7_buffer_projection",
     "examples/web/8_persistent_threads",
     "examples/web/9_timestamp"
+]
+default-members = [
+    "crates/empa",
+    "crates/empa_glam",
+    "crates/empa_macros",
+    "crates/empa_reflect",
+    "crates/empa_test",
+    "examples/native/0_triangle",
+    "examples/native/1_animated_triangle",
+    "examples/native/2_textured_triangle",
+    "examples/native/3_compute",
+    "examples/native/4_cube_3d",
 ]
 
 [workspace.dependencies]

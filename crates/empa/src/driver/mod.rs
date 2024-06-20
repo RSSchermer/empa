@@ -1,14 +1,14 @@
 pub mod driver;
 pub use driver::*;
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(feature = "web")]
 pub mod web;
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(feature = "web")]
 pub type Dvr = web::Driver;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(feature = "web"))]
 pub mod native;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(feature = "web"))]
 pub type Dvr = native::Driver;

@@ -277,7 +277,7 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
         }
     };
 
-    let mut validator = Validator::new(ValidationFlags::all(), Capabilities::all());
+    let mut validator = Validator::new(ValidationFlags::all() & !(ValidationFlags::EXPRESSIONS | ValidationFlags::BLOCKS), Capabilities::all());
 
     if let Err(err) = validator.validate(shader_source.module()) {
         let mut diagnostic = Diagnostic::error().with_message(err.as_inner().to_string());

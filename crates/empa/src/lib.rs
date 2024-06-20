@@ -22,10 +22,10 @@ pub mod shader_module;
 pub mod texture;
 pub mod type_flag;
 
-#[cfg(all(target_arch = "wasm32", feature = "arwa"))]
+#[cfg(all(feature = "web", feature = "arwa"))]
 pub mod arwa;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(feature = "web"))]
 pub mod native;
 
 #[doc(hidden)]
