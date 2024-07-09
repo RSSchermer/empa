@@ -190,15 +190,17 @@ impl ComputeStageBuilder {
     pub fn begin(shader_module: &ShaderModule, entry_point: &str) -> Self {
         let shader_meta = shader_module.meta.clone();
 
-        let entry_index = shader_meta
-            .resolve_entry_point_index(entry_point)
-            .expect("could not find entry point in shader module");
-        let stage = shader_meta.entry_point_stage(entry_index);
+        if shader_meta.is_parsed() {
+            let entry_index = shader_meta
+                .resolve_entry_point_index(entry_point)
+                .expect("could not find entry point in shader module");
+            let stage = shader_meta.entry_point_stage(entry_index);
 
-        assert!(
-            stage == Some(ShaderStage::Compute),
-            "entry point is not a compute stage"
-        );
+            assert!(
+                stage == Some(ShaderStage::Compute),
+                "entry point is not a compute stage"
+            );
+        }
 
         let compute_stage = ComputeStage {
             shader_module: shader_module.handle.clone(),

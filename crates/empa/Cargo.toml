@@ -16,7 +16,11 @@ arwa = ["web", "dep:arwa"]
 dx12 = ["wgc/dx12"]
 metal = ["wgc/metal"]
 
+[target.'cfg(not(target_arch = "wasm32"))'.features]
 default = ["dx12", "metal"]
+
+[target.'cfg(target_arch = "wasm32")'.features]
+default = ["web", "arwa"]
 
 [dependencies]
 arrayvec = { workspace = true }
