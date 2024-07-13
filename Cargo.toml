@@ -11,6 +11,7 @@ members = [
     "examples/native/2_textured_triangle",
     "examples/native/3_compute",
     "examples/native/4_cube_3d",
+    "examples/native/5_override_constant",
     "examples/web/0_triangle",
     "examples/web/1_animated_triangle",
     "examples/web/2_textured_triangle",
@@ -33,6 +34,7 @@ default-members = [
     "examples/native/2_textured_triangle",
     "examples/native/3_compute",
     "examples/native/4_cube_3d",
+    "examples/native/5_override_constant",
 ]
 
 [workspace.dependencies]

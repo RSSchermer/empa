@@ -41,21 +41,21 @@ pub fn expand_derive_pipeline_constants(input: &DeriveInput) -> Result<TokenStre
             let span = field.span;
 
             let pattern = if let Some(id) = field.id {
-                quote!(#mod_path::PipelineIdentifier::Number(#id))
+                quote!(#mod_path::PipelineConstantIdentifier::Number(#id))
             } else {
-                quote!(#mod_path::PipelineIdentifier::Name(#field_name))
+                quote!(#mod_path::PipelineConstantIdentifier::Name(#field_name))
             };
 
-            quote_spanned!(span=> {
+            quote_spanned!(span=>
                 #pattern => Some(<#ty as #mod_path::PipelineConstant>::to_value(&self.#field_ident))
-            })
+            )
         });
 
         let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
         let impl_block = quote! {
             #[automatically_derived]
-            unsafe impl #impl_generics #mod_path::PipelineConstants for #struct_name #ty_generics #where_clause {
+            impl #impl_generics #mod_path::PipelineConstants for #struct_name #ty_generics #where_clause {
                 fn lookup(
                     &self,
                     identifier: #mod_path::PipelineConstantIdentifier
@@ -68,15 +68,9 @@ pub fn expand_derive_pipeline_constants(input: &DeriveInput) -> Result<TokenStre
             }
         };
 
-        let suffix = struct_name.to_string().trim_start_matches("r#").to_owned();
-        let dummy_const = Ident::new(
-            &format!("_IMPL_PIPELINE_CONSTANTS_FOR_{}", suffix),
-            Span::call_site(),
-        );
-
         let generated = quote! {
             #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
-            const #dummy_const: () = {
+            const _: () = {
                 #[allow(unknown_lints)]
                 #[cfg_attr(feature = "cargo-clippy", allow(useless_attribute))]
                 #[allow(rust_2018_idioms)]

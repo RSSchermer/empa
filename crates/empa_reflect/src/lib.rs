@@ -3,7 +3,7 @@ use std::ops::Deref;
 
 use naga::front::wgsl;
 use naga::proc::IndexableLength;
-use naga::{AddressSpace, Module};
+use naga::{AddressSpace, Module, Override, ScalarKind};
 pub use wgsl::ParseError;
 
 #[derive(Clone, Debug)]
@@ -32,8 +32,15 @@ impl ShaderSource {
             }
         }
 
-        // TODO: ignore overridable constants for now, naga does not seem up to date with the spec
-        // as of this writing
+        let constants = module.overrides.iter().map(|(_, c)| {
+            let ty = module.types.get_handle(c.ty).unwrap();
+
+            Constant {
+                identifier: ConstantIdentifier::from_naga(c),
+                constant_type: ConstantType::from_naga(ty),
+                required: c.init.is_none(),
+            }
+        }).collect();
 
         let mut entry_points = Vec::new();
 
@@ -45,7 +52,7 @@ impl ShaderSource {
             source,
             module,
             resource_bindings,
-            constants: vec![],
+            constants,
             entry_points,
         })
     }
@@ -77,6 +84,16 @@ pub enum ConstantIdentifier {
     Name(String),
 }
 
+impl ConstantIdentifier {
+    fn from_naga(value: &Override) -> Self {
+        if let Some(id) = value.id {
+            ConstantIdentifier::Number(id as u32)
+        } else {
+            ConstantIdentifier::Name(value.name.clone().expect("override constant should have name or ID"))
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub struct Constant {
     identifier: ConstantIdentifier,
@@ -104,6 +121,22 @@ pub enum ConstantType {
     Bool,
     SignedInteger,
     UnsignedInteger,
+}
+
+impl ConstantType {
+    fn from_naga(value: &naga::Type) -> Self {
+        if let naga::TypeInner::Scalar(scalar) = &value.inner {
+            match &scalar.kind {
+                ScalarKind::Sint => ConstantType::SignedInteger,
+                ScalarKind::Uint => ConstantType::UnsignedInteger,
+                ScalarKind::Float => ConstantType::Float,
+                ScalarKind::Bool => ConstantType::Bool,
+                _ => unreachable!("constant type must be concrete")
+            }
+        } else {
+            unreachable!("constant type must be scalar");
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]

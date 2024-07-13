@@ -2,6 +2,8 @@ use std::fmt;
 
 use crate::shader_module::StaticConstantType;
 
+pub use empa_macros::PipelineConstants;
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PipelineConstantIdentifier<'a> {
     Number(u32),
@@ -54,33 +56,33 @@ mod pipeline_constant_seal {
 }
 
 pub trait PipelineConstant: pipeline_constant_seal::Seal {
-    fn into_value(self) -> PipelineConstantValue;
+    fn to_value(&self) -> PipelineConstantValue;
 }
 
 impl pipeline_constant_seal::Seal for bool {}
 impl PipelineConstant for bool {
-    fn into_value(self) -> PipelineConstantValue {
-        PipelineConstantValue::Bool(self)
+    fn to_value(&self) -> PipelineConstantValue {
+        PipelineConstantValue::Bool(*self)
     }
 }
 
 impl pipeline_constant_seal::Seal for f32 {}
 impl PipelineConstant for f32 {
-    fn into_value(self) -> PipelineConstantValue {
-        PipelineConstantValue::Float(self)
+    fn to_value(&self) -> PipelineConstantValue {
+        PipelineConstantValue::Float(*self)
     }
 }
 
 impl pipeline_constant_seal::Seal for u32 {}
 impl PipelineConstant for u32 {
-    fn into_value(self) -> PipelineConstantValue {
-        PipelineConstantValue::UnsignedInteger(self)
+    fn to_value(&self) -> PipelineConstantValue {
+        PipelineConstantValue::UnsignedInteger(*self)
     }
 }
 
 impl pipeline_constant_seal::Seal for i32 {}
 impl PipelineConstant for i32 {
-    fn into_value(self) -> PipelineConstantValue {
-        PipelineConstantValue::SignedInteger(self)
+    fn to_value(&self) -> PipelineConstantValue {
+        PipelineConstantValue::SignedInteger(*self)
     }
 }
