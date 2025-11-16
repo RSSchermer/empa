@@ -171,7 +171,7 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
     let path = parse_macro_input!(input as LitStr);
 
     let span = Span::call_site();
-    let source_path = span.source_file().path();
+    let source_path = span.local_file().unwrap();
     let source_dir = source_path.parent().unwrap();
 
     let mut search_paths = SearchPaths::new();
