@@ -1,8 +1,8 @@
 use std::fmt;
 
-use crate::shader_module::StaticConstantType;
-
 pub use empa_macros::PipelineConstants;
+
+use crate::shader_module::StaticConstantType;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PipelineConstantIdentifier<'a> {

@@ -32,15 +32,19 @@ impl ShaderSource {
             }
         }
 
-        let constants = module.overrides.iter().map(|(_, c)| {
-            let ty = module.types.get_handle(c.ty).unwrap();
+        let constants = module
+            .overrides
+            .iter()
+            .map(|(_, c)| {
+                let ty = module.types.get_handle(c.ty).unwrap();
 
-            Constant {
-                identifier: ConstantIdentifier::from_naga(c),
-                constant_type: ConstantType::from_naga(ty),
-                required: c.init.is_none(),
-            }
-        }).collect();
+                Constant {
+                    identifier: ConstantIdentifier::from_naga(c),
+                    constant_type: ConstantType::from_naga(ty),
+                    required: c.init.is_none(),
+                }
+            })
+            .collect();
 
         let mut entry_points = Vec::new();
 
@@ -89,7 +93,12 @@ impl ConstantIdentifier {
         if let Some(id) = value.id {
             ConstantIdentifier::Number(id as u32)
         } else {
-            ConstantIdentifier::Name(value.name.clone().expect("override constant should have name or ID"))
+            ConstantIdentifier::Name(
+                value
+                    .name
+                    .clone()
+                    .expect("override constant should have name or ID"),
+            )
         }
     }
 }
@@ -131,7 +140,7 @@ impl ConstantType {
                 ScalarKind::Uint => ConstantType::UnsignedInteger,
                 ScalarKind::Float => ConstantType::Float,
                 ScalarKind::Bool => ConstantType::Bool,
-                _ => unreachable!("constant type must be concrete")
+                _ => unreachable!("constant type must be concrete"),
             }
         } else {
             unreachable!("constant type must be scalar");

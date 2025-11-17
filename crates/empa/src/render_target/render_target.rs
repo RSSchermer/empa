@@ -40,7 +40,10 @@ where
 {
     type RenderLayout = RenderLayout<C::Layout, Ds::Format>;
 
-    type ColorTargetEncodings<'a> = C::Encodings<'a> where Self: 'a;
+    type ColorTargetEncodings<'a>
+        = C::Encodings<'a>
+    where
+        Self: 'a;
 
     fn color_target_encodings<'a>(&'a self) -> Self::ColorTargetEncodings<'a> {
         self.color.encodings()
@@ -58,7 +61,10 @@ where
 {
     type RenderLayout = RenderLayout<C::Layout, ()>;
 
-    type ColorTargetEncodings<'a> = C::Encodings<'a> where C: 'a;
+    type ColorTargetEncodings<'a>
+        = C::Encodings<'a>
+    where
+        C: 'a;
 
     fn color_target_encodings<'a>(&'a self) -> Self::ColorTargetEncodings<'a> {
         self.color.encodings()
@@ -81,7 +87,10 @@ where
 {
     type RenderLayout = RenderLayout<(), Ds::Format>;
 
-    type ColorTargetEncodings<'a> = [ColorTargetEncoding<'a>; 0] where Ds: 'a;
+    type ColorTargetEncodings<'a>
+        = [ColorTargetEncoding<'a>; 0]
+    where
+        Ds: 'a;
 
     fn color_target_encodings<'a>(&'a self) -> Self::ColorTargetEncodings<'a> {
         []
@@ -111,7 +120,10 @@ where
 {
     type RenderLayout = MultisampleRenderLayout<C::Layout, Ds::Format, SAMPLES>;
 
-    type ColorTargetEncodings<'a> = C::Encodings<'a> where Self: 'a;
+    type ColorTargetEncodings<'a>
+        = C::Encodings<'a>
+    where
+        Self: 'a;
 
     fn color_target_encodings<'a>(&'a self) -> Self::ColorTargetEncodings<'a> {
         self.color.encodings()
@@ -134,7 +146,10 @@ where
 {
     type RenderLayout = MultisampleRenderLayout<C::Layout, (), SAMPLES>;
 
-    type ColorTargetEncodings<'a> = C::Encodings<'a> where C: 'a;
+    type ColorTargetEncodings<'a>
+        = C::Encodings<'a>
+    where
+        C: 'a;
 
     fn color_target_encodings<'a>(&'a self) -> Self::ColorTargetEncodings<'a> {
         self.color.encodings()
@@ -162,7 +177,10 @@ where
 {
     type RenderLayout = MultisampleRenderLayout<(), Ds::Format, SAMPLES>;
 
-    type ColorTargetEncodings<'a> = [ColorTargetEncoding<'a>; 0] where Ds: 'a;
+    type ColorTargetEncodings<'a>
+        = [ColorTargetEncoding<'a>; 0]
+    where
+        Ds: 'a;
 
     fn color_target_encodings<'a>(&'a self) -> Self::ColorTargetEncodings<'a> {
         []

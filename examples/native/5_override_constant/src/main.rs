@@ -49,12 +49,10 @@ async fn run() -> Result<(), Box<dyn Error>> {
         .create_compute_pipeline(
             &ComputePipelineDescriptorBuilder::begin()
                 .layout(&pipeline_layout)
-                .compute(ComputeStageBuilder::begin(&shader, "main")
-                    .pipeline_constants(&Constants {
-                        factor: 2,
-                        add: 10,
-                    })
-                    .finish()
+                .compute(
+                    ComputeStageBuilder::begin(&shader, "main")
+                        .pipeline_constants(&Constants { factor: 2, add: 10 })
+                        .finish(),
                 )
                 .finish(),
         )

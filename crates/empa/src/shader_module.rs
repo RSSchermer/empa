@@ -155,7 +155,7 @@ pub struct StaticEntryPoint {
 pub(crate) enum ShaderSourceInternal {
     Static(StaticShaderSource),
     Dynamic(Arc<DynamicShaderSource>),
-    Unparsed(Arc<String>)
+    Unparsed(Arc<String>),
 }
 
 impl ShaderSourceInternal {
@@ -163,7 +163,7 @@ impl ShaderSourceInternal {
         match self {
             ShaderSourceInternal::Static(source) => source.source,
             ShaderSourceInternal::Dynamic(source) => source.raw_str(),
-            ShaderSourceInternal::Unparsed(source) => source.as_str()
+            ShaderSourceInternal::Unparsed(source) => source.as_str(),
         }
     }
 
@@ -175,7 +175,7 @@ impl ShaderSourceInternal {
         match self {
             ShaderSourceInternal::Static(source) => source.resource_bindings,
             ShaderSourceInternal::Dynamic(_) => todo!(),
-            ShaderSourceInternal::Unparsed(_) => unimplemented!()
+            ShaderSourceInternal::Unparsed(_) => unimplemented!(),
         }
     }
 
@@ -183,7 +183,7 @@ impl ShaderSourceInternal {
         match self {
             ShaderSourceInternal::Static(s) => s.constants.iter().any(|c| c.required),
             ShaderSourceInternal::Dynamic(s) => s.constants().iter().any(|c| c.required()),
-            ShaderSourceInternal::Unparsed(_) => false
+            ShaderSourceInternal::Unparsed(_) => false,
         }
     }
 
@@ -201,7 +201,7 @@ impl ShaderSourceInternal {
                 .enumerate()
                 .find(|(_, e)| e.name() == name)
                 .map(|(index, _)| index),
-            ShaderSourceInternal::Unparsed(_) => unimplemented!()
+            ShaderSourceInternal::Unparsed(_) => unimplemented!(),
         }
     }
 
@@ -211,7 +211,7 @@ impl ShaderSourceInternal {
             ShaderSourceInternal::Dynamic(source) => {
                 source.entry_points().get(index).map(|e| e.stage())
             }
-            ShaderSourceInternal::Unparsed(_) => unimplemented!()
+            ShaderSourceInternal::Unparsed(_) => unimplemented!(),
         }
     }
 
@@ -225,7 +225,7 @@ impl ShaderSourceInternal {
                 .entry_points()
                 .get(index)
                 .map(|e| EntryPointBindings::Dynamic(e.input_bindings().iter())),
-            ShaderSourceInternal::Unparsed(_) => unimplemented!()
+            ShaderSourceInternal::Unparsed(_) => unimplemented!(),
         }
     }
 
@@ -239,7 +239,7 @@ impl ShaderSourceInternal {
                 .entry_points()
                 .get(index)
                 .map(|e| EntryPointBindings::Dynamic(e.output_bindings().iter())),
-            ShaderSourceInternal::Unparsed(_) => unimplemented!()
+            ShaderSourceInternal::Unparsed(_) => unimplemented!(),
         }
     }
 
@@ -373,7 +373,7 @@ impl ShaderSource {
 
     pub fn unparsed(raw: String) -> Self {
         ShaderSource {
-            inner: ShaderSourceInternal::Unparsed(Arc::new(raw))
+            inner: ShaderSourceInternal::Unparsed(Arc::new(raw)),
         }
     }
 }
