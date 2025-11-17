@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::marker;
 
 use empa_reflect::ShaderStage;
-use flagset::{flags, FlagSet};
+use flagset::{FlagSet, flags};
 
 use crate::driver::{ColorTargetState, Driver, Dvr};
 use crate::pipeline_constants::PipelineConstants;
@@ -325,7 +325,9 @@ where
 {
     pub fn finish(self) -> FragmentStage<O> {
         if !self.has_constants && self.inner.shader_meta.has_required_constants() {
-            panic!("the shader declares pipeline constants without fallback values, but no pipeline constants were set");
+            panic!(
+                "the shader declares pipeline constants without fallback values, but no pipeline constants were set"
+            );
         }
 
         self.inner

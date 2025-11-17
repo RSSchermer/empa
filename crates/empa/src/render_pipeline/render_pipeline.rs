@@ -320,7 +320,10 @@ where
             }
 
             if entry.binding_type != resource_binding.binding_type {
-                panic!("the binding type for binding `{}` in group `{}` does not match the shader type", resource_binding.binding, resource_binding.group)
+                panic!(
+                    "the binding type for binding `{}` in group `{}` does not match the shader type",
+                    resource_binding.binding, resource_binding.group
+                )
             }
         }
 

@@ -1,14 +1,12 @@
 [package]
 name = "timestamp-example"
-version = "0.1.0"
-authors = ["Roland Schermer <roland0507@gmail.com>"]
-edition = "2021"
-license = "MIT"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
 publish = false
 
 [dependencies]
-console_error_panic_hook = "0.1.7"
-arwa = { version = "0.1.0", path = "../../../../rudo/arwa" }
-empa = { version = "0.1.0", path = "../../../crates/empa", features = ["arwa", "bytemuck"] }
-futures = "0.3.21"
-wasm-bindgen = "0.2.81"
+arwa = { workspace = true }
+empa = { workspace = true, features = ["arwa", "bytemuck"] }
+futures = { workspace = true }

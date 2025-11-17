@@ -23,9 +23,9 @@ use crate::render_target::{
     MultisampleRenderLayout, ReadOnly, RenderLayout, RenderLayoutCompatible, TypedColorLayout,
     TypedMultisampleColorLayout, ValidRenderTarget,
 };
-use crate::texture::format::{DepthStencilRenderable, ImageData, TextureFormat, TextureFormatId};
 use crate::texture::ImageCopySize3D;
-use crate::type_flag::{TypeFlag, O, X};
+use crate::texture::format::{DepthStencilRenderable, ImageData, TextureFormat, TextureFormatId};
+use crate::type_flag::{O, TypeFlag, X};
 use crate::{abi, buffer, driver, texture};
 
 pub struct CommandBuffer {
@@ -1423,8 +1423,8 @@ impl RenderBundleEncoderDescriptor<()> {
         }
     }
 
-    pub fn multisample<C, const SAMPLES: u8>(
-    ) -> RenderBundleEncoderDescriptor<MultisampleRenderLayout<C, (), SAMPLES>>
+    pub fn multisample<C, const SAMPLES: u8>()
+    -> RenderBundleEncoderDescriptor<MultisampleRenderLayout<C, (), SAMPLES>>
     where
         C: TypedMultisampleColorLayout,
     {

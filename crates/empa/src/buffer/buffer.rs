@@ -549,7 +549,12 @@ impl<T, U> Buffer<[T], U> {
         let bytes_per_block = mem::size_of::<T>() as u32;
         let bytes_per_row = blocks_per_row * bytes_per_block;
 
-        assert!(bytes_per_row.rem(256) == 0, "bytes per block row `block_size * block_per_row` (`{} * {}`) must be a multiple of `256`", bytes_per_block, bytes_per_row);
+        assert!(
+            bytes_per_row.rem(256) == 0,
+            "bytes per block row `block_size * block_per_row` (`{} * {}`) must be a multiple of `256`",
+            bytes_per_block,
+            bytes_per_row
+        );
 
         ImageCopySrc {
             inner: ImageCopyBuffer {
@@ -576,7 +581,12 @@ impl<T, U> Buffer<[T], U> {
         let bytes_per_block = mem::size_of::<T>() as u32;
         let bytes_per_row = blocks_per_row * bytes_per_block;
 
-        assert!(bytes_per_row.rem(256) == 0, "bytes per block row `block_size * block_per_row` (`{} * {}`) must be a multiple of `256`", bytes_per_block, bytes_per_row);
+        assert!(
+            bytes_per_row.rem(256) == 0,
+            "bytes per block row `block_size * block_per_row` (`{} * {}`) must be a multiple of `256`",
+            bytes_per_block,
+            bytes_per_row
+        );
 
         ImageCopyDst {
             inner: ImageCopyBuffer {
@@ -609,7 +619,12 @@ impl<U> Buffer<[u8], U> {
 
         let bytes_per_row = blocks_per_row * bytes_per_block;
 
-        assert!(bytes_per_row.rem(256) == 0, "bytes per block row `block_size * block_per_row` (`{} * {}`) must be a multiple of `256`", bytes_per_block, bytes_per_row);
+        assert!(
+            bytes_per_row.rem(256) == 0,
+            "bytes per block row `block_size * block_per_row` (`{} * {}`) must be a multiple of `256`",
+            bytes_per_block,
+            bytes_per_row
+        );
 
         ImageCopySrcRaw {
             inner: ImageCopyBuffer {
@@ -635,7 +650,12 @@ impl<U> Buffer<[u8], U> {
 
         let bytes_per_row = blocks_per_row * bytes_per_block;
 
-        assert!(bytes_per_row.rem(256) == 0, "bytes per block row `block_size * block_per_row` (`{} * {}`) must be a multiple of `256`", bytes_per_block, bytes_per_row);
+        assert!(
+            bytes_per_row.rem(256) == 0,
+            "bytes per block row `block_size * block_per_row` (`{} * {}`) must be a multiple of `256`",
+            bytes_per_block,
+            bytes_per_row
+        );
 
         ImageCopyDstRaw {
             inner: ImageCopyBuffer {
@@ -685,21 +705,21 @@ where
 }
 
 impl<'a, T, U> View<'a, T, U> {
-    fn map_internal(&self, mode: MapMode) -> impl Future<Output = Result<(), MapError>> {
+    fn map_internal(self, mode: MapMode) -> impl Future<Output = Result<(), MapError>> {
         let start = self.offset_in_bytes;
         let size_in_bytes = mem::size_of::<T>();
 
         self.buffer.map_async_internal(mode, start, size_in_bytes)
     }
 
-    pub fn map_read(&self) -> impl Future<Output = Result<(), MapError>>
+    pub fn map_read(self) -> impl Future<Output = Result<(), MapError>>
     where
         U: MapRead,
     {
         self.map_internal(MapMode::Read)
     }
 
-    pub fn map_write(&self) -> impl Future<Output = Result<(), MapError>>
+    pub fn map_write(self) -> impl Future<Output = Result<(), MapError>>
     where
         U: MapWrite,
     {
@@ -859,21 +879,21 @@ impl<'a, T, U> View<'a, [T], U> {
         index.get_unchecked(self)
     }
 
-    fn map_internal(&self, mode: MapMode) -> impl Future<Output = Result<(), MapError>> {
+    fn map_internal(self, mode: MapMode) -> impl Future<Output = Result<(), MapError>> {
         let start = self.offset_in_bytes;
         let size_in_bytes = mem::size_of::<T>() * self.len;
 
         self.buffer.map_async_internal(mode, start, size_in_bytes)
     }
 
-    pub fn map_read(&self) -> impl Future<Output = Result<(), MapError>>
+    pub fn map_read(self) -> impl Future<Output = Result<(), MapError>>
     where
         U: MapRead,
     {
         self.map_internal(MapMode::Read)
     }
 
-    pub fn map_write(&self) -> impl Future<Output = Result<(), MapError>>
+    pub fn map_write(self) -> impl Future<Output = Result<(), MapError>>
     where
         U: MapWrite,
     {
@@ -946,7 +966,12 @@ impl<'a, T, U> View<'a, [T], U> {
         let bytes_per_block = mem::size_of::<T>() as u32;
         let bytes_per_row = blocks_per_row * bytes_per_block;
 
-        assert!(bytes_per_row.rem(256) == 0, "bytes per block row `block_size * block_per_row` (`{} * {}`) must be a multiple of `256`", bytes_per_block, bytes_per_row);
+        assert!(
+            bytes_per_row.rem(256) == 0,
+            "bytes per block row `block_size * block_per_row` (`{} * {}`) must be a multiple of `256`",
+            bytes_per_block,
+            bytes_per_row
+        );
 
         ImageCopySrc {
             inner: ImageCopyBuffer {
@@ -973,7 +998,12 @@ impl<'a, T, U> View<'a, [T], U> {
         let bytes_per_block = mem::size_of::<T>() as u32;
         let bytes_per_row = blocks_per_row * bytes_per_block;
 
-        assert!(bytes_per_row.rem(256) == 0, "bytes per block row `block_size * block_per_row` (`{} * {}`) must be a multiple of `256`", bytes_per_block, bytes_per_row);
+        assert!(
+            bytes_per_row.rem(256) == 0,
+            "bytes per block row `block_size * block_per_row` (`{} * {}`) must be a multiple of `256`",
+            bytes_per_block,
+            bytes_per_row
+        );
 
         ImageCopyDst {
             inner: ImageCopyBuffer {
@@ -1010,7 +1040,12 @@ impl<'a, U> View<'a, [u8], U> {
 
         let bytes_per_row = blocks_per_row * bytes_per_block;
 
-        assert!(bytes_per_row.rem(256) == 0, "bytes per block row `block_size * block_per_row` (`{} * {}`) must be a multiple of `256`", bytes_per_block, bytes_per_row);
+        assert!(
+            bytes_per_row.rem(256) == 0,
+            "bytes per block row `block_size * block_per_row` (`{} * {}`) must be a multiple of `256`",
+            bytes_per_block,
+            bytes_per_row
+        );
 
         ImageCopySrcRaw {
             inner: ImageCopyBuffer {
@@ -1036,7 +1071,12 @@ impl<'a, U> View<'a, [u8], U> {
 
         let bytes_per_row = blocks_per_row * bytes_per_block;
 
-        assert!(bytes_per_row.rem(256) == 0, "bytes per block row `block_size * block_per_row` (`{} * {}`) must be a multiple of `256`", bytes_per_block, bytes_per_row);
+        assert!(
+            bytes_per_row.rem(256) == 0,
+            "bytes per block row `block_size * block_per_row` (`{} * {}`) must be a multiple of `256`",
+            bytes_per_block,
+            bytes_per_row
+        );
 
         ImageCopyDstRaw {
             inner: ImageCopyBuffer {
@@ -1670,7 +1710,9 @@ where
     if let Ok(ok) = try_cast_slice(buffer) {
         ok
     } else {
-        panic!("the size in bytes of the target type must be a multiple of the size in bytes of the source slice");
+        panic!(
+            "the size in bytes of the target type must be a multiple of the size in bytes of the source slice"
+        );
     }
 }
 
@@ -1841,6 +1883,8 @@ where
     if let Ok(ok) = try_cast_slice_view(view) {
         ok
     } else {
-        panic!("the size in bytes of the target type must be a multiple of the size in bytes of the source slice");
+        panic!(
+            "the size in bytes of the target type must be a multiple of the size in bytes of the source slice"
+        );
     }
 }

@@ -10,7 +10,7 @@ use crate::driver::{
 };
 use crate::resource_binding::typed_bind_group_entry::TypedSlotBinding;
 use crate::texture::format::TextureFormatId;
-use crate::{driver, Untyped};
+use crate::{Untyped, driver};
 
 pub struct BindGroupLayoutEncoding<'a> {
     pub(crate) handle: &'a <Dvr as Driver>::BindGroupLayoutHandle,
@@ -101,8 +101,12 @@ impl_typed_bind_group_layout!(B0, B1, B2, B3, B4, B5, B6, B7, B8, B9, B10);
 impl_typed_bind_group_layout!(B0, B1, B2, B3, B4, B5, B6, B7, B8, B9, B10, B11);
 impl_typed_bind_group_layout!(B0, B1, B2, B3, B4, B5, B6, B7, B8, B9, B10, B11, B12);
 impl_typed_bind_group_layout!(B0, B1, B2, B3, B4, B5, B6, B7, B8, B9, B10, B11, B12, B13);
-impl_typed_bind_group_layout!(B0, B1, B2, B3, B4, B5, B6, B7, B8, B9, B10, B11, B12, B13, B14);
-impl_typed_bind_group_layout!(B0, B1, B2, B3, B4, B5, B6, B7, B8, B9, B10, B11, B12, B13, B14, B15);
+impl_typed_bind_group_layout!(
+    B0, B1, B2, B3, B4, B5, B6, B7, B8, B9, B10, B11, B12, B13, B14
+);
+impl_typed_bind_group_layout!(
+    B0, B1, B2, B3, B4, B5, B6, B7, B8, B9, B10, B11, B12, B13, B14, B15
+);
 impl_typed_bind_group_layout!(
     B0, B1, B2, B3, B4, B5, B6, B7, B8, B9, B10, B11, B12, B13, B14, B15, B16
 );

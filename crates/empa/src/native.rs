@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::{error, fmt};
 
 use arrayvec::ArrayVec;
-use flagset::{flags, FlagSet};
+use flagset::{FlagSet, flags};
 use raw_window_handle::{
     HandleError, HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle,
 };
@@ -18,8 +18,8 @@ use wgt::SurfaceStatus;
 use crate::adapter::Adapter;
 use crate::device::Device;
 use crate::driver::native::{texture_format_to_wgc, texture_usage_to_wgc};
-use crate::texture::format::{TextureFormat, TextureFormatId, ViewFormats};
 use crate::texture::Texture2D;
+use crate::texture::format::{TextureFormat, TextureFormatId, ViewFormats};
 use crate::{driver, texture};
 
 flags! {

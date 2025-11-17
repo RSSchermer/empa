@@ -4,8 +4,9 @@ use std::error::Error;
 use std::future::Future;
 use std::ops::{Range, RangeInclusive};
 
-use flagset::{flags, FlagSet};
+use flagset::{FlagSet, flags};
 
+use crate::CompareFunction;
 use crate::adapter::{Feature, Limits};
 use crate::buffer::MapError;
 use crate::command::{BlendConstant, Draw, DrawIndexed, ScissorRect, Viewport};
@@ -16,7 +17,6 @@ use crate::render_pipeline::{
 use crate::render_target::{LoadOp, StoreOp};
 use crate::sampler::{AddressMode, FilterMode};
 use crate::texture::format::TextureFormatId;
-use crate::CompareFunction;
 
 pub trait Driver: Sized {
     type AdapterHandle: Adapter<Self> + 'static;

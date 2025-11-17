@@ -1,12 +1,12 @@
 [package]
 name = "empa"
-version = "0.1.0"
-edition = "2021"
 description = "Typed interaction with the GPU implemented against the WebGPU spec."
-authors = ["Roland Schermer <roland0507@gmail.com>"]
-homepage = "https://github.com/RSSchermer/empa"
-repository = "https://github.com/RSSchermer/empa"
-license = "MIT"
+version = { workspace = true }
+edition = { workspace = true }
+authors = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [lib]
 

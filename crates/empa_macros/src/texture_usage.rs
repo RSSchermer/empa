@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
-use syn::{parse, parse_macro_input, Ident, Token};
+use syn::{Ident, Token, parse, parse_macro_input};
 
 struct UsageFlags {
     render_attachment: bool,

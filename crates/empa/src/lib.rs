@@ -1,5 +1,3 @@
-#![feature(new_uninit)]
-
 mod driver;
 
 mod compare_function;

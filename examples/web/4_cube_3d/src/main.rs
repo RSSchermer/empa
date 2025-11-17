@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::f32::consts::PI;
 
-use arwa::dom::{selector, ParentNode};
+use arwa::dom::{ParentNode, selector};
 use arwa::html::HtmlCanvasElement;
 use arwa::window::window;
 use empa::arwa::{
@@ -21,10 +21,10 @@ use empa::render_target::{
     DepthAttachment, DepthValue, FloatAttachment, LoadOp, RenderTarget, StoreOp,
 };
 use empa::resource_binding::Resources;
-use empa::shader_module::{shader_source, ShaderSource};
+use empa::shader_module::{ShaderSource, shader_source};
 use empa::texture::format::{depth24plus, rgba8unorm};
 use empa::texture::{AttachableImageDescriptor, MipmapLevels, Texture2DDescriptor};
-use empa::{abi, buffer, texture, CompareFunction};
+use empa::{CompareFunction, abi, buffer, texture};
 use empa_glam::ToAbi;
 use futures::FutureExt;
 

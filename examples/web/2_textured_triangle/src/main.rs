@@ -1,8 +1,8 @@
 use std::error::Error;
 
-use arwa::dom::{selector, ParentNode};
+use arwa::dom::{ParentNode, selector};
 use arwa::html::{HtmlCanvasElement, HtmlImgElement};
-use arwa::image_bitmap::{create_image_bitmap, ImageBitmapOptions, ImageRegion};
+use arwa::image_bitmap::{ImageBitmapOptions, ImageRegion, create_image_bitmap};
 use arwa::window::window;
 use empa::arwa::{
     AlphaMode, CanvasConfiguration, ExternalImageCopySrc, HtmlCanvasElementExt, NavigatorExt,
@@ -21,7 +21,7 @@ use empa::render_pipeline::{
 use empa::render_target::{FloatAttachment, LoadOp, RenderTarget, StoreOp};
 use empa::resource_binding::Resources;
 use empa::sampler::{FilterMode, Sampler, SamplerDescriptor};
-use empa::shader_module::{shader_source, ShaderSource};
+use empa::shader_module::{ShaderSource, shader_source};
 use empa::texture::format::{rgba8unorm, rgba8unorm_srgb};
 use empa::texture::{
     AttachableImageDescriptor, ImageCopySize2D, MipmapLevels, Sampled2DFloat, Texture2DDescriptor,

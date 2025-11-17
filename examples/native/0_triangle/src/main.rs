@@ -11,7 +11,7 @@ use empa::render_pipeline::{
     RenderPipelineDescriptorBuilder, VertexStageBuilder,
 };
 use empa::render_target::{FloatAttachment, LoadOp, RenderLayout, RenderTarget, StoreOp};
-use empa::shader_module::{shader_source, ShaderSource};
+use empa::shader_module::{ShaderSource, shader_source};
 use empa::texture::format::bgra8unorm;
 use empa::texture::{AttachableImageDescriptor, TextureUsages};
 use empa::{buffer, texture};

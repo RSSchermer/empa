@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use arwa::dom::{selector, ParentNode};
+use arwa::dom::{ParentNode, selector};
 use arwa::html::HtmlCanvasElement;
 use arwa::window::window;
 use empa::arwa::{
@@ -14,9 +14,9 @@ use empa::render_pipeline::{
     VertexStageBuilder,
 };
 use empa::render_target::{FloatAttachment, LoadOp, RenderTarget, StoreOp};
-use empa::shader_module::{shader_source, ShaderSource};
-use empa::texture::format::rgba8unorm;
+use empa::shader_module::{ShaderSource, shader_source};
 use empa::texture::AttachableImageDescriptor;
+use empa::texture::format::rgba8unorm;
 use empa::{buffer, texture};
 use futures::FutureExt;
 

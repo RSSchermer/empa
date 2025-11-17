@@ -5,7 +5,7 @@ use std::error::Error;
 
 use arwa::console;
 use arwa::window::window;
-use empa::access_mode::ReadWrite;
+use empa::access_mode::{Read, ReadWrite};
 use empa::arwa::{NavigatorExt, RequestAdapterOptions};
 use empa::buffer;
 use empa::buffer::{Buffer, Storage, StorageBinding};
@@ -15,7 +15,7 @@ use empa::compute_pipeline::{
 };
 use empa::device::{Device, DeviceDescriptor};
 use empa::resource_binding::BindGroupLayout;
-use empa::shader_module::{shader_source, ShaderSource};
+use empa::shader_module::{ShaderSource, shader_source};
 use futures::FutureExt;
 
 const SCAN_SHADER: ShaderSource = shader_source!("scan.wgsl");
@@ -35,7 +35,7 @@ const UNIFORM_ADD_SHADER: ShaderSource = shader_source!("uniform_add.wgsl");
 #[derive(empa::resource_binding::Resources)]
 struct UniformAddResources<'a> {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    sums: Storage<'a, [u32], ReadWrite>,
+    sums: Storage<'a, [u32], Read>,
     #[resource(binding = 1, visibility = "COMPUTE")]
     data: Storage<'a, [u32], ReadWrite>,
 }

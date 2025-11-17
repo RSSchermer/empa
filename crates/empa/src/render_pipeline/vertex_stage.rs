@@ -78,7 +78,10 @@ impl VertexStageBuilder<()> {
                 for attribute in buffer_layout.attributes.iter() {
                     if attribute.shader_location == location {
                         if !vertex_format_is_compatible(attribute.format, binding.binding_type()) {
-                            panic!("attribute for location `{}` is not compatible with the shader type", location);
+                            panic!(
+                                "attribute for location `{}` is not compatible with the shader type",
+                                location
+                            );
                         }
 
                         continue 'outer;
@@ -121,7 +124,9 @@ where
 {
     pub fn finish(self) -> VertexStage<V> {
         if !self.has_constants && self.inner.shader_meta.has_required_constants() {
-            panic!("the shader declares pipeline constants without fallback values, but no pipeline constants were set");
+            panic!(
+                "the shader declares pipeline constants without fallback values, but no pipeline constants were set"
+            );
         }
 
         self.inner

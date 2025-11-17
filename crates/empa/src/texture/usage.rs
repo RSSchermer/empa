@@ -1,7 +1,7 @@
 use flagset::FlagSet;
 
 use crate::driver::TextureUsage;
-use crate::type_flag::{TypeFlag, O, X};
+use crate::type_flag::{O, TypeFlag, X};
 
 mod usage_flags_seal {
     use flagset::FlagSet;
@@ -33,12 +33,12 @@ pub struct Usages<
 }
 
 impl<
-        RenderAttachment: TypeFlag,
-        StorageBinding: TypeFlag,
-        TextureBinding: TypeFlag,
-        CopyDst: TypeFlag,
-        CopySrc: TypeFlag,
-    > Clone for Usages<RenderAttachment, StorageBinding, TextureBinding, CopyDst, CopySrc>
+    RenderAttachment: TypeFlag,
+    StorageBinding: TypeFlag,
+    TextureBinding: TypeFlag,
+    CopyDst: TypeFlag,
+    CopySrc: TypeFlag,
+> Clone for Usages<RenderAttachment, StorageBinding, TextureBinding, CopyDst, CopySrc>
 {
     fn clone(&self) -> Self {
         Usages {
@@ -48,22 +48,22 @@ impl<
 }
 
 impl<
-        RenderAttachment: TypeFlag,
-        StorageBinding: TypeFlag,
-        TextureBinding: TypeFlag,
-        CopyDst: TypeFlag,
-        CopySrc: TypeFlag,
-    > Copy for Usages<RenderAttachment, StorageBinding, TextureBinding, CopyDst, CopySrc>
+    RenderAttachment: TypeFlag,
+    StorageBinding: TypeFlag,
+    TextureBinding: TypeFlag,
+    CopyDst: TypeFlag,
+    CopySrc: TypeFlag,
+> Copy for Usages<RenderAttachment, StorageBinding, TextureBinding, CopyDst, CopySrc>
 {
 }
 
 impl<
-        RenderAttachment: TypeFlag,
-        StorageBinding: TypeFlag,
-        TextureBinding: TypeFlag,
-        CopyDst: TypeFlag,
-        CopySrc: TypeFlag,
-    > usage_flags_seal::Seal
+    RenderAttachment: TypeFlag,
+    StorageBinding: TypeFlag,
+    TextureBinding: TypeFlag,
+    CopyDst: TypeFlag,
+    CopySrc: TypeFlag,
+> usage_flags_seal::Seal
     for Usages<RenderAttachment, StorageBinding, TextureBinding, CopyDst, CopySrc>
 {
     const FLAG_SET: FlagSet<TextureUsage> = {
@@ -121,12 +121,12 @@ impl<
 }
 
 impl<
-        RenderAttachment: TypeFlag,
-        StorageBinding: TypeFlag,
-        TextureBinding: TypeFlag,
-        CopyDst: TypeFlag,
-        CopySrc: TypeFlag,
-    > UsageFlags for Usages<RenderAttachment, StorageBinding, TextureBinding, CopyDst, CopySrc>
+    RenderAttachment: TypeFlag,
+    StorageBinding: TypeFlag,
+    TextureBinding: TypeFlag,
+    CopyDst: TypeFlag,
+    CopySrc: TypeFlag,
+> UsageFlags for Usages<RenderAttachment, StorageBinding, TextureBinding, CopyDst, CopySrc>
 {
 }
 

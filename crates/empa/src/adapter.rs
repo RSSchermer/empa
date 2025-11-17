@@ -3,7 +3,7 @@ use std::fmt;
 use std::future::Future;
 use std::sync::OnceLock;
 
-use flagset::{flags, FlagSet};
+use flagset::{FlagSet, flags};
 use futures::TryFutureExt;
 
 use crate::device::{Device, DeviceDescriptor};

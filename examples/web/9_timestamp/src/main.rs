@@ -11,7 +11,7 @@ use empa::command::{DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{ComputePipelineDescriptorBuilder, ComputeStageBuilder};
 use empa::device::DeviceDescriptor;
 use empa::resource_binding::Resources;
-use empa::shader_module::{shader_source, ShaderSource};
+use empa::shader_module::{ShaderSource, shader_source};
 use futures::FutureExt;
 
 #[derive(empa::resource_binding::Resources)]
@@ -23,7 +23,6 @@ struct MyResources<'a> {
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 fn main() {
-    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     arwa::spawn_local(render().map(|res| res.unwrap()));
 }
 

@@ -17,12 +17,12 @@ use empa::render_pipeline::{
 use empa::render_target::{
     DepthAttachment, DepthValue, FloatAttachment, LoadOp, RenderLayout, RenderTarget, StoreOp,
 };
-use empa::shader_module::{shader_source, ShaderSource};
+use empa::shader_module::{ShaderSource, shader_source};
 use empa::texture::format::{bgra8unorm, depth24plus};
 use empa::texture::{
     AttachableImageDescriptor, MipmapLevels, Texture2D, Texture2DDescriptor, TextureUsages,
 };
-use empa::{abi, buffer, texture, CompareFunction};
+use empa::{CompareFunction, abi, buffer, texture};
 use empa_glam::ToAbi;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;

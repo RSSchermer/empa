@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fs::File;
+use std::io::BufReader;
 
 use empa::buffer::{Buffer, BufferUsages};
 use empa::command::{
@@ -17,7 +18,7 @@ use empa::render_pipeline::{
 use empa::render_target::{FloatAttachment, LoadOp, RenderLayout, RenderTarget, StoreOp};
 use empa::resource_binding::BindGroup;
 use empa::sampler::{FilterMode, Sampler, SamplerDescriptor};
-use empa::shader_module::{shader_source, ShaderSource};
+use empa::shader_module::{ShaderSource, shader_source};
 use empa::texture::format::{bgra8unorm, rgba8unorm_srgb};
 use empa::texture::{
     AttachableImageDescriptor, ImageDataLayout, MipmapLevels, Sampled2DFloat, Texture2DDescriptor,
@@ -141,9 +142,10 @@ impl AppState {
             },
         );
 
-        let decoder = png::Decoder::new(File::open("checkerboard_gradient.png")?);
+        let file = File::open("checkerboard_gradient.png")?;
+        let decoder = png::Decoder::new(BufReader::new(file));
         let mut reader = decoder.read_info()?;
-        let mut buf = vec![0; reader.output_buffer_size()];
+        let mut buf = vec![0; reader.output_buffer_size().unwrap_or_default()];
         let info = reader.next_frame(&mut buf)?;
         let bytes = &buf[..info.buffer_size()];
         let bytes_rgba: &[[u8; 4]] = bytemuck::cast_slice(bytes);

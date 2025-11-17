@@ -9,7 +9,7 @@ use crate::resource_binding::bind_group_layout::{
     BindGroupLayoutEntry, BindingType, SizedBufferLayout, TexelType, UnsizedBufferLayout,
 };
 use crate::texture::format::Storable;
-use crate::type_flag::{TypeFlag, O, X};
+use crate::type_flag::{O, TypeFlag, X};
 
 mod visibility_seal {
     use flagset::FlagSet;

@@ -21,9 +21,9 @@ use crate::device::{Device, Queue};
 use crate::driver::web::{size_3d_to_web_sys, texture_format_to_str, texture_format_to_web_sys};
 use crate::texture;
 use crate::texture::format::{
-    bgra8unorm, bgra8unorm_srgb, r16float, r32float, r8unorm, rg16float, rg32float, rg8unorm,
-    rgb10a2unorm, rgba16float, rgba32float, rgba8unorm, rgba8unorm_srgb, TextureFormat,
-    TextureFormatId, ViewFormats,
+    TextureFormat, TextureFormatId, ViewFormats, bgra8unorm, bgra8unorm_srgb, r8unorm, r16float,
+    r32float, rg8unorm, rg16float, rg32float, rgb10a2unorm, rgba8unorm, rgba8unorm_srgb,
+    rgba16float, rgba32float,
 };
 use crate::texture::{ImageCopySize2D, Texture2D};
 

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use compiletest_rs::{run_tests, Config};
+use compiletest_rs::{Config, run_tests};
 
 fn run_mode(mode: &'static str) {
     let mut config = Config::default();

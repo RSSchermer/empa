@@ -1,13 +1,13 @@
 use std::borrow::{Borrow, Cow};
 use std::error::Error;
-use std::future::{ready, Future};
+use std::future::{Future, ready};
 use std::num::NonZeroU64;
 use std::ops::Range;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use std::sync::atomic::{AtomicBool, AtomicUsize};
-use std::sync::{atomic, Arc};
+use std::sync::{Arc, atomic};
 use std::task::{Context, Poll};
 use std::thread::JoinHandle;
 use std::{future, mem, ptr, slice, thread};
@@ -51,7 +51,7 @@ use crate::render_pipeline::{
 use crate::render_target::{LoadOp, StoreOp};
 use crate::sampler::{AddressMode, FilterMode};
 use crate::texture::format::TextureFormatId;
-use crate::{driver, CompareFunction};
+use crate::{CompareFunction, driver};
 
 // External reference counting based on the `Arc` implementation
 

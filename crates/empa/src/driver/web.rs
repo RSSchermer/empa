@@ -41,7 +41,7 @@ use crate::render_pipeline::{
 use crate::render_target::{LoadOp, StoreOp};
 use crate::sampler::{AddressMode, FilterMode};
 use crate::texture::format::TextureFormatId;
-use crate::{driver, CompareFunction};
+use crate::{CompareFunction, driver};
 
 pub struct Driver;
 
@@ -2315,7 +2315,7 @@ pub fn limits_from_web_sys(limits: &web_sys::GpuSupportedLimits) -> Limits {
 }
 
 #[wasm_bindgen(module = "/src/js_support.js")]
-extern "C" {
+unsafe extern "C" {
     #[wasm_bindgen(js_name = __empa_js_copy_buffer_to_memory)]
     fn copy_buffer_to_memory(
         buffer: &Uint8Array,

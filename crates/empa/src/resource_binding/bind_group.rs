@@ -8,9 +8,9 @@ use crate::command::BindGroupEncoding;
 use crate::device::{Device, ID_GEN};
 use crate::driver::{BindGroupDescriptor, BindingResource, Device as _, Driver, Dvr};
 use crate::resource_binding::typed_bind_group_entry::{
-    f32_unfiltered, ShaderStages, TypedSlotBinding,
+    ShaderStages, TypedSlotBinding, f32_unfiltered,
 };
-use crate::resource_binding::{typed_bind_group_entry, BindGroupLayout, TypedBindGroupLayout};
+use crate::resource_binding::{BindGroupLayout, TypedBindGroupLayout, typed_bind_group_entry};
 use crate::sampler::{ComparisonSampler, NonFilteringSampler, Sampler};
 use crate::texture::format::Storable;
 use crate::texture::{

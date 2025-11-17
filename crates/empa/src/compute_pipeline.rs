@@ -229,7 +229,9 @@ impl ComputeStageBuilder {
 
     pub fn finish(self) -> ComputeStage {
         if !self.has_constants && self.compute_stage.shader_meta.has_required_constants() {
-            panic!("the shader declares pipeline constants without fallback values, but no pipeline constants were set");
+            panic!(
+                "the shader declares pipeline constants without fallback values, but no pipeline constants were set"
+            );
         }
 
         self.compute_stage

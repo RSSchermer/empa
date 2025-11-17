@@ -1,11 +1,12 @@
 [package]
 name = "empa-smi"
-version = "0.1.0"
-authors = ["Roland Schermer <roland0507@gmail.com>"]
-edition = "2024"
-publish = false
-repository = "https://github.com/RSSchermer/empa"
-license = "MIT"
+description = "Shader Module Interface descriptions from Empa."
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }

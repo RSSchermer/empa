@@ -12,7 +12,7 @@ mod vertex;
 use proc_macro::TokenStream;
 use proc_macro2;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput};
+use syn::{DeriveInput, parse_macro_input};
 
 #[proc_macro]
 #[allow(nonstandard_style)]

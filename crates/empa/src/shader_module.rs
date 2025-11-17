@@ -254,7 +254,10 @@ impl ShaderSourceInternal {
                                 required: bool| {
             if let Some(supplied_value) = pipeline_constants.lookup(identifier) {
                 if supplied_value.constant_type() != tpe {
-                    panic!("supplied value for pipeline constant `{}` does not match the type expected by the shader", identifier)
+                    panic!(
+                        "supplied value for pipeline constant `{}` does not match the type expected by the shader",
+                        identifier
+                    )
                 }
 
                 map.insert(identifier.to_string(), supplied_value.to_f64());

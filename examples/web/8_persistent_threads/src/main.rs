@@ -11,7 +11,7 @@ use empa::command::{DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{ComputePipelineDescriptorBuilder, ComputeStageBuilder};
 use empa::device::DeviceDescriptor;
 use empa::resource_binding::Resources;
-use empa::shader_module::{shader_source, ShaderSource};
+use empa::shader_module::{ShaderSource, shader_source};
 use futures::FutureExt;
 
 #[derive(empa::resource_binding::Resources)]

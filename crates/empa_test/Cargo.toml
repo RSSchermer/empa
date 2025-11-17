@@ -1,11 +1,11 @@
 [package]
 name = "empa-test"
-version = "0.1.0"
-authors = ["Roland Schermer <roland0507@gmail.com>"]
-edition = "2021"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
 publish = false
-repository = "https://github.com/RSSchermer/empa"
-license = "MIT"
+repository = { workspace = true }
+license = { workspace = true }
 
 [dev-dependencies]
 compiletest_rs = { workspace = true }

@@ -4,11 +4,11 @@ use crate::driver::{
 use crate::render_target::{
     ColorTargetEncoding, DepthStencilTargetEncoding, DepthValue, LoadOp, StoreOp, TypedColorLayout,
 };
+use crate::texture::AttachableImage;
 use crate::texture::format::{
     ColorRenderable, CombinedDepthStencilRenderable, DepthRenderable, DepthStencilRenderable,
     FloatRenderable, SignedIntegerRenderable, StencilRenderable, UnsignedIntegerRenderable,
 };
-use crate::texture::AttachableImage;
 
 mod color_targets_seal {
     pub trait Seal {}

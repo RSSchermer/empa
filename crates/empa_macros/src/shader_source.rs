@@ -1,5 +1,5 @@
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
 use std::env;
 use std::error::Error as _;
 use std::hash::{Hash, Hasher};
@@ -16,12 +16,12 @@ use empa_reflect::{
     SizedBufferLayout, StorageTextureFormat, TexelType, UnsizedBufferLayout,
 };
 use include_preprocessor::{
-    preprocess, Error as IppError, OutputSink, SearchPaths, SourceMappedChunk, SourceTracker,
+    Error as IppError, OutputSink, SearchPaths, SourceMappedChunk, SourceTracker, preprocess,
 };
 use naga::valid::{Capabilities, ValidationFlags, Validator};
-use proc_macro::{tracked_path, Span, TokenStream};
+use proc_macro::{Span, TokenStream, tracked_path};
 use quote::quote;
-use syn::{parse_macro_input, LitStr};
+use syn::{LitStr, parse_macro_input};
 
 fn gen_file_id(path: &Path) -> u64 {
     let mut hasher = DefaultHasher::new();

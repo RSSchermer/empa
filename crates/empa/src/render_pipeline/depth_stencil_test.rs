@@ -1,12 +1,12 @@
 use std::marker;
 
+use crate::CompareFunction;
 use crate::driver::{DepthStencilState, StencilFaceState, StencilOperation};
 use crate::render_target::ReadOnly;
 use crate::texture::format::{
-    depth16unorm, depth24plus, depth24plus_stencil8, depth32float, depth32float_stencil8, stencil8,
-    DepthStencilTestFormat,
+    DepthStencilTestFormat, depth16unorm, depth24plus, depth24plus_stencil8, depth32float,
+    depth32float_stencil8, stencil8,
 };
-use crate::CompareFunction;
 
 mod depth_stencil_test_seal {
     pub trait Seal {}

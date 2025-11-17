@@ -2,7 +2,7 @@ use std::ops::RangeInclusive;
 
 use crate::device::Device;
 use crate::driver::{Device as _, Driver, Dvr};
-use crate::{driver, CompareFunction};
+use crate::{CompareFunction, driver};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum AddressMode {
