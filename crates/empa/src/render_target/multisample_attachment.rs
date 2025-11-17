@@ -64,7 +64,7 @@ mod multisample_color_target_seal {
 pub trait MultisampleColorTarget<const SAMPLES: u8>: multisample_color_target_seal::Seal {
     type Format: MultisampleColorRenderable;
 
-    fn to_encoding(&self) -> ColorTargetEncoding;
+    fn to_encoding(&self) -> ColorTargetEncoding<'_>;
 }
 
 pub struct MultisampleFloatAttachment<'a, F, const SAMPLES: u8>
@@ -89,7 +89,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> ColorTargetEncoding {
+    fn to_encoding(&self) -> ColorTargetEncoding<'_> {
         let MultisampleFloatAttachment {
             image,
             load_op,
@@ -133,7 +133,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> ColorTargetEncoding {
+    fn to_encoding(&self) -> ColorTargetEncoding<'_> {
         let MultisampleResolveAttachment {
             image,
             resolve,
@@ -181,7 +181,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> ColorTargetEncoding {
+    fn to_encoding(&self) -> ColorTargetEncoding<'_> {
         let MultisampleSignedIntegerAttachment {
             image,
             load_op,
@@ -224,7 +224,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> ColorTargetEncoding {
+    fn to_encoding(&self) -> ColorTargetEncoding<'_> {
         let MultisampleUnsignedIntegerAttachment {
             image,
             load_op,
@@ -254,7 +254,7 @@ pub trait MultisampleDepthStencilTarget<const SAMPLES: u8>:
 {
     type Format: DepthStencilRenderable;
 
-    fn to_encoding(&self) -> DepthStencilTargetEncoding;
+    fn to_encoding(&self) -> DepthStencilTargetEncoding<'_>;
 }
 
 pub struct MultisampleDepthStencilAttachment<'a, F, const SAMPLES: u8>
@@ -281,7 +281,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> DepthStencilTargetEncoding {
+    fn to_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         let MultisampleDepthStencilAttachment {
             image,
             depth_load_op,
@@ -329,7 +329,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> DepthStencilTargetEncoding {
+    fn to_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         let MultisampleReadOnlyDepthStencilAttachment { image } = self;
 
         DepthStencilTargetEncoding {
@@ -367,7 +367,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> DepthStencilTargetEncoding {
+    fn to_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         let MultisampleDepthAttachment {
             image,
             load_op,
@@ -410,7 +410,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> DepthStencilTargetEncoding {
+    fn to_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         let MultisampleReadOnlyDepthAttachment { image } = self;
 
         DepthStencilTargetEncoding {
@@ -448,7 +448,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> DepthStencilTargetEncoding {
+    fn to_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         let MultisampleStencilAttachment {
             image,
             load_op,
@@ -491,7 +491,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> DepthStencilTargetEncoding {
+    fn to_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         let MultisampleReadOnlyStencilAttachment { image } = self;
 
         DepthStencilTargetEncoding {

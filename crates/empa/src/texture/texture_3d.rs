@@ -184,7 +184,7 @@ impl<F, U> Texture3D<F, U> {
         })
     }
 
-    pub fn sampled_float(&self, descriptor: &View3DDescriptor) -> Sampled3DFloat
+    pub fn sampled_float(&self, descriptor: &View3DDescriptor) -> Sampled3DFloat<'_>
     where
         F: FloatSamplable,
         U: TextureBinding,
@@ -198,7 +198,7 @@ impl<F, U> Texture3D<F, U> {
     pub fn try_as_sampled_float<ViewedFormat>(
         &self,
         descriptor: &View3DDescriptor,
-    ) -> Result<Sampled3DFloat, UnsupportedViewFormat>
+    ) -> Result<Sampled3DFloat<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + FloatSamplable,
         U: TextureBinding,
@@ -219,7 +219,7 @@ impl<F, U> Texture3D<F, U> {
     pub fn sampled_unfiltered_float(
         &self,
         descriptor: &View3DDescriptor,
-    ) -> Sampled3DUnfilteredFloat
+    ) -> Sampled3DUnfilteredFloat<'_>
     where
         F: UnfilteredFloatSamplable,
         U: TextureBinding,
@@ -233,7 +233,7 @@ impl<F, U> Texture3D<F, U> {
     pub fn try_as_sampled_unfiltered_float<ViewedFormat>(
         &self,
         descriptor: &View3DDescriptor,
-    ) -> Result<Sampled3DUnfilteredFloat, UnsupportedViewFormat>
+    ) -> Result<Sampled3DUnfilteredFloat<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
         U: TextureBinding,
@@ -251,7 +251,10 @@ impl<F, U> Texture3D<F, U> {
         }
     }
 
-    pub fn sampled_signed_integer(&self, descriptor: &View3DDescriptor) -> Sampled3DSignedInteger
+    pub fn sampled_signed_integer(
+        &self,
+        descriptor: &View3DDescriptor,
+    ) -> Sampled3DSignedInteger<'_>
     where
         F: SignedIntegerSamplable,
         U: TextureBinding,
@@ -265,7 +268,7 @@ impl<F, U> Texture3D<F, U> {
     pub fn try_as_sampled_signed_integer<ViewedFormat>(
         &self,
         descriptor: &View3DDescriptor,
-    ) -> Result<Sampled3DSignedInteger, UnsupportedViewFormat>
+    ) -> Result<Sampled3DSignedInteger<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
         U: TextureBinding,
@@ -286,7 +289,7 @@ impl<F, U> Texture3D<F, U> {
     pub fn sampled_unsigned_integer(
         &self,
         descriptor: &View3DDescriptor,
-    ) -> Sampled3DUnsignedInteger
+    ) -> Sampled3DUnsignedInteger<'_>
     where
         F: UnsignedIntegerSamplable,
         U: TextureBinding,
@@ -300,7 +303,7 @@ impl<F, U> Texture3D<F, U> {
     pub fn try_as_sampled_unsigned_integer<ViewedFormat>(
         &self,
         descriptor: &View3DDescriptor,
-    ) -> Result<Sampled3DUnsignedInteger, UnsupportedViewFormat>
+    ) -> Result<Sampled3DUnsignedInteger<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
         U: TextureBinding,
@@ -340,7 +343,7 @@ impl<F, U> Texture3D<F, U> {
         })
     }
 
-    pub fn storage(&self, mipmap_level: u8) -> Storage3D<F>
+    pub fn storage(&self, mipmap_level: u8) -> Storage3D<'_, F>
     where
         F: Storable,
         U: StorageBinding,
@@ -354,7 +357,7 @@ impl<F, U> Texture3D<F, U> {
     pub fn try_as_storage<ViewedFormat>(
         &self,
         mipmap_level: u8,
-    ) -> Result<Storage3D<ViewedFormat>, UnsupportedViewFormat>
+    ) -> Result<Storage3D<'_, ViewedFormat>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + Storable,
         U: StorageBinding,
@@ -377,7 +380,7 @@ impl<F, U> Texture3D<F, U> {
         mipmap_level: u8,
         bytes_per_block: u32,
         block_size: [u32; 2],
-    ) -> ImageCopyTexture<F> {
+    ) -> ImageCopyTexture<'_, F> {
         assert!(
             mipmap_level < self.mip_level_count,
             "mipmap level out of bounds"
@@ -406,7 +409,7 @@ impl<F, U> Texture3D<F, U> {
         descriptor: SubImageCopy3DDescriptor,
         bytes_per_block: u32,
         block_size: [u32; 2],
-    ) -> ImageCopyTexture<F> {
+    ) -> ImageCopyTexture<'_, F> {
         let SubImageCopy3DDescriptor {
             mipmap_level,
             origin_x,
@@ -440,7 +443,7 @@ impl<F, U> Texture3D<F, U> {
         }
     }
 
-    pub fn image_copy_to_buffer_src(&self, mipmap_level: u8) -> ImageCopySrc<F>
+    pub fn image_copy_to_buffer_src(&self, mipmap_level: u8) -> ImageCopySrc<'_, F>
     where
         F: ImageCopyToBufferFormat,
         U: CopySrc,
@@ -450,7 +453,7 @@ impl<F, U> Texture3D<F, U> {
         }
     }
 
-    pub fn image_copy_from_buffer_dst(&self, mipmap_level: u8) -> ImageCopyDst<F>
+    pub fn image_copy_from_buffer_dst(&self, mipmap_level: u8) -> ImageCopyDst<'_, F>
     where
         F: ImageCopyFromBufferFormat,
         U: CopyDst,
@@ -460,7 +463,7 @@ impl<F, U> Texture3D<F, U> {
         }
     }
 
-    pub fn image_copy_to_texture_src(&self, mipmap_level: u8) -> ImageCopyToTextureSrc<F>
+    pub fn image_copy_to_texture_src(&self, mipmap_level: u8) -> ImageCopyToTextureSrc<'_, F>
     where
         F: ImageCopyTextureFormat,
         U: CopySrc,
@@ -470,7 +473,7 @@ impl<F, U> Texture3D<F, U> {
         }
     }
 
-    pub fn image_copy_from_texture_dst(&self, mipmap_level: u8) -> ImageCopyFromTextureDst<F>
+    pub fn image_copy_from_texture_dst(&self, mipmap_level: u8) -> ImageCopyFromTextureDst<'_, F>
     where
         F: ImageCopyTextureFormat,
         U: CopyDst,
@@ -483,7 +486,7 @@ impl<F, U> Texture3D<F, U> {
     pub fn sub_image_copy_to_buffer_src(
         &self,
         descriptor: SubImageCopy3DDescriptor,
-    ) -> SubImageCopySrc<F>
+    ) -> SubImageCopySrc<'_, F>
     where
         F: ImageCopyToBufferFormat + SubImageCopyFormat,
         U: CopySrc,
@@ -496,7 +499,7 @@ impl<F, U> Texture3D<F, U> {
     pub fn sub_image_copy_from_buffer_dst(
         &self,
         descriptor: SubImageCopy3DDescriptor,
-    ) -> SubImageCopyDst<F>
+    ) -> SubImageCopyDst<'_, F>
     where
         F: ImageCopyFromBufferFormat + SubImageCopyFormat,
         U: CopyDst,
@@ -509,7 +512,7 @@ impl<F, U> Texture3D<F, U> {
     pub fn sub_image_copy_to_texture_src(
         &self,
         descriptor: SubImageCopy3DDescriptor,
-    ) -> SubImageCopyToTextureSrc<F>
+    ) -> SubImageCopyToTextureSrc<'_, F>
     where
         F: ImageCopyTextureFormat + SubImageCopyFormat,
         U: CopySrc,
@@ -522,7 +525,7 @@ impl<F, U> Texture3D<F, U> {
     pub fn sub_image_copy_from_texture_dst(
         &self,
         descriptor: SubImageCopy3DDescriptor,
-    ) -> SubImageCopyFromTextureDst<F>
+    ) -> SubImageCopyFromTextureDst<'_, F>
     where
         F: ImageCopyTextureFormat + SubImageCopyFormat,
         U: CopyDst,

@@ -72,7 +72,7 @@ pub fn expand_derive_pipeline_constants(input: &DeriveInput) -> Result<TokenStre
             #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
             const _: () = {
                 #[allow(unknown_lints)]
-                #[cfg_attr(feature = "cargo-clippy", allow(useless_attribute))]
+                #[allow(clippy::useless_attribute)]
                 #[allow(rust_2018_idioms)]
 
                 #impl_block

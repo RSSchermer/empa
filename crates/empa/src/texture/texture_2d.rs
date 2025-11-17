@@ -317,7 +317,7 @@ impl<F, U> Texture2D<F, U> {
         })
     }
 
-    pub fn sampled_float(&self, descriptor: &View2DDescriptor) -> Sampled2DFloat
+    pub fn sampled_float(&self, descriptor: &View2DDescriptor) -> Sampled2DFloat<'_>
     where
         F: FloatSamplable,
         U: TextureBinding,
@@ -331,7 +331,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_float<ViewedFormat>(
         &self,
         descriptor: &View2DDescriptor,
-    ) -> Result<Sampled2DFloat, UnsupportedViewFormat>
+    ) -> Result<Sampled2DFloat<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + FloatSamplable,
         U: TextureBinding,
@@ -352,7 +352,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sampled_unfilterable_float(
         &self,
         descriptor: &View2DDescriptor,
-    ) -> Sampled2DUnfilteredFloat
+    ) -> Sampled2DUnfilteredFloat<'_>
     where
         F: UnfilteredFloatSamplable,
         U: TextureBinding,
@@ -366,7 +366,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_unfilterable_float<ViewedFormat>(
         &self,
         descriptor: &View2DDescriptor,
-    ) -> Result<Sampled2DUnfilteredFloat, UnsupportedViewFormat>
+    ) -> Result<Sampled2DUnfilteredFloat<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
         U: TextureBinding,
@@ -384,7 +384,10 @@ impl<F, U> Texture2D<F, U> {
         }
     }
 
-    pub fn sampled_signed_integer(&self, descriptor: &View2DDescriptor) -> Sampled2DSignedInteger
+    pub fn sampled_signed_integer(
+        &self,
+        descriptor: &View2DDescriptor,
+    ) -> Sampled2DSignedInteger<'_>
     where
         F: SignedIntegerSamplable,
         U: TextureBinding,
@@ -398,7 +401,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_signed_integer<ViewedFormat>(
         &self,
         descriptor: &View2DDescriptor,
-    ) -> Result<Sampled2DSignedInteger, UnsupportedViewFormat>
+    ) -> Result<Sampled2DSignedInteger<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
         U: TextureBinding,
@@ -419,7 +422,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sampled_unsigned_integer(
         &self,
         descriptor: &View2DDescriptor,
-    ) -> Sampled2DUnsignedInteger
+    ) -> Sampled2DUnsignedInteger<'_>
     where
         F: UnsignedIntegerSamplable,
         U: TextureBinding,
@@ -433,7 +436,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_unsigned_integer<ViewedFormat>(
         &self,
         descriptor: &View2DDescriptor,
-    ) -> Result<Sampled2DUnsignedInteger, UnsupportedViewFormat>
+    ) -> Result<Sampled2DUnsignedInteger<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
         U: TextureBinding,
@@ -451,7 +454,7 @@ impl<F, U> Texture2D<F, U> {
         }
     }
 
-    pub fn sampled_depth(&self, descriptor: &View2DDescriptor) -> Sampled2DDepth
+    pub fn sampled_depth(&self, descriptor: &View2DDescriptor) -> Sampled2DDepth<'_>
     where
         F: DepthSamplable,
         U: TextureBinding,
@@ -465,7 +468,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_depth<ViewedFormat>(
         &self,
         descriptor: &View2DDescriptor,
-    ) -> Result<Sampled2DDepth, UnsupportedViewFormat>
+    ) -> Result<Sampled2DDepth<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + DepthSamplable,
         U: TextureBinding,
@@ -483,7 +486,7 @@ impl<F, U> Texture2D<F, U> {
         }
     }
 
-    pub fn sampled_depth_aspect(&self, descriptor: &View2DDescriptor) -> Sampled2DDepth
+    pub fn sampled_depth_aspect(&self, descriptor: &View2DDescriptor) -> Sampled2DDepth<'_>
     where
         F: DepthStencilFormat,
         U: TextureBinding,
@@ -549,7 +552,7 @@ impl<F, U> Texture2D<F, U> {
         })
     }
 
-    pub fn sampled_array_float(&self, descriptor: &View2DArrayDescriptor) -> Sampled2DArrayFloat
+    pub fn sampled_array_float(&self, descriptor: &View2DArrayDescriptor) -> Sampled2DArrayFloat<'_>
     where
         F: FloatSamplable,
         U: TextureBinding,
@@ -563,7 +566,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_array_float<ViewedFormat>(
         &self,
         descriptor: &View2DArrayDescriptor,
-    ) -> Result<Sampled2DArrayFloat, UnsupportedViewFormat>
+    ) -> Result<Sampled2DArrayFloat<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + FloatSamplable,
         U: TextureBinding,
@@ -584,7 +587,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sampled_array_unfilterable_float(
         &self,
         descriptor: &View2DArrayDescriptor,
-    ) -> Sampled2DArrayUnfilteredFloat
+    ) -> Sampled2DArrayUnfilteredFloat<'_>
     where
         F: UnfilteredFloatSamplable,
         U: TextureBinding,
@@ -598,7 +601,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_array_unfilterable_float<ViewedFormat>(
         &self,
         descriptor: &View2DArrayDescriptor,
-    ) -> Result<Sampled2DArrayUnfilteredFloat, UnsupportedViewFormat>
+    ) -> Result<Sampled2DArrayUnfilteredFloat<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
         U: TextureBinding,
@@ -619,7 +622,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sampled_array_signed_integer(
         &self,
         descriptor: &View2DArrayDescriptor,
-    ) -> Sampled2DArraySignedInteger
+    ) -> Sampled2DArraySignedInteger<'_>
     where
         F: SignedIntegerSamplable,
         U: TextureBinding,
@@ -633,7 +636,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_array_signed_integer<ViewedFormat>(
         &self,
         descriptor: &View2DArrayDescriptor,
-    ) -> Result<Sampled2DArraySignedInteger, UnsupportedViewFormat>
+    ) -> Result<Sampled2DArraySignedInteger<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
         U: TextureBinding,
@@ -654,7 +657,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sampled_array_unsigned_integer(
         &self,
         descriptor: &View2DArrayDescriptor,
-    ) -> Sampled2DArrayUnsignedInteger
+    ) -> Sampled2DArrayUnsignedInteger<'_>
     where
         F: UnsignedIntegerSamplable,
         U: TextureBinding,
@@ -668,7 +671,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_array_unsigned_integer<ViewedFormat>(
         &self,
         descriptor: &View2DArrayDescriptor,
-    ) -> Result<Sampled2DArrayUnsignedInteger, UnsupportedViewFormat>
+    ) -> Result<Sampled2DArrayUnsignedInteger<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
         U: TextureBinding,
@@ -686,7 +689,7 @@ impl<F, U> Texture2D<F, U> {
         }
     }
 
-    pub fn sampled_array_depth(&self, descriptor: &View2DArrayDescriptor) -> Sampled2DArrayDepth
+    pub fn sampled_array_depth(&self, descriptor: &View2DArrayDescriptor) -> Sampled2DArrayDepth<'_>
     where
         F: DepthSamplable,
         U: TextureBinding,
@@ -700,7 +703,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_array_depth<ViewedFormat>(
         &self,
         descriptor: &View2DArrayDescriptor,
-    ) -> Result<Sampled2DArrayDepth, UnsupportedViewFormat>
+    ) -> Result<Sampled2DArrayDepth<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + DepthSamplable,
         U: TextureBinding,
@@ -721,7 +724,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sampled_array_depth_aspect(
         &self,
         descriptor: &View2DArrayDescriptor,
-    ) -> Sampled2DArrayDepth
+    ) -> Sampled2DArrayDepth<'_>
     where
         F: DepthStencilFormat,
         U: TextureBinding,
@@ -780,7 +783,7 @@ impl<F, U> Texture2D<F, U> {
         })
     }
 
-    pub fn sampled_cube_float(&self, descriptor: &ViewCubeDescriptor) -> SampledCubeFloat
+    pub fn sampled_cube_float(&self, descriptor: &ViewCubeDescriptor) -> SampledCubeFloat<'_>
     where
         F: FloatSamplable,
         U: TextureBinding,
@@ -794,7 +797,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_cube_float<ViewedFormat>(
         &self,
         descriptor: &ViewCubeDescriptor,
-    ) -> Result<SampledCubeFloat, UnsupportedViewFormat>
+    ) -> Result<SampledCubeFloat<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + FloatSamplable,
         U: TextureBinding,
@@ -815,7 +818,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sampled_cube_unfilterable_float(
         &self,
         descriptor: &ViewCubeDescriptor,
-    ) -> SampledCubeUnfilteredFloat
+    ) -> SampledCubeUnfilteredFloat<'_>
     where
         F: UnfilteredFloatSamplable,
         U: TextureBinding,
@@ -829,7 +832,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_cube_unfilterable_float<ViewedFormat>(
         &self,
         descriptor: &ViewCubeDescriptor,
-    ) -> Result<SampledCubeUnfilteredFloat, UnsupportedViewFormat>
+    ) -> Result<SampledCubeUnfilteredFloat<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
         U: TextureBinding,
@@ -850,7 +853,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sampled_cube_signed_integer(
         &self,
         descriptor: &ViewCubeDescriptor,
-    ) -> SampledCubeSignedInteger
+    ) -> SampledCubeSignedInteger<'_>
     where
         F: SignedIntegerSamplable,
         U: TextureBinding,
@@ -864,7 +867,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_cube_signed_integer<ViewedFormat>(
         &self,
         descriptor: &ViewCubeDescriptor,
-    ) -> Result<SampledCubeSignedInteger, UnsupportedViewFormat>
+    ) -> Result<SampledCubeSignedInteger<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
         U: TextureBinding,
@@ -885,7 +888,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sampled_cube_unsigned_integer(
         &self,
         descriptor: &ViewCubeDescriptor,
-    ) -> SampledCubeUnsignedInteger
+    ) -> SampledCubeUnsignedInteger<'_>
     where
         F: UnsignedIntegerSamplable,
         U: TextureBinding,
@@ -899,7 +902,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_cube_unsigned_integer<ViewedFormat>(
         &self,
         descriptor: &ViewCubeDescriptor,
-    ) -> Result<SampledCubeUnsignedInteger, UnsupportedViewFormat>
+    ) -> Result<SampledCubeUnsignedInteger<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
         U: TextureBinding,
@@ -917,7 +920,7 @@ impl<F, U> Texture2D<F, U> {
         }
     }
 
-    pub fn sampled_cube_depth(&self, descriptor: &ViewCubeDescriptor) -> SampledCubeDepth
+    pub fn sampled_cube_depth(&self, descriptor: &ViewCubeDescriptor) -> SampledCubeDepth<'_>
     where
         F: DepthSamplable,
         U: TextureBinding,
@@ -931,7 +934,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_cube_depth<ViewedFormat>(
         &self,
         descriptor: &ViewCubeDescriptor,
-    ) -> Result<SampledCubeDepth, UnsupportedViewFormat>
+    ) -> Result<SampledCubeDepth<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + DepthSamplable,
         U: TextureBinding,
@@ -949,7 +952,7 @@ impl<F, U> Texture2D<F, U> {
         }
     }
 
-    pub fn sampled_cube_depth_aspect(&self, descriptor: &ViewCubeDescriptor) -> SampledCubeDepth
+    pub fn sampled_cube_depth_aspect(&self, descriptor: &ViewCubeDescriptor) -> SampledCubeDepth<'_>
     where
         F: DepthStencilFormat,
         U: TextureBinding,
@@ -1023,7 +1026,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sampled_cube_array_float(
         &self,
         descriptor: &ViewCubeArrayDescriptor,
-    ) -> SampledCubeArrayFloat
+    ) -> SampledCubeArrayFloat<'_>
     where
         F: FloatSamplable,
         U: TextureBinding,
@@ -1037,7 +1040,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_cube_array_float<ViewedFormat>(
         &self,
         descriptor: &ViewCubeArrayDescriptor,
-    ) -> Result<SampledCubeArrayFloat, UnsupportedViewFormat>
+    ) -> Result<SampledCubeArrayFloat<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + FloatSamplable,
         U: TextureBinding,
@@ -1058,7 +1061,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sampled_cube_array_unfilterable_float(
         &self,
         descriptor: &ViewCubeArrayDescriptor,
-    ) -> SampledCubeArrayUnfilteredFloat
+    ) -> SampledCubeArrayUnfilteredFloat<'_>
     where
         F: UnfilteredFloatSamplable,
         U: TextureBinding,
@@ -1072,7 +1075,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_cube_array_unfilterable_float<ViewedFormat>(
         &self,
         descriptor: &ViewCubeArrayDescriptor,
-    ) -> Result<SampledCubeArrayUnfilteredFloat, UnsupportedViewFormat>
+    ) -> Result<SampledCubeArrayUnfilteredFloat<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + UnfilteredFloatSamplable,
         U: TextureBinding,
@@ -1093,7 +1096,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sampled_cube_array_signed_integer(
         &self,
         descriptor: &ViewCubeArrayDescriptor,
-    ) -> SampledCubeArraySignedInteger
+    ) -> SampledCubeArraySignedInteger<'_>
     where
         F: SignedIntegerSamplable,
         U: TextureBinding,
@@ -1107,7 +1110,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_cube_array_signed_integer<ViewedFormat>(
         &self,
         descriptor: &ViewCubeArrayDescriptor,
-    ) -> Result<SampledCubeArraySignedInteger, UnsupportedViewFormat>
+    ) -> Result<SampledCubeArraySignedInteger<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + SignedIntegerSamplable,
         U: TextureBinding,
@@ -1128,7 +1131,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sampled_cube_array_unsigned_integer(
         &self,
         descriptor: &ViewCubeArrayDescriptor,
-    ) -> SampledCubeArrayUnsignedInteger
+    ) -> SampledCubeArrayUnsignedInteger<'_>
     where
         F: UnsignedIntegerSamplable,
         U: TextureBinding,
@@ -1142,7 +1145,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_cube_array_unsigned_integer<ViewedFormat>(
         &self,
         descriptor: &ViewCubeArrayDescriptor,
-    ) -> Result<SampledCubeArrayUnsignedInteger, UnsupportedViewFormat>
+    ) -> Result<SampledCubeArrayUnsignedInteger<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + UnsignedIntegerSamplable,
         U: TextureBinding,
@@ -1163,7 +1166,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sampled_cube_array_depth(
         &self,
         descriptor: &ViewCubeArrayDescriptor,
-    ) -> SampledCubeArrayDepth
+    ) -> SampledCubeArrayDepth<'_>
     where
         F: DepthSamplable,
         U: TextureBinding,
@@ -1177,7 +1180,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_sampled_cube_array_depth<ViewedFormat>(
         &self,
         descriptor: &ViewCubeArrayDescriptor,
-    ) -> Result<SampledCubeArrayDepth, UnsupportedViewFormat>
+    ) -> Result<SampledCubeArrayDepth<'_>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + DepthSamplable,
         U: TextureBinding,
@@ -1198,7 +1201,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sampled_cube_array_depth_aspect(
         &self,
         descriptor: &ViewCubeArrayDescriptor,
-    ) -> SampledCubeArrayDepth
+    ) -> SampledCubeArrayDepth<'_>
     where
         F: DepthStencilFormat,
         U: TextureBinding,
@@ -1212,7 +1215,7 @@ impl<F, U> Texture2D<F, U> {
     fn attachable_image_internal<ViewedFormat>(
         &self,
         descriptor: &AttachableImageDescriptor,
-    ) -> AttachableImage<ViewedFormat>
+    ) -> AttachableImage<'_, ViewedFormat>
     where
         ViewedFormat: Renderable,
         U: RenderAttachment,
@@ -1250,7 +1253,7 @@ impl<F, U> Texture2D<F, U> {
         }
     }
 
-    pub fn attachable_image(&self, descriptor: &AttachableImageDescriptor) -> AttachableImage<F>
+    pub fn attachable_image(&self, descriptor: &AttachableImageDescriptor) -> AttachableImage<'_, F>
     where
         F: Renderable,
         U: RenderAttachment,
@@ -1261,7 +1264,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_attachable_image<ViewedFormat>(
         &self,
         descriptor: &AttachableImageDescriptor,
-    ) -> Result<AttachableImage<ViewedFormat>, UnsupportedViewFormat>
+    ) -> Result<AttachableImage<'_, ViewedFormat>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + Renderable,
         U: RenderAttachment,
@@ -1279,7 +1282,7 @@ impl<F, U> Texture2D<F, U> {
     fn storage_internal<ViewedFormat>(
         &self,
         descriptor: &Storage2DDescriptor,
-    ) -> Storage2D<ViewedFormat>
+    ) -> Storage2D<'_, ViewedFormat>
     where
         ViewedFormat: Storable,
         U: StorageBinding,
@@ -1315,7 +1318,7 @@ impl<F, U> Texture2D<F, U> {
         }
     }
 
-    pub fn storage(&self, descriptor: &Storage2DDescriptor) -> Storage2D<F>
+    pub fn storage(&self, descriptor: &Storage2DDescriptor) -> Storage2D<'_, F>
     where
         F: Storable,
         U: StorageBinding,
@@ -1326,7 +1329,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_storage<ViewedFormat>(
         &self,
         descriptor: &Storage2DDescriptor,
-    ) -> Result<Storage2D<ViewedFormat>, UnsupportedViewFormat>
+    ) -> Result<Storage2D<'_, ViewedFormat>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + Storable,
         U: StorageBinding,
@@ -1344,7 +1347,7 @@ impl<F, U> Texture2D<F, U> {
     fn storage_array_internal<ViewedFormat>(
         &self,
         descriptor: &Storage2DArrayDescriptor,
-    ) -> Storage2DArray<ViewedFormat>
+    ) -> Storage2DArray<'_, ViewedFormat>
     where
         ViewedFormat: Storable,
         U: StorageBinding,
@@ -1385,7 +1388,7 @@ impl<F, U> Texture2D<F, U> {
         }
     }
 
-    pub fn storage_array(&self, descriptor: &Storage2DArrayDescriptor) -> Storage2DArray<F>
+    pub fn storage_array(&self, descriptor: &Storage2DArrayDescriptor) -> Storage2DArray<'_, F>
     where
         F: Storable,
         U: StorageBinding,
@@ -1396,7 +1399,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn try_as_storage_array<ViewedFormat>(
         &self,
         descriptor: &Storage2DArrayDescriptor,
-    ) -> Result<Storage2DArray<ViewedFormat>, UnsupportedViewFormat>
+    ) -> Result<Storage2DArray<'_, ViewedFormat>, UnsupportedViewFormat>
     where
         ViewedFormat: ViewFormat<F> + Storable,
         U: StorageBinding,
@@ -1417,7 +1420,7 @@ impl<F, U> Texture2D<F, U> {
         bytes_per_block: u32,
         block_size: [u32; 2],
         aspect: TextureAspect,
-    ) -> ImageCopyTexture<F> {
+    ) -> ImageCopyTexture<'_, F> {
         assert!(
             mipmap_level < self.mip_level_count,
             "mipmap level out of bounds"
@@ -1446,7 +1449,7 @@ impl<F, U> Texture2D<F, U> {
         descriptor: SubImageCopy2DDescriptor,
         bytes_per_block: u32,
         block_size: [u32; 2],
-    ) -> ImageCopyTexture<F> {
+    ) -> ImageCopyTexture<'_, F> {
         let SubImageCopy2DDescriptor {
             mipmap_level,
             origin_x,
@@ -1493,7 +1496,7 @@ impl<F, U> Texture2D<F, U> {
         }
     }
 
-    pub fn image_copy_to_buffer_src(&self, mipmap_level: u8) -> ImageCopySrc<F>
+    pub fn image_copy_to_buffer_src(&self, mipmap_level: u8) -> ImageCopySrc<'_, F>
     where
         F: ImageCopyToBufferFormat,
         U: CopySrc,
@@ -1508,7 +1511,7 @@ impl<F, U> Texture2D<F, U> {
         }
     }
 
-    pub fn image_copy_to_buffer_src_depth(&self, mipmap_level: u8) -> ImageCopySrc<F>
+    pub fn image_copy_to_buffer_src_depth(&self, mipmap_level: u8) -> ImageCopySrc<'_, F>
     where
         F: DepthStencilFormat,
         F::DepthAspect: ImageCopyToBufferFormat,
@@ -1524,7 +1527,7 @@ impl<F, U> Texture2D<F, U> {
         }
     }
 
-    pub fn image_copy_to_buffer_src_stencil(&self, mipmap_level: u8) -> ImageCopySrc<F>
+    pub fn image_copy_to_buffer_src_stencil(&self, mipmap_level: u8) -> ImageCopySrc<'_, F>
     where
         F: DepthStencilFormat,
         F::StencilAspect: ImageCopyToBufferFormat,
@@ -1540,7 +1543,7 @@ impl<F, U> Texture2D<F, U> {
         }
     }
 
-    pub fn image_copy_from_buffer_dst(&self, mipmap_level: u8) -> ImageCopyDst<F>
+    pub fn image_copy_from_buffer_dst(&self, mipmap_level: u8) -> ImageCopyDst<'_, F>
     where
         F: ImageCopyFromBufferFormat,
         U: CopyDst,
@@ -1557,7 +1560,7 @@ impl<F, U> Texture2D<F, U> {
 
     // Note: including this function for completeness sake, but this should not currently be
     // invokable, no format meets the constraints.
-    pub fn image_copy_from_buffer_dst_depth(&self, mipmap_level: u8) -> ImageCopyDst<F>
+    pub fn image_copy_from_buffer_dst_depth(&self, mipmap_level: u8) -> ImageCopyDst<'_, F>
     where
         F: DepthStencilFormat,
         F::DepthAspect: ImageCopyFromBufferFormat,
@@ -1573,7 +1576,7 @@ impl<F, U> Texture2D<F, U> {
         }
     }
 
-    pub fn image_copy_from_buffer_dst_stencil(&self, mipmap_level: u8) -> ImageCopyDst<F>
+    pub fn image_copy_from_buffer_dst_stencil(&self, mipmap_level: u8) -> ImageCopyDst<'_, F>
     where
         F: DepthStencilFormat,
         F::StencilAspect: ImageCopyFromBufferFormat,
@@ -1589,7 +1592,7 @@ impl<F, U> Texture2D<F, U> {
         }
     }
 
-    pub fn image_copy_to_texture_src(&self, mipmap_level: u8) -> ImageCopyToTextureSrc<F>
+    pub fn image_copy_to_texture_src(&self, mipmap_level: u8) -> ImageCopyToTextureSrc<'_, F>
     where
         F: ImageCopyTextureFormat,
         U: CopySrc,
@@ -1599,7 +1602,7 @@ impl<F, U> Texture2D<F, U> {
         }
     }
 
-    pub fn image_copy_from_texture_dst(&self, mipmap_level: u8) -> ImageCopyFromTextureDst<F>
+    pub fn image_copy_from_texture_dst(&self, mipmap_level: u8) -> ImageCopyFromTextureDst<'_, F>
     where
         F: ImageCopyTextureFormat,
         U: CopyDst,
@@ -1612,7 +1615,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sub_image_copy_to_buffer_src(
         &self,
         descriptor: SubImageCopy2DDescriptor,
-    ) -> SubImageCopySrc<F>
+    ) -> SubImageCopySrc<'_, F>
     where
         F: ImageCopyToBufferFormat + SubImageCopyFormat,
         U: CopySrc,
@@ -1625,7 +1628,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sub_image_copy_from_buffer_dst(
         &self,
         descriptor: SubImageCopy2DDescriptor,
-    ) -> SubImageCopyDst<F>
+    ) -> SubImageCopyDst<'_, F>
     where
         F: ImageCopyFromBufferFormat + SubImageCopyFormat,
         U: CopyDst,
@@ -1638,7 +1641,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sub_image_copy_to_texture_src(
         &self,
         descriptor: SubImageCopy2DDescriptor,
-    ) -> SubImageCopyToTextureSrc<F>
+    ) -> SubImageCopyToTextureSrc<'_, F>
     where
         F: ImageCopyTextureFormat + SubImageCopyFormat,
         U: CopySrc,
@@ -1651,7 +1654,7 @@ impl<F, U> Texture2D<F, U> {
     pub fn sub_image_copy_from_texture_dst(
         &self,
         descriptor: SubImageCopy2DDescriptor,
-    ) -> SubImageCopyFromTextureDst<F>
+    ) -> SubImageCopyFromTextureDst<'_, F>
     where
         F: ImageCopyTextureFormat + SubImageCopyFormat,
         U: CopyDst,

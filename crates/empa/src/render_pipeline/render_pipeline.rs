@@ -72,7 +72,7 @@ pub struct RenderPipelineDescriptor<O, V, I, R> {
 }
 
 impl<O, V, I, R> RenderPipelineDescriptor<O, V, I, R> {
-    fn to_driver(&self) -> driver::RenderPipelineDescriptor<Dvr> {
+    fn to_driver(&self) -> driver::RenderPipelineDescriptor<'_, Dvr> {
         driver::RenderPipelineDescriptor {
             layout: &self.layout,
             primitive_state: &self.primitive_state,

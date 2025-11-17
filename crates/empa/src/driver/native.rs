@@ -778,7 +778,7 @@ impl Buffer<Driver> for BufferHandle {
     // itself does not guarantee that the slice pointer won't be dangling after the buffer is unmapped. However,
     // the rest of empa should never (successfully) unmap the buffer while there is still a live mapped range.
 
-    fn mapped<'a, E>(&'a self, offset_in_bytes: usize, len_in_elements: usize) -> &[E] {
+    fn mapped<'a, E>(&'a self, offset_in_bytes: usize, len_in_elements: usize) -> &'a [E] {
         let size = len_in_elements * mem::size_of::<E>();
 
         let res = gfx_select!(self.id => self.global.buffer_get_mapped_range(
@@ -801,7 +801,7 @@ impl Buffer<Driver> for BufferHandle {
         }
     }
 
-    fn mapped_mut<'a, E>(&'a self, offset_in_bytes: usize, len_in_elements: usize) -> &mut [E] {
+    fn mapped_mut<'a, E>(&'a self, offset_in_bytes: usize, len_in_elements: usize) -> &'a mut [E] {
         let size = len_in_elements * mem::size_of::<E>();
 
         let res = gfx_select!(self.id => self.global.buffer_get_mapped_range(
@@ -1384,7 +1384,7 @@ impl RenderPassEncoder<Driver> for RenderPassEncoderHandle {
         render_commands::wgpu_render_pass_end_occlusion_query(&mut self.render_pass);
     }
 
-    fn execute_bundles(&mut self) -> ExecuteRenderBundlesEncoderHandle {
+    fn execute_bundles(&mut self) -> ExecuteRenderBundlesEncoderHandle<'_> {
         ExecuteRenderBundlesEncoderHandle {
             render_pass: &mut self.render_pass,
             bundle_ids: vec![],

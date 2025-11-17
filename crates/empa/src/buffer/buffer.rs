@@ -377,19 +377,19 @@ impl<T, U> Buffer<T, U> {
         View::from(self).map_write()
     }
 
-    pub fn mapped(&self) -> Mapped<T> {
+    pub fn mapped(&self) -> Mapped<'_, T> {
         View::from(self).mapped()
     }
 
-    pub fn mapped_mut(&self) -> MappedMut<T> {
+    pub fn mapped_mut(&self) -> MappedMut<'_, T> {
         View::from(self).mapped_mut()
     }
 
-    pub fn view(&self) -> View<T, U> {
+    pub fn view(&self) -> View<'_, T, U> {
         self.into()
     }
 
-    pub fn project_to<P>(&self, projection: Projection<T, P>) -> View<P, U> {
+    pub fn project_to<P>(&self, projection: Projection<T, P>) -> View<'_, P, U> {
         View {
             buffer: &self.internal,
             offset_in_bytes: projection.offset_in_bytes,
@@ -398,7 +398,7 @@ impl<T, U> Buffer<T, U> {
         }
     }
 
-    pub fn uniform(&self) -> Uniform<T>
+    pub fn uniform(&self) -> Uniform<'_, T>
     where
         T: abi::Sized,
         U: UniformBinding,
@@ -415,7 +415,7 @@ impl<T, U> Buffer<T, U> {
         }
     }
 
-    pub fn storage<A: AccessMode>(&self) -> Storage<T, A>
+    pub fn storage<A: AccessMode>(&self) -> Storage<'_, T, A>
     where
         T: abi::Unsized,
         U: StorageBinding,
@@ -461,7 +461,7 @@ impl<T, U> Buffer<[T], U> {
     /// buffer.get(..2); // Some View<[f32]> containing `[1.0 2.0]`
     /// buffer.get(4); // None (index out of bounds)
     /// ```
-    pub fn get<I>(&self, index: I) -> Option<View<I::Output, U>>
+    pub fn get<I>(&self, index: I) -> Option<View<'_, I::Output, U>>
     where
         I: SliceIndex<T>,
     {
@@ -487,11 +487,11 @@ impl<T, U> Buffer<[T], U> {
     /// # Unsafe
     ///
     /// Only safe if `index` is in bounds. See [get] for a safe alternative.
-    pub unsafe fn get_unchecked<I>(&self, index: I) -> View<I::Output, U>
+    pub unsafe fn get_unchecked<I>(&self, index: I) -> View<'_, I::Output, U>
     where
         I: SliceIndex<T>,
     {
-        index.get_unchecked(self.into())
+        unsafe { index.get_unchecked(self.into()) }
     }
 
     pub fn map_read(&self) -> impl Future<Output = Result<(), MapError>>
@@ -508,19 +508,19 @@ impl<T, U> Buffer<[T], U> {
         View::from(self).map_write()
     }
 
-    pub fn mapped(&self) -> MappedSlice<T> {
+    pub fn mapped(&self) -> MappedSlice<'_, T> {
         View::from(self).mapped()
     }
 
-    pub fn mapped_mut(&self) -> MappedSliceMut<T> {
+    pub fn mapped_mut(&self) -> MappedSliceMut<'_, T> {
         View::from(self).mapped_mut()
     }
 
-    pub fn view(&self) -> View<[T], U> {
+    pub fn view(&self) -> View<'_, [T], U> {
         self.into()
     }
 
-    pub fn storage<A: AccessMode>(&self) -> Storage<[T], A>
+    pub fn storage<A: AccessMode>(&self) -> Storage<'_, [T], A>
     where
         T: abi::Sized,
         U: StorageBinding,
@@ -537,7 +537,7 @@ impl<T, U> Buffer<[T], U> {
         }
     }
 
-    pub fn image_copy_src(&self, layout: ImageDataLayout) -> ImageCopySrc<T>
+    pub fn image_copy_src(&self, layout: ImageDataLayout) -> ImageCopySrc<'_, T>
     where
         U: CopySrc,
     {
@@ -569,7 +569,7 @@ impl<T, U> Buffer<[T], U> {
         }
     }
 
-    pub fn image_copy_dst(&self, layout: ImageDataLayout) -> ImageCopyDst<T>
+    pub fn image_copy_dst(&self, layout: ImageDataLayout) -> ImageCopyDst<'_, T>
     where
         U: CopyDst,
     {
@@ -607,7 +607,7 @@ impl<T, U> Buffer<[T], U> {
 }
 
 impl<U> Buffer<[u8], U> {
-    pub fn image_copy_src_raw(&self, layout: ImageDataByteLayout) -> ImageCopySrcRaw
+    pub fn image_copy_src_raw(&self, layout: ImageDataByteLayout) -> ImageCopySrcRaw<'_>
     where
         U: CopySrc,
     {
@@ -638,7 +638,7 @@ impl<U> Buffer<[u8], U> {
         }
     }
 
-    pub fn image_copy_dst_raw(&self, layout: ImageDataByteLayout) -> ImageCopyDstRaw
+    pub fn image_copy_dst_raw(&self, layout: ImageDataByteLayout) -> ImageCopyDstRaw<'_>
     where
         U: CopyDst,
     {
@@ -760,7 +760,7 @@ impl<'a, T, U> View<'a, T, U> {
         }
     }
 
-    pub fn project_to<P>(&self, projection: Projection<T, P>) -> View<P, U> {
+    pub fn project_to<P>(&self, projection: Projection<T, P>) -> View<'_, P, U> {
         View {
             buffer: self.buffer,
             offset_in_bytes: self.offset_in_bytes + projection.offset_in_bytes,
@@ -876,7 +876,7 @@ impl<'a, T, U> View<'a, [T], U> {
     where
         I: SliceIndex<T>,
     {
-        index.get_unchecked(self)
+        unsafe { index.get_unchecked(self) }
     }
 
     fn map_internal(self, mode: MapMode) -> impl Future<Output = Result<(), MapError>> {
@@ -954,7 +954,7 @@ impl<'a, T, U> View<'a, [T], U> {
         }
     }
 
-    pub fn image_copy_src(&self, layout: ImageDataLayout) -> ImageCopySrc<T>
+    pub fn image_copy_src(&self, layout: ImageDataLayout) -> ImageCopySrc<'_, T>
     where
         U: CopySrc,
     {
@@ -986,7 +986,7 @@ impl<'a, T, U> View<'a, [T], U> {
         }
     }
 
-    pub fn image_copy_dst(&self, layout: ImageDataLayout) -> ImageCopyDst<T>
+    pub fn image_copy_dst(&self, layout: ImageDataLayout) -> ImageCopyDst<'_, T>
     where
         U: CopyDst,
     {
@@ -1028,7 +1028,7 @@ impl<'a, T, U> View<'a, [T], U> {
 }
 
 impl<'a, U> View<'a, [u8], U> {
-    pub fn image_copy_src_raw(&self, layout: ImageDataByteLayout) -> ImageCopySrcRaw
+    pub fn image_copy_src_raw(&self, layout: ImageDataByteLayout) -> ImageCopySrcRaw<'_>
     where
         U: CopySrc,
     {
@@ -1059,7 +1059,7 @@ impl<'a, U> View<'a, [u8], U> {
         }
     }
 
-    pub fn image_copy_dst_raw(&self, layout: ImageDataByteLayout) -> ImageCopyDstRaw
+    pub fn image_copy_dst_raw(&self, layout: ImageDataByteLayout) -> ImageCopyDstRaw<'_>
     where
         U: CopyDst,
     {
@@ -1327,7 +1327,7 @@ impl<T> SliceIndex<T> for RangeInclusive<usize> {
     }
 
     unsafe fn get_unchecked<U>(self, view: View<[T], U>) -> View<Self::Output, U> {
-        view.get_unchecked(*self.start()..self.end() + 1)
+        unsafe { view.get_unchecked(*self.start()..self.end() + 1) }
     }
 }
 
@@ -1339,7 +1339,7 @@ impl<T> SliceIndex<T> for RangeFrom<usize> {
     }
 
     unsafe fn get_unchecked<U>(self, view: View<[T], U>) -> View<Self::Output, U> {
-        view.get_unchecked(self.start..view.len())
+        unsafe { view.get_unchecked(self.start..view.len()) }
     }
 }
 
@@ -1351,7 +1351,7 @@ impl<T> SliceIndex<T> for RangeTo<usize> {
     }
 
     unsafe fn get_unchecked<U>(self, view: View<[T], U>) -> View<Self::Output, U> {
-        view.get_unchecked(0..self.end)
+        unsafe { view.get_unchecked(0..self.end) }
     }
 }
 
@@ -1363,20 +1363,24 @@ impl<T> SliceIndex<T> for RangeToInclusive<usize> {
     }
 
     unsafe fn get_unchecked<U>(self, view: View<[T], U>) -> View<Self::Output, U> {
-        view.get_unchecked(0..=self.end)
+        unsafe { view.get_unchecked(0..=self.end) }
     }
 }
 
 unsafe fn value_to_bytes<T>(value: &T) -> &[u8] {
-    let size_in_bytes = mem::size_of::<T>();
+    unsafe {
+        let size_in_bytes = mem::size_of::<T>();
 
-    slice::from_raw_parts(value as *const T as *const u8, size_in_bytes)
+        slice::from_raw_parts(value as *const T as *const u8, size_in_bytes)
+    }
 }
 
 unsafe fn slice_to_bytes<T>(slice: &[T]) -> &[u8] {
-    let size_in_bytes = mem::size_of::<T>() * slice.len();
+    unsafe {
+        let size_in_bytes = mem::size_of::<T>() * slice.len();
 
-    slice::from_raw_parts(slice as *const [T] as *const u8, size_in_bytes)
+        slice::from_raw_parts(slice as *const [T] as *const u8, size_in_bytes)
+    }
 }
 
 #[derive(Clone)]

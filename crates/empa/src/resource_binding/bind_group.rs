@@ -89,7 +89,7 @@ pub unsafe trait Resources {
 pub unsafe trait Resource {
     type Binding: TypedSlotBinding;
 
-    fn to_encoding(&self) -> ResourceEncoding;
+    fn to_encoding(&self) -> ResourceEncoding<'_>;
 }
 
 pub struct ResourceEncoding<'a> {
@@ -108,7 +108,7 @@ where
 {
     type Binding = T::Binding;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         <T as Resource>::to_encoding(self)
     }
 }
@@ -116,7 +116,7 @@ where
 unsafe impl Resource for Sampled1DFloat<'_> {
     type Binding = typed_bind_group_entry::Texture1D<f32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -124,7 +124,7 @@ unsafe impl Resource for Sampled1DFloat<'_> {
 unsafe impl Resource for Sampled1DUnfilteredFloat<'_> {
     type Binding = typed_bind_group_entry::Texture1D<f32_unfiltered, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -132,7 +132,7 @@ unsafe impl Resource for Sampled1DUnfilteredFloat<'_> {
 unsafe impl Resource for Sampled1DSignedInteger<'_> {
     type Binding = typed_bind_group_entry::Texture1D<i32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -140,7 +140,7 @@ unsafe impl Resource for Sampled1DSignedInteger<'_> {
 unsafe impl Resource for Sampled1DUnsignedInteger<'_> {
     type Binding = typed_bind_group_entry::Texture1D<u32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -151,7 +151,7 @@ where
 {
     type Binding = typed_bind_group_entry::StorageTexture1D<F, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -159,7 +159,7 @@ where
 unsafe impl Resource for Sampled2DFloat<'_> {
     type Binding = typed_bind_group_entry::Texture2D<f32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -167,7 +167,7 @@ unsafe impl Resource for Sampled2DFloat<'_> {
 unsafe impl Resource for Sampled2DUnfilteredFloat<'_> {
     type Binding = typed_bind_group_entry::Texture2D<f32_unfiltered, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -175,7 +175,7 @@ unsafe impl Resource for Sampled2DUnfilteredFloat<'_> {
 unsafe impl Resource for Sampled2DSignedInteger<'_> {
     type Binding = typed_bind_group_entry::Texture2D<i32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -183,7 +183,7 @@ unsafe impl Resource for Sampled2DSignedInteger<'_> {
 unsafe impl Resource for Sampled2DUnsignedInteger<'_> {
     type Binding = typed_bind_group_entry::Texture2D<u32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -191,7 +191,7 @@ unsafe impl Resource for Sampled2DUnsignedInteger<'_> {
 unsafe impl Resource for Sampled2DDepth<'_> {
     type Binding = typed_bind_group_entry::TextureDepth2D<ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -199,7 +199,7 @@ unsafe impl Resource for Sampled2DDepth<'_> {
 unsafe impl Resource for Sampled2DArrayFloat<'_> {
     type Binding = typed_bind_group_entry::Texture2DArray<f32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -207,7 +207,7 @@ unsafe impl Resource for Sampled2DArrayFloat<'_> {
 unsafe impl Resource for Sampled2DArrayUnfilteredFloat<'_> {
     type Binding = typed_bind_group_entry::Texture2DArray<f32_unfiltered, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -215,7 +215,7 @@ unsafe impl Resource for Sampled2DArrayUnfilteredFloat<'_> {
 unsafe impl Resource for Sampled2DArraySignedInteger<'_> {
     type Binding = typed_bind_group_entry::Texture2DArray<i32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -223,7 +223,7 @@ unsafe impl Resource for Sampled2DArraySignedInteger<'_> {
 unsafe impl Resource for Sampled2DArrayUnsignedInteger<'_> {
     type Binding = typed_bind_group_entry::Texture2DArray<u32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -231,7 +231,7 @@ unsafe impl Resource for Sampled2DArrayUnsignedInteger<'_> {
 unsafe impl Resource for Sampled2DArrayDepth<'_> {
     type Binding = typed_bind_group_entry::TextureDepth2DArray<ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -239,7 +239,7 @@ unsafe impl Resource for Sampled2DArrayDepth<'_> {
 unsafe impl Resource for SampledCubeFloat<'_> {
     type Binding = typed_bind_group_entry::TextureCube<f32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -247,7 +247,7 @@ unsafe impl Resource for SampledCubeFloat<'_> {
 unsafe impl Resource for SampledCubeUnfilteredFloat<'_> {
     type Binding = typed_bind_group_entry::TextureCube<f32_unfiltered, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -255,7 +255,7 @@ unsafe impl Resource for SampledCubeUnfilteredFloat<'_> {
 unsafe impl Resource for SampledCubeSignedInteger<'_> {
     type Binding = typed_bind_group_entry::TextureCube<i32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -263,7 +263,7 @@ unsafe impl Resource for SampledCubeSignedInteger<'_> {
 unsafe impl Resource for SampledCubeUnsignedInteger<'_> {
     type Binding = typed_bind_group_entry::TextureCube<u32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -271,7 +271,7 @@ unsafe impl Resource for SampledCubeUnsignedInteger<'_> {
 unsafe impl Resource for SampledCubeDepth<'_> {
     type Binding = typed_bind_group_entry::TextureDepthCube<ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -279,7 +279,7 @@ unsafe impl Resource for SampledCubeDepth<'_> {
 unsafe impl Resource for SampledCubeArrayFloat<'_> {
     type Binding = typed_bind_group_entry::TextureCubeArray<f32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -287,7 +287,7 @@ unsafe impl Resource for SampledCubeArrayFloat<'_> {
 unsafe impl Resource for SampledCubeArrayUnfilteredFloat<'_> {
     type Binding = typed_bind_group_entry::TextureCubeArray<f32_unfiltered, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -295,7 +295,7 @@ unsafe impl Resource for SampledCubeArrayUnfilteredFloat<'_> {
 unsafe impl Resource for SampledCubeArraySignedInteger<'_> {
     type Binding = typed_bind_group_entry::TextureCubeArray<i32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -303,7 +303,7 @@ unsafe impl Resource for SampledCubeArraySignedInteger<'_> {
 unsafe impl Resource for SampledCubeArrayUnsignedInteger<'_> {
     type Binding = typed_bind_group_entry::TextureCubeArray<u32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -311,7 +311,7 @@ unsafe impl Resource for SampledCubeArrayUnsignedInteger<'_> {
 unsafe impl Resource for SampledCubeArrayDepth<'_> {
     type Binding = typed_bind_group_entry::TextureDepthCubeArray<ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -322,7 +322,7 @@ where
 {
     type Binding = typed_bind_group_entry::StorageTexture2D<F, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -333,7 +333,7 @@ where
 {
     type Binding = typed_bind_group_entry::StorageTexture2DArray<F, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -341,7 +341,7 @@ where
 unsafe impl Resource for Sampled3DFloat<'_> {
     type Binding = typed_bind_group_entry::Texture3D<f32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -349,7 +349,7 @@ unsafe impl Resource for Sampled3DFloat<'_> {
 unsafe impl Resource for Sampled3DUnfilteredFloat<'_> {
     type Binding = typed_bind_group_entry::Texture3D<f32_unfiltered, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -357,7 +357,7 @@ unsafe impl Resource for Sampled3DUnfilteredFloat<'_> {
 unsafe impl Resource for Sampled3DSignedInteger<'_> {
     type Binding = typed_bind_group_entry::Texture3D<i32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -365,7 +365,7 @@ unsafe impl Resource for Sampled3DSignedInteger<'_> {
 unsafe impl Resource for Sampled3DUnsignedInteger<'_> {
     type Binding = typed_bind_group_entry::Texture3D<u32, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -376,7 +376,7 @@ where
 {
     type Binding = typed_bind_group_entry::StorageTexture3D<F, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::TextureView(self.inner.clone()).into()
     }
 }
@@ -384,7 +384,7 @@ where
 unsafe impl Resource for Sampler {
     type Binding = typed_bind_group_entry::FilteringSampler<ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::Sampler(&self.handle).into()
     }
 }
@@ -392,7 +392,7 @@ unsafe impl Resource for Sampler {
 unsafe impl Resource for ComparisonSampler {
     type Binding = typed_bind_group_entry::ComparisonSampler<ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::Sampler(&self.handle).into()
     }
 }
@@ -400,7 +400,7 @@ unsafe impl Resource for ComparisonSampler {
 unsafe impl Resource for NonFilteringSampler {
     type Binding = typed_bind_group_entry::NonFilteringSampler<ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::Sampler(&self.handle).into()
     }
 }
@@ -411,7 +411,7 @@ where
 {
     type Binding = typed_bind_group_entry::Uniform<T, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::BufferBinding(self.inner.clone()).into()
     }
 }
@@ -422,7 +422,7 @@ where
 {
     type Binding = typed_bind_group_entry::Storage<T, Read, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::BufferBinding(self.inner.clone()).into()
     }
 }
@@ -433,7 +433,7 @@ where
 {
     type Binding = typed_bind_group_entry::Storage<T, ReadWrite, ShaderStages<O, O, O>>;
 
-    fn to_encoding(&self) -> ResourceEncoding {
+    fn to_encoding(&self) -> ResourceEncoding<'_> {
         BindingResource::BufferBinding(self.inner.clone()).into()
     }
 }

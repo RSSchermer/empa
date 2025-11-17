@@ -19,7 +19,7 @@ pub trait ValidRenderTarget: valid_render_target_seal::Seal {
 
     fn color_target_encodings<'a>(&'a self) -> Self::ColorTargetEncodings<'a>;
 
-    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding;
+    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding<'_>;
 }
 
 pub struct RenderTarget<C, Ds> {
@@ -49,7 +49,7 @@ where
         self.color.encodings()
     }
 
-    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding {
+    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         self.depth_stencil.to_encoding()
     }
 }
@@ -70,7 +70,7 @@ where
         self.color.encodings()
     }
 
-    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding {
+    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         DepthStencilTargetEncoding {
             inner: None,
             width: 0,
@@ -96,7 +96,7 @@ where
         []
     }
 
-    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding {
+    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         self.depth_stencil.to_encoding()
     }
 }
@@ -129,7 +129,7 @@ where
         self.color.encodings()
     }
 
-    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding {
+    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         self.depth_stencil.to_encoding()
     }
 }
@@ -155,7 +155,7 @@ where
         self.color.encodings()
     }
 
-    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding {
+    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         DepthStencilTargetEncoding {
             inner: None,
             width: 0,
@@ -186,7 +186,7 @@ where
         []
     }
 
-    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding {
+    fn depth_stencil_target_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         self.depth_stencil.to_encoding()
     }
 }

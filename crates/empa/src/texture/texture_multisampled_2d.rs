@@ -60,7 +60,7 @@ where
         }
     }
 
-    pub fn attachable_image(&self) -> AttachableMultisampledImage<F, SAMPLES> {
+    pub fn attachable_image(&self) -> AttachableMultisampledImage<'_, F, SAMPLES> {
         let inner = self.handle.texture_view(&TextureViewDescriptor {
             format: F::FORMAT_ID,
             dimensions: TextureViewDimension::Two,
@@ -77,7 +77,7 @@ where
         }
     }
 
-    fn image_copy_internal(&self) -> ImageCopyTexture<F> {
+    fn image_copy_internal(&self) -> ImageCopyTexture<'_, F> {
         let inner = driver::ImageCopyTexture {
             texture_handle: &self.handle,
             mip_level: 0,
@@ -96,7 +96,7 @@ where
         }
     }
 
-    pub fn image_copy_to_texture_src(&self) -> ImageCopyToTextureSrcMultisample<F, SAMPLES>
+    pub fn image_copy_to_texture_src(&self) -> ImageCopyToTextureSrcMultisample<'_, F, SAMPLES>
     where
         U: CopySrc,
     {
@@ -105,7 +105,7 @@ where
         }
     }
 
-    pub fn image_copy_from_texture_dst(&self) -> ImageCopyToTextureDstMultisample<F, SAMPLES>
+    pub fn image_copy_from_texture_dst(&self) -> ImageCopyToTextureDstMultisample<'_, F, SAMPLES>
     where
         U: CopyDst,
     {

@@ -60,7 +60,7 @@ mod color_target_seal {
 pub trait ColorTarget: color_target_seal::Seal {
     type Format: ColorRenderable;
 
-    fn to_encoding(&self) -> ColorTargetEncoding;
+    fn to_encoding(&self) -> ColorTargetEncoding<'_>;
 }
 
 pub struct FloatAttachment<'a, F>
@@ -79,7 +79,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> ColorTargetEncoding {
+    fn to_encoding(&self) -> ColorTargetEncoding<'_> {
         let FloatAttachment {
             image,
             load_op,
@@ -119,7 +119,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> ColorTargetEncoding {
+    fn to_encoding(&self) -> ColorTargetEncoding<'_> {
         let SignedIntegerAttachment {
             image,
             load_op,
@@ -159,7 +159,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> ColorTargetEncoding {
+    fn to_encoding(&self) -> ColorTargetEncoding<'_> {
         let UnsignedIntegerAttachment {
             image,
             load_op,
@@ -187,7 +187,7 @@ mod depth_stencil_target_seal {
 pub trait DepthStencilTarget: depth_stencil_target_seal::Seal {
     type Format: DepthStencilRenderable;
 
-    fn to_encoding(&self) -> DepthStencilTargetEncoding;
+    fn to_encoding(&self) -> DepthStencilTargetEncoding<'_>;
 }
 
 pub struct DepthStencilAttachment<'a, F>
@@ -211,7 +211,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> DepthStencilTargetEncoding {
+    fn to_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         let DepthStencilAttachment {
             image,
             depth_load_op,
@@ -256,7 +256,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> DepthStencilTargetEncoding {
+    fn to_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         let ReadOnlyDepthStencilAttachment { image } = self;
 
         DepthStencilTargetEncoding {
@@ -288,7 +288,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> DepthStencilTargetEncoding {
+    fn to_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         let DepthAttachment {
             image,
             load_op,
@@ -328,7 +328,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> DepthStencilTargetEncoding {
+    fn to_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         let ReadOnlyDepthAttachment { image } = self;
 
         DepthStencilTargetEncoding {
@@ -360,7 +360,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> DepthStencilTargetEncoding {
+    fn to_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         let StencilAttachment {
             image,
             load_op,
@@ -400,7 +400,7 @@ where
 {
     type Format = F;
 
-    fn to_encoding(&self) -> DepthStencilTargetEncoding {
+    fn to_encoding(&self) -> DepthStencilTargetEncoding<'_> {
         let ReadOnlyStencilAttachment { image } = self;
 
         DepthStencilTargetEncoding {

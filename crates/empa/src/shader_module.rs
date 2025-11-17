@@ -215,7 +215,10 @@ impl ShaderSourceInternal {
         }
     }
 
-    pub(crate) fn entry_point_input_bindings(&self, index: usize) -> Option<EntryPointBindings> {
+    pub(crate) fn entry_point_input_bindings(
+        &self,
+        index: usize,
+    ) -> Option<EntryPointBindings<'_>> {
         match self {
             ShaderSourceInternal::Static(source) => source
                 .entry_points
@@ -229,7 +232,10 @@ impl ShaderSourceInternal {
         }
     }
 
-    pub(crate) fn entry_point_output_bindings(&self, index: usize) -> Option<EntryPointBindings> {
+    pub(crate) fn entry_point_output_bindings(
+        &self,
+        index: usize,
+    ) -> Option<EntryPointBindings<'_>> {
         match self {
             ShaderSourceInternal::Static(source) => source
                 .entry_points

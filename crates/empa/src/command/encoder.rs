@@ -1530,7 +1530,7 @@ impl<C, const SAMPLES: u8> RenderBundleEncoderDescriptor<MultisampleRenderLayout
 }
 
 impl<T> RenderBundleEncoderDescriptor<T> {
-    pub(crate) fn to_driver(&self) -> driver::RenderBundleEncoderDescriptor {
+    pub(crate) fn to_driver(&self) -> driver::RenderBundleEncoderDescriptor<'_> {
         driver::RenderBundleEncoderDescriptor {
             color_formats: self.color_formats.as_ref(),
             depth_stencil_format: self.depth_stencil_format,

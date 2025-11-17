@@ -91,7 +91,7 @@ pub fn expand_derive_vertex(input: &DeriveInput) -> Result<TokenStream, String> 
             #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
             const _: () = {
                 #[allow(unknown_lints)]
-                #[cfg_attr(feature = "cargo-clippy", allow(useless_attribute))]
+                #[allow(clippy::useless_attribute)]
                 use #mod_path::vertex_attribute::*;
 
                 const fn assert_format_compatible<T, F>()

@@ -47,7 +47,7 @@ impl<T> BindGroupLayout<T> {
         }
     }
 
-    pub fn to_encoding(&self) -> BindGroupLayoutEncoding {
+    pub fn to_encoding(&self) -> BindGroupLayoutEncoding<'_> {
         BindGroupLayoutEncoding {
             handle: &self.handle,
         }
