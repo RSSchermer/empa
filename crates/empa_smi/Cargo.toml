@@ -1,0 +1,11 @@
+[package]
+name = "empa-smi"
+version = "0.1.0"
+authors = ["Roland Schermer <roland0507@gmail.com>"]
+edition = "2024"
+publish = false
+repository = "https://github.com/RSSchermer/empa"
+license = "MIT"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }

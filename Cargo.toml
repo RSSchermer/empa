@@ -5,6 +5,7 @@ members = [
     "crates/empa_glam",
     "crates/empa_macros",
     "crates/empa_reflect",
+    "crates/empa_smi",
     "crates/empa_test",
     "examples/native/0_triangle",
     "examples/native/1_animated_triangle",
@@ -28,6 +29,7 @@ default-members = [
     "crates/empa_glam",
     "crates/empa_macros",
     "crates/empa_reflect",
+    "crates/empa_smi",
     "crates/empa_test",
     "examples/native/0_triangle",
     "examples/native/1_animated_triangle",
@@ -60,6 +62,7 @@ pin-project = "1"
 proc-macro2 = "1.0.69"
 syn = "1.0.5"
 raw-window-handle = "0.6"
+serde = "1.0"
 wasm-bindgen = "0.2.81"
 wasm-bindgen-futures = "0.4.31"
 web-sys = "0.3.69"
