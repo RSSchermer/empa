@@ -4,7 +4,27 @@ use std::cmp::Ordering;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{IoBinding, OverridableConstant, ShaderStage, StorageTextureFormat, TexelType};
+use crate::{IoBinding, OverridableConstantType, ShaderStage, StorageTextureFormat, TexelType};
+
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Debug)]
+pub struct OverridableConstant {
+    pub name: String,
+    pub id: Option<u16>,
+    pub constant_type: OverridableConstantType,
+    pub required: bool,
+}
+
+impl PartialOrd for OverridableConstant {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.id.partial_cmp(&other.id)
+    }
+}
+
+impl Ord for OverridableConstant {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.id.cmp(&other.id)
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Debug)]
 pub struct ArrayLayout {
@@ -124,6 +144,18 @@ pub struct EntryPoint {
     pub output_bindings: Vec<IoBinding>,
     pub overridable_constants: Vec<usize>,
     pub resource_bindings: Vec<usize>,
+}
+
+impl PartialOrd for EntryPoint {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.name.partial_cmp(&other.name)
+    }
+}
+
+impl Ord for EntryPoint {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.name.cmp(&other.name)
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Debug)]

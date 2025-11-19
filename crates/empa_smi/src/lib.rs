@@ -13,25 +13,6 @@ pub enum ShaderStage {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Debug)]
-pub struct OverridableConstant {
-    pub id: u32,
-    pub constant_type: OverridableConstantType,
-    pub required: bool,
-}
-
-impl PartialOrd for OverridableConstant {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.id.partial_cmp(&other.id)
-    }
-}
-
-impl Ord for OverridableConstant {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.id.cmp(&other.id)
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Debug)]
 pub enum OverridableConstantType {
     Float,
     Bool,
@@ -126,6 +107,41 @@ impl PartialOrd for IoBinding {
 impl Ord for IoBinding {
     fn cmp(&self, other: &Self) -> Ordering {
         self.location.cmp(&other.location)
+    }
+}
+
+pub enum OverridableConstant<'a> {
+    Dynamic(&'a dynamic::OverridableConstant),
+    Constant(&'static constant::OverridableConstant),
+}
+
+impl<'a> OverridableConstant<'a> {
+    pub fn name(&self) -> &str {
+        match self {
+            OverridableConstant::Dynamic(c) => &c.name,
+            OverridableConstant::Constant(c) => c.name,
+        }
+    }
+
+    pub fn id(&self) -> Option<u16> {
+        match self {
+            OverridableConstant::Dynamic(c) => c.id,
+            OverridableConstant::Constant(c) => c.id,
+        }
+    }
+
+    pub fn constant_type(&self) -> OverridableConstantType {
+        match self {
+            OverridableConstant::Dynamic(c) => c.constant_type,
+            OverridableConstant::Constant(c) => c.constant_type,
+        }
+    }
+
+    pub fn required(&self) -> bool {
+        match self {
+            OverridableConstant::Dynamic(c) => c.required,
+            OverridableConstant::Constant(c) => c.required,
+        }
     }
 }
 
@@ -610,6 +626,11 @@ macro_rules! gen_slice_wrapper {
     };
 }
 
+gen_slice_wrapper!(
+    OverridableConstants,
+    OverridableConstant,
+    OverridableConstantsIter
+);
 gen_slice_wrapper!(MemoryUnits, MemoryUnit, MemoryUnitsIter);
 gen_slice_wrapper!(ResourceBindings, ResourceBinding, ResourceBindingsIter);
 gen_slice_wrapper!(EntryPoints, EntryPoint, EntryPointsIter);
@@ -621,10 +642,14 @@ pub enum ShaderModuleInterface {
 }
 
 impl ShaderModuleInterface {
-    pub fn overridable_constants(&self) -> &[OverridableConstant] {
+    pub fn overridable_constants(&self) -> OverridableConstants<'_> {
         match self {
-            ShaderModuleInterface::Dynamic(dynamic) => &dynamic.overridable_constants,
-            ShaderModuleInterface::Constant(constant) => constant.overridable_constants,
+            ShaderModuleInterface::Dynamic(dynamic) => {
+                OverridableConstants::Dynamic(&dynamic.overridable_constants)
+            }
+            ShaderModuleInterface::Constant(constant) => {
+                OverridableConstants::Constant(constant.overridable_constants)
+            }
         }
     }
 

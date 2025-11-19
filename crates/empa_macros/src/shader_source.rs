@@ -13,7 +13,7 @@ use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use empa_reflect::{
     BindingType, ConstantIdentifier, ConstantType, EntryPointBinding, EntryPointBindingType,
     Interpolation, MemoryUnit, MemoryUnitLayout, Sampling, ShaderSource, ShaderStage,
-    SizedBufferLayout, StorageTextureFormat, TexelType, UnsizedBufferLayout,
+    SizedBufferLayoutOld, StorageTextureFormat, TexelType, UnsizedBufferLayoutOld,
 };
 use include_preprocessor::{
     Error as IppError, OutputSink, SearchPaths, SourceMappedChunk, SourceTracker, preprocess,
@@ -549,7 +549,7 @@ fn storage_format_tokens(storage_format: StorageTextureFormat) -> proc_macro2::T
     }
 }
 
-fn sized_buffer_layout_tokens(layout: &SizedBufferLayout) -> proc_macro2::TokenStream {
+fn sized_buffer_layout_tokens(layout: &SizedBufferLayoutOld) -> proc_macro2::TokenStream {
     let recurse = layout.memory_units().iter().map(|u| memory_unit_tokens(u));
 
     let tokens = quote! {
@@ -559,7 +559,7 @@ fn sized_buffer_layout_tokens(layout: &SizedBufferLayout) -> proc_macro2::TokenS
     tokens
 }
 
-fn unsized_buffer_layout_tokens(layout: &UnsizedBufferLayout) -> proc_macro2::TokenStream {
+fn unsized_buffer_layout_tokens(layout: &UnsizedBufferLayoutOld) -> proc_macro2::TokenStream {
     let head_recurse = layout.sized_head().iter().map(|u| memory_unit_tokens(u));
 
     let tail = if let Some(layout) = layout.unsized_tail() {

@@ -2,7 +2,29 @@
 //!
 //! This is primarily meant to be constructed by procedural macros at compile-time.
 
-use crate::{IoBinding, OverridableConstant, ShaderStage, StorageTextureFormat, TexelType};
+use std::cmp::Ordering;
+
+use crate::{IoBinding, OverridableConstantType, ShaderStage, StorageTextureFormat, TexelType};
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct OverridableConstant {
+    pub name: &'static str,
+    pub id: Option<u16>,
+    pub constant_type: OverridableConstantType,
+    pub required: bool,
+}
+
+impl PartialOrd for OverridableConstant {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.id.partial_cmp(&other.id)
+    }
+}
+
+impl Ord for OverridableConstant {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.id.cmp(&other.id)
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct ArrayLayout {

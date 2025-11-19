@@ -8,6 +8,7 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
-[dependencies.naga]
-workspace = true
-features = ["wgsl-in"]
+[dependencies]
+empa-smi = { workspace = true }
+indexmap = { workspace = true }
+naga = { workspace = true, features = ["wgsl-in"] }

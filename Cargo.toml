@@ -63,6 +63,7 @@ flagset = "^0.4"
 futures = "0.3.21"
 glam = "^0.24"
 include-preprocessor = { version = "0.1.0", path = "../include_preprocessor/include_preprocessor" }
+indexmap = "2.12"
 js-sys = "0.3.69"
 lazy_static = "1.4.0"
 memoffset = "0.6"
