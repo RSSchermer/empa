@@ -1,8 +1,7 @@
 use std::fmt;
 
 pub use empa_macros::PipelineConstants;
-
-use crate::shader_module::StaticConstantType;
+use empa_smi::OverridableConstantType;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PipelineConstantIdentifier<'a> {
@@ -28,12 +27,12 @@ pub enum PipelineConstantValue {
 }
 
 impl PipelineConstantValue {
-    pub(crate) fn constant_type(&self) -> StaticConstantType {
+    pub(crate) fn constant_type(&self) -> OverridableConstantType {
         match self {
-            PipelineConstantValue::Bool(_) => StaticConstantType::Bool,
-            PipelineConstantValue::Float(_) => StaticConstantType::Float,
-            PipelineConstantValue::SignedInteger(_) => StaticConstantType::SignedInteger,
-            PipelineConstantValue::UnsignedInteger(_) => StaticConstantType::UnsignedInteger,
+            PipelineConstantValue::Bool(_) => OverridableConstantType::Bool,
+            PipelineConstantValue::Float(_) => OverridableConstantType::Float,
+            PipelineConstantValue::SignedInteger(_) => OverridableConstantType::SignedInteger,
+            PipelineConstantValue::UnsignedInteger(_) => OverridableConstantType::UnsignedInteger,
         }
     }
 

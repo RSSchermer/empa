@@ -5,7 +5,6 @@ use syn::{Data, DeriveInput};
 
 pub fn expand_derive_sized(input: &DeriveInput) -> Result<TokenStream, String> {
     if let Data::Struct(data) = &input.data {
-        let mod_path = quote!(empa::abi);
         let struct_name = &input.ident;
 
         let recurse_len = data.fields.iter().map(|field| {
@@ -13,7 +12,7 @@ pub fn expand_derive_sized(input: &DeriveInput) -> Result<TokenStream, String> {
             let span = field.span();
 
             quote_spanned! {span=>
-                <#ty as #mod_path::Sized>::LAYOUT.len()
+                <#ty as empa::abi::Sized>::LAYOUT.len()
             }
         });
 
@@ -27,17 +26,17 @@ pub fn expand_derive_sized(input: &DeriveInput) -> Result<TokenStream, String> {
             let span = field.span();
 
             quote_spanned! {span=>
-                let base_offset = empa::offset_of!(#struct_name, #ident);
-                let memory_units = <#ty as #mod_path::Sized>::LAYOUT;
+                let base_offset = empa::offset_of!(#struct_name, #ident) as u64;
+                let memory_units = <#ty as empa::abi::Sized>::LAYOUT;
                 let mut j = 0;
 
                 while j < memory_units.len() {
-                    let memory_unit = memory_units[j];
+                    let memory_unit = &memory_units[j];
 
-                    array[i] = #mod_path::MemoryUnit {
+                    array[i].write(empa::smi::MemoryUnit {
                         offset: base_offset + memory_unit.offset,
-                        layout: memory_unit.layout
-                    };
+                        layout: empa::smi::clone_memory_unit_layout(&memory_unit.layout),
+                    });
 
                     i += 1;
                     j += 1;
@@ -49,21 +48,21 @@ pub fn expand_derive_sized(input: &DeriveInput) -> Result<TokenStream, String> {
 
         let impl_block = quote! {
             #[automatically_derived]
-            unsafe impl #impl_generics #mod_path::Sized for #struct_name #ty_generics #where_clause {
-                const LAYOUT: &'static [#mod_path::MemoryUnit] = &{
+            unsafe impl #impl_generics empa::abi::Sized for #struct_name #ty_generics #where_clause {
+                const LAYOUT: &'static [empa::smi::MemoryUnit] = &{
                     const LEN: usize = #(#recurse_len)+*;
 
-                    // Initialize array with temporary values;
-                    let mut array = [#mod_path::MemoryUnit {
-                        offset: 0,
-                        layout: #mod_path::MemoryUnitLayout::Float
-                    }; LEN];
+                    let array: std::mem::MaybeUninit<[empa::smi::MemoryUnit; LEN]> =
+                        std::mem::MaybeUninit::uninit();
+                    let mut array = array.transpose();
 
                     let mut i = 0;
 
                     #(#recurse_array)*
 
-                    array
+                    unsafe {
+                        std::mem::MaybeUninit::array_assume_init(array)
+                    }
                 };
             }
         };

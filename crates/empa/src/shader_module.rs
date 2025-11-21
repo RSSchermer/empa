@@ -1,252 +1,114 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
+use std::fmt;
+use std::ops::Deref;
 use std::sync::Arc;
-use std::{fmt, slice};
 
 pub use empa_macros::shader_source;
-use empa_reflect::{
-    ConstantIdentifier, ConstantType, EntryPointBinding as DynamicEntryPointBinding,
-    EntryPointBindingType, ParseError as DynamicParseError, ShaderSource as DynamicShaderSource,
-    ShaderStage,
-};
+use empa_smi::wgsl::BuildSmiError;
+use empa_smi::{EntryPoint, ResourceBinding, ShaderModuleInterface};
 
 use crate::device::Device;
 use crate::driver::{Device as _, Driver, Dvr};
 use crate::pipeline_constants::{PipelineConstantIdentifier, PipelineConstants};
-use crate::resource_binding::BindingType;
 
-/// Internal type for `shader_source` macro.
-#[doc(hidden)]
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct StaticConstantDescriptor {
-    pub identifier: PipelineConstantIdentifier<'static>,
-    pub constant_type: StaticConstantType,
-    pub required: bool,
+pub struct ParseError {
+    inner: BuildSmiError,
 }
 
-/// Internal type for `shader_source` macro.
-#[doc(hidden)]
-pub type StaticConstantType = ConstantType;
-
-/// Internal type for `shader_source` macro.
-#[doc(hidden)]
-pub type StaticShaderStage = ShaderStage;
-
-/// Internal type for `shader_source` macro.
-#[doc(hidden)]
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct StaticResourceBinding {
-    pub group: u32,
-    pub binding: u32,
-    pub binding_type: BindingType,
-}
-
-/// Internal type for `shader_source` macro.
-#[doc(hidden)]
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct StaticEntryPointBinding {
-    pub location: u32,
-    pub binding_type: StaticEntryPointBindingType,
-    pub interpolation: Option<StaticInterpolation>,
-    pub sampling: Option<StaticSampling>,
-}
-
-/// Internal type for `shader_source` macro.
-#[doc(hidden)]
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum StaticEntryPointBindingType {
-    SignedInteger,
-    SignedIntegerVector2,
-    SignedIntegerVector3,
-    SignedIntegerVector4,
-    UnsignedInteger,
-    UnsignedIntegerVector2,
-    UnsignedIntegerVector3,
-    UnsignedIntegerVector4,
-    Float,
-    FloatVector2,
-    FloatVector3,
-    FloatVector4,
-    HalfFloat,
-    HalfFloatVector2,
-    HalfFloatVector3,
-    HalfFloatVector4,
-}
-
-impl StaticEntryPointBindingType {
-    pub fn to_entry_point_binding_type(&self) -> EntryPointBindingType {
-        match self {
-            StaticEntryPointBindingType::SignedInteger => EntryPointBindingType::SignedInteger,
-            StaticEntryPointBindingType::SignedIntegerVector2 => {
-                EntryPointBindingType::SignedIntegerVector2
-            }
-            StaticEntryPointBindingType::SignedIntegerVector3 => {
-                EntryPointBindingType::SignedIntegerVector3
-            }
-            StaticEntryPointBindingType::SignedIntegerVector4 => {
-                EntryPointBindingType::SignedIntegerVector4
-            }
-            StaticEntryPointBindingType::UnsignedInteger => EntryPointBindingType::UnsignedInteger,
-            StaticEntryPointBindingType::UnsignedIntegerVector2 => {
-                EntryPointBindingType::UnsignedIntegerVector2
-            }
-            StaticEntryPointBindingType::UnsignedIntegerVector3 => {
-                EntryPointBindingType::UnsignedIntegerVector3
-            }
-            StaticEntryPointBindingType::UnsignedIntegerVector4 => {
-                EntryPointBindingType::UnsignedIntegerVector4
-            }
-            StaticEntryPointBindingType::Float => EntryPointBindingType::Float,
-            StaticEntryPointBindingType::FloatVector2 => EntryPointBindingType::FloatVector2,
-            StaticEntryPointBindingType::FloatVector3 => EntryPointBindingType::FloatVector3,
-            StaticEntryPointBindingType::FloatVector4 => EntryPointBindingType::FloatVector4,
-            StaticEntryPointBindingType::HalfFloat => EntryPointBindingType::HalfFloat,
-            StaticEntryPointBindingType::HalfFloatVector2 => {
-                EntryPointBindingType::HalfFloatVector2
-            }
-            StaticEntryPointBindingType::HalfFloatVector3 => {
-                EntryPointBindingType::HalfFloatVector3
-            }
-            StaticEntryPointBindingType::HalfFloatVector4 => {
-                EntryPointBindingType::HalfFloatVector4
-            }
+impl fmt::Debug for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.inner {
+            BuildSmiError::Parse(e) => fmt::Debug::fmt(e, f),
+            BuildSmiError::Validation(e) => fmt::Debug::fmt(e, f),
         }
     }
 }
 
-/// Internal type for `shader_source` macro.
-#[doc(hidden)]
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum StaticInterpolation {
-    Perspective,
-    Linear,
-    Flat,
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.inner {
+            BuildSmiError::Parse(e) => fmt::Display::fmt(e, f),
+            BuildSmiError::Validation(e) => fmt::Display::fmt(e, f),
+        }
+    }
 }
 
-/// Internal type for `shader_source` macro.
-#[doc(hidden)]
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum StaticSampling {
-    Center,
-    Centroid,
-    Sample,
+pub(crate) enum SmiRef {
+    Static(&'static ShaderModuleInterface),
+    Dynamic(Arc<ShaderModuleInterface>),
 }
 
-/// Internal type for `shader_source` macro.
-#[doc(hidden)]
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct StaticShaderSource {
-    pub source: &'static str,
-    pub resource_bindings: &'static [StaticResourceBinding],
-    pub constants: &'static [StaticConstantDescriptor],
-    pub entry_points: &'static [StaticEntryPoint],
+impl From<&'static ShaderModuleInterface> for SmiRef {
+    fn from(value: &'static ShaderModuleInterface) -> Self {
+        SmiRef::Static(value)
+    }
 }
 
-/// Internal type for `shader_source` macro.
-#[doc(hidden)]
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct StaticEntryPoint {
-    pub name: &'static str,
-    pub stage: StaticShaderStage,
-    pub input_bindings: &'static [StaticEntryPointBinding],
-    pub output_bindings: &'static [StaticEntryPointBinding],
+impl From<ShaderModuleInterface> for SmiRef {
+    fn from(value: ShaderModuleInterface) -> Self {
+        SmiRef::Dynamic(Arc::new(value))
+    }
 }
 
-#[derive(Clone)]
-pub(crate) enum ShaderSourceInternal {
-    Static(StaticShaderSource),
-    Dynamic(Arc<DynamicShaderSource>),
-    Unparsed(Arc<String>),
-}
+impl Deref for SmiRef {
+    type Target = ShaderModuleInterface;
 
-impl ShaderSourceInternal {
-    pub(crate) fn source(&self) -> &str {
+    fn deref(&self) -> &Self::Target {
         match self {
-            ShaderSourceInternal::Static(source) => source.source,
-            ShaderSourceInternal::Dynamic(source) => source.raw_str(),
-            ShaderSourceInternal::Unparsed(source) => source.as_str(),
+            SmiRef::Static(v) => v,
+            SmiRef::Dynamic(v) => v,
+        }
+    }
+}
+
+pub struct ShaderSource {
+    source: Cow<'static, str>,
+    smi: SmiRef,
+}
+
+impl ShaderSource {
+    /// Internal function for `shader_source` macro.
+    #[doc(hidden)]
+    pub const fn from_static_unchecked(
+        source: &'static str,
+        smi: &'static ShaderModuleInterface,
+    ) -> Self {
+        ShaderSource {
+            source: Cow::Borrowed(source),
+            smi: SmiRef::Static(smi),
         }
     }
 
-    pub(crate) fn is_parsed(&self) -> bool {
-        !matches!(self, ShaderSourceInternal::Unparsed(_))
-    }
+    pub fn parse(source: String) -> Result<Self, ParseError> {
+        let smi = empa_smi::wgsl::build_smi(&source).map_err(|e| ParseError { inner: e })?;
 
-    pub(crate) fn resource_bindings(&self) -> &[StaticResourceBinding] {
-        match self {
-            ShaderSourceInternal::Static(source) => source.resource_bindings,
-            ShaderSourceInternal::Dynamic(_) => todo!(),
-            ShaderSourceInternal::Unparsed(_) => unimplemented!(),
-        }
+        Ok(ShaderSource {
+            source: source.into(),
+            smi: smi.into(),
+        })
     }
+}
 
+#[derive(Clone, Copy)]
+pub(crate) struct EntryPointExt<'a> {
+    smi: &'a ShaderModuleInterface,
+    entry_point: &'a EntryPoint,
+}
+
+impl EntryPointExt<'_> {
     pub(crate) fn has_required_constants(&self) -> bool {
-        match self {
-            ShaderSourceInternal::Static(s) => s.constants.iter().any(|c| c.required),
-            ShaderSourceInternal::Dynamic(s) => s.constants().iter().any(|c| c.required()),
-            ShaderSourceInternal::Unparsed(_) => false,
-        }
+        self.entry_point
+            .overridable_constants
+            .iter()
+            .any(|constant_index| self.smi.overridable_constants[*constant_index].required)
     }
 
-    pub(crate) fn resolve_entry_point_index(&self, name: &str) -> Option<usize> {
-        match self {
-            ShaderSourceInternal::Static(source) => source
-                .entry_points
-                .iter()
-                .enumerate()
-                .find(|(_, e)| e.name == name)
-                .map(|(index, _)| index),
-            ShaderSourceInternal::Dynamic(source) => source
-                .entry_points()
-                .iter()
-                .enumerate()
-                .find(|(_, e)| e.name() == name)
-                .map(|(index, _)| index),
-            ShaderSourceInternal::Unparsed(_) => unimplemented!(),
-        }
-    }
-
-    pub(crate) fn entry_point_stage(&self, index: usize) -> Option<ShaderStage> {
-        match self {
-            ShaderSourceInternal::Static(source) => source.entry_points.get(index).map(|e| e.stage),
-            ShaderSourceInternal::Dynamic(source) => {
-                source.entry_points().get(index).map(|e| e.stage())
-            }
-            ShaderSourceInternal::Unparsed(_) => unimplemented!(),
-        }
-    }
-
-    pub(crate) fn entry_point_input_bindings(
-        &self,
-        index: usize,
-    ) -> Option<EntryPointBindings<'_>> {
-        match self {
-            ShaderSourceInternal::Static(source) => source
-                .entry_points
-                .get(index)
-                .map(|e| EntryPointBindings::Static(e.input_bindings.iter())),
-            ShaderSourceInternal::Dynamic(source) => source
-                .entry_points()
-                .get(index)
-                .map(|e| EntryPointBindings::Dynamic(e.input_bindings().iter())),
-            ShaderSourceInternal::Unparsed(_) => unimplemented!(),
-        }
-    }
-
-    pub(crate) fn entry_point_output_bindings(
-        &self,
-        index: usize,
-    ) -> Option<EntryPointBindings<'_>> {
-        match self {
-            ShaderSourceInternal::Static(source) => source
-                .entry_points
-                .get(index)
-                .map(|e| EntryPointBindings::Static(e.output_bindings.iter())),
-            ShaderSourceInternal::Dynamic(source) => source
-                .entry_points()
-                .get(index)
-                .map(|e| EntryPointBindings::Dynamic(e.output_bindings().iter())),
-            ShaderSourceInternal::Unparsed(_) => unimplemented!(),
-        }
+    pub(crate) fn resource_bindings(&self) -> impl Iterator<Item = &ResourceBinding> + '_ {
+        self.entry_point
+            .resource_bindings
+            .iter()
+            .map(|i| &self.smi.resource_bindings[*i])
     }
 
     pub(crate) fn build_constants<C: PipelineConstants>(
@@ -255,50 +117,35 @@ impl ShaderSourceInternal {
     ) -> HashMap<String, f64> {
         let mut map = HashMap::new();
 
-        let mut add_constant = |identifier: PipelineConstantIdentifier,
-                                tpe: ConstantType,
-                                required: bool| {
+        for constant_index in self.entry_point.overridable_constants.iter().copied() {
+            let constant = &self.smi.overridable_constants[constant_index];
+
+            let identifier = if let Some(id) = constant.id {
+                PipelineConstantIdentifier::Number(id as u32)
+            } else {
+                PipelineConstantIdentifier::Name(constant.name.as_ref())
+            };
+
             if let Some(supplied_value) = pipeline_constants.lookup(identifier) {
-                if supplied_value.constant_type() != tpe {
+                if supplied_value.constant_type() != constant.constant_type {
                     panic!(
-                        "supplied value for pipeline constant `{}` does not match the type expected by the shader",
+                        "supplied value for pipeline constant `{}` does not match the type \
+                        expected by the shader",
                         identifier
                     )
                 }
 
+                // Pipelines with multiple entry points (e.g. render pipelines) may reference
+                // the same overridable constant multiple times, but since the identifier will
+                // be identical in each case, this does not result in duplicate entries.
                 map.insert(identifier.to_string(), supplied_value.to_f64());
             } else {
-                if required {
+                if constant.required {
                     panic!(
                         "could not find a value for the required constant `{}`",
                         identifier
                     );
                 }
-            }
-        };
-
-        match self {
-            ShaderSourceInternal::Static(s) => {
-                for constant in s.constants {
-                    add_constant(
-                        constant.identifier,
-                        constant.constant_type,
-                        constant.required,
-                    );
-                }
-            }
-            ShaderSourceInternal::Dynamic(s) => {
-                for constant in s.constants() {
-                    let identifier = match constant.identifier() {
-                        ConstantIdentifier::Number(n) => PipelineConstantIdentifier::Number(*n),
-                        ConstantIdentifier::Name(n) => PipelineConstantIdentifier::Name(n),
-                    };
-
-                    add_constant(identifier, constant.constant_type(), constant.required());
-                }
-            }
-            ShaderSourceInternal::Unparsed(_) => {
-                unimplemented!()
             }
         }
 
@@ -306,101 +153,54 @@ impl ShaderSourceInternal {
     }
 }
 
-pub(crate) enum EntryPointBindings<'a> {
-    Static(slice::Iter<'a, StaticEntryPointBinding>),
-    Dynamic(slice::Iter<'a, DynamicEntryPointBinding>),
-}
+impl Deref for EntryPointExt<'_> {
+    type Target = EntryPoint;
 
-impl<'a> Iterator for EntryPointBindings<'a> {
-    type Item = EntryPointBinding<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            EntryPointBindings::Static(s) => s.next().map(|e| EntryPointBinding::Static(e)),
-            EntryPointBindings::Dynamic(s) => s.next().map(|e| EntryPointBinding::Dynamic(e)),
-        }
+    fn deref(&self) -> &Self::Target {
+        self.entry_point
     }
 }
 
-pub(crate) enum EntryPointBinding<'a> {
-    Static(&'a StaticEntryPointBinding),
-    Dynamic(&'a DynamicEntryPointBinding),
+#[derive(Clone)]
+pub(crate) struct ShaderModuleData {
+    pub(crate) handle: <Dvr as Driver>::ShaderModuleHandle,
+    pub(crate) smi: ShaderModuleInterface,
 }
 
-impl EntryPointBinding<'_> {
-    pub(crate) fn location(&self) -> u32 {
-        match self {
-            EntryPointBinding::Static(b) => b.location,
-            EntryPointBinding::Dynamic(b) => b.location(),
-        }
+impl ShaderModuleData {
+    pub(crate) fn resolve_entry_point_index(&self, name: &str) -> Option<usize> {
+        self.smi
+            .entry_points
+            .iter()
+            .enumerate()
+            .find(|(_, e)| e.name.as_ref() == name)
+            .map(|(index, _)| index)
     }
 
-    pub(crate) fn binding_type(&self) -> EntryPointBindingType {
-        match self {
-            EntryPointBinding::Static(b) => b.binding_type.to_entry_point_binding_type(),
-            EntryPointBinding::Dynamic(b) => b.binding_type(),
-        }
-    }
-}
+    pub(crate) fn entry_point_ext(&self, entry_point_index: usize) -> EntryPointExt<'_> {
+        let entry_point = &self.smi.entry_points[entry_point_index];
 
-pub struct ParseError {
-    inner: DynamicParseError,
-}
-
-impl fmt::Debug for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        <DynamicParseError as fmt::Debug>::fmt(&self.inner, f)
-    }
-}
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        <DynamicParseError as fmt::Display>::fmt(&self.inner, f)
-    }
-}
-
-pub struct ShaderSource {
-    inner: ShaderSourceInternal,
-}
-
-impl ShaderSource {
-    /// Internal function for `shader_source` macro.
-    #[doc(hidden)]
-    pub const fn from_static(shader_source: StaticShaderSource) -> Self {
-        ShaderSource {
-            inner: ShaderSourceInternal::Static(shader_source),
-        }
-    }
-
-    pub fn parse(raw: String) -> Result<Self, ParseError> {
-        DynamicShaderSource::parse(raw)
-            .map(|ok| ShaderSource {
-                inner: ShaderSourceInternal::Dynamic(Arc::new(ok)),
-            })
-            .map_err(|inner| ParseError { inner })
-    }
-
-    pub fn unparsed(raw: String) -> Self {
-        ShaderSource {
-            inner: ShaderSourceInternal::Unparsed(Arc::new(raw)),
+        EntryPointExt {
+            smi: &self.smi,
+            entry_point,
         }
     }
 }
 
 pub struct ShaderModule {
-    pub(crate) handle: <Dvr as Driver>::ShaderModuleHandle,
-    pub(crate) meta: ShaderSourceInternal,
+    pub(crate) data: ShaderModuleData,
 }
 
 impl ShaderModule {
     pub(crate) fn new(device: &Device, source: &ShaderSource) -> Self {
         let handle = device
             .device_handle
-            .create_shader_module(source.inner.source());
-
-        ShaderModule {
+            .create_shader_module(source.source.as_ref());
+        let data = ShaderModuleData {
             handle,
-            meta: source.inner.clone(),
-        }
+            smi: source.smi.clone(),
+        };
+
+        ShaderModule { data }
     }
 }

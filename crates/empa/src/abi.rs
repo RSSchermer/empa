@@ -1,6 +1,7 @@
 use std::mem;
 
 pub use empa_macros::Sized;
+use empa_smi::{ArrayLayout, MemoryUnit, MemoryUnitLayout, UnsizedTailLayout};
 
 pub unsafe trait Sized {
     const LAYOUT: &'static [MemoryUnit];
@@ -9,7 +10,7 @@ pub unsafe trait Sized {
 pub unsafe trait Unsized {
     const SIZED_HEAD_LAYOUT: &'static [MemoryUnit];
 
-    const UNSIZED_TAIL_LAYOUT: Option<&'static [MemoryUnit]>;
+    const UNSIZED_TAIL_LAYOUT: Option<UnsizedTailLayout>;
 }
 
 unsafe impl<T> Unsized for T
@@ -17,7 +18,7 @@ where
     T: Sized,
 {
     const SIZED_HEAD_LAYOUT: &'static [MemoryUnit] = T::LAYOUT;
-    const UNSIZED_TAIL_LAYOUT: Option<&'static [MemoryUnit]> = None;
+    const UNSIZED_TAIL_LAYOUT: Option<UnsizedTailLayout> = None;
 }
 
 unsafe impl<T> Unsized for [T]
@@ -25,43 +26,11 @@ where
     T: Sized,
 {
     const SIZED_HEAD_LAYOUT: &'static [MemoryUnit] = &[];
-    const UNSIZED_TAIL_LAYOUT: Option<&'static [MemoryUnit]> = Some(T::LAYOUT);
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct MemoryUnit {
-    pub offset: usize,
-    pub layout: MemoryUnitLayout,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum MemoryUnitLayout {
-    Float,
-    FloatVector2,
-    FloatVector3,
-    FloatVector4,
-    Integer,
-    IntegerVector2,
-    IntegerVector3,
-    IntegerVector4,
-    UnsignedInteger,
-    UnsignedIntegerVector2,
-    UnsignedIntegerVector3,
-    UnsignedIntegerVector4,
-    Matrix2x2,
-    Matrix2x3,
-    Matrix2x4,
-    Matrix3x2,
-    Matrix3x3,
-    Matrix3x4,
-    Matrix4x2,
-    Matrix4x3,
-    Matrix4x4,
-    Array {
-        units: &'static [MemoryUnit],
-        stride: usize,
-        len: usize,
-    },
+    const UNSIZED_TAIL_LAYOUT: Option<UnsizedTailLayout> = Some(UnsizedTailLayout {
+        offset: 0,
+        element_layout: std::borrow::Cow::Borrowed(T::LAYOUT),
+        stride: mem::size_of::<T>() as u64,
+    });
 }
 
 unsafe impl<T, const N: usize> Sized for [T; N]
@@ -70,11 +39,11 @@ where
 {
     const LAYOUT: &'static [MemoryUnit] = &[MemoryUnit {
         offset: 0,
-        layout: MemoryUnitLayout::Array {
-            units: T::LAYOUT,
-            stride: mem::size_of::<T>(),
-            len: N,
-        },
+        layout: MemoryUnitLayout::Array(ArrayLayout {
+            element_layout: std::borrow::Cow::Borrowed(T::LAYOUT),
+            stride: mem::size_of::<T>() as u64,
+            len: N as u64,
+        }),
     }];
 }
 

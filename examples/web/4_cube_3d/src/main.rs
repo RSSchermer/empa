@@ -1,3 +1,5 @@
+#![feature(maybe_uninit_array_assume_init, maybe_uninit_uninit_array_transpose)]
+
 use std::error::Error;
 use std::f32::consts::PI;
 

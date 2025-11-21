@@ -28,7 +28,7 @@ arwa = { workspace = true, optional = true }
 atomic-counter = { workspace = true }
 bytemuck = { workspace = true, optional = true }
 empa-macros = { workspace = true }
-empa-reflect = { workspace = true }
+empa-smi = { workspace = true, features = ["wgsl"] }
 flagset = { workspace = true }
 futures = { workspace = true }
 lazy_static = { workspace = true }

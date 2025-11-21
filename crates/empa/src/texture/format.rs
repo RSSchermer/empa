@@ -2,6 +2,8 @@
 
 use std::iter;
 
+use empa_smi::StorageTextureFormat;
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[allow(non_camel_case_types)]
 pub enum TextureFormatId {
@@ -660,24 +662,58 @@ impl DepthStencilTestFormat for depth24plus_stencil8 {}
 impl DepthStencilTestFormat for depth32float_stencil8 {}
 impl DepthStencilTestFormat for stencil8 {}
 
-pub trait Storable: TextureFormat {}
+pub trait Storable: TextureFormat {
+    const STORAGE_TEXTURE_FORMAT: StorageTextureFormat;
+}
 
-impl Storable for rgba8unorm {}
-impl Storable for rgba8snorm {}
-impl Storable for rgba8uint {}
-impl Storable for rgba8sint {}
-impl Storable for rgba16uint {}
-impl Storable for rgba16sint {}
-impl Storable for rgba16float {}
-impl Storable for r32uint {}
-impl Storable for r32sint {}
-impl Storable for r32float {}
-impl Storable for rg32uint {}
-impl Storable for rg32sint {}
-impl Storable for rg32float {}
-impl Storable for rgba32uint {}
-impl Storable for rgba32sint {}
-impl Storable for rgba32float {}
+impl Storable for rgba8unorm {
+    const STORAGE_TEXTURE_FORMAT: StorageTextureFormat = StorageTextureFormat::rgba8unorm;
+}
+impl Storable for rgba8snorm {
+    const STORAGE_TEXTURE_FORMAT: StorageTextureFormat = StorageTextureFormat::rgba8snorm;
+}
+impl Storable for rgba8uint {
+    const STORAGE_TEXTURE_FORMAT: StorageTextureFormat = StorageTextureFormat::rgba8uint;
+}
+impl Storable for rgba8sint {
+    const STORAGE_TEXTURE_FORMAT: StorageTextureFormat = StorageTextureFormat::rgba8sint;
+}
+impl Storable for rgba16uint {
+    const STORAGE_TEXTURE_FORMAT: StorageTextureFormat = StorageTextureFormat::rgba16uint;
+}
+impl Storable for rgba16sint {
+    const STORAGE_TEXTURE_FORMAT: StorageTextureFormat = StorageTextureFormat::rgba16sint;
+}
+impl Storable for rgba16float {
+    const STORAGE_TEXTURE_FORMAT: StorageTextureFormat = StorageTextureFormat::rgba16float;
+}
+impl Storable for r32uint {
+    const STORAGE_TEXTURE_FORMAT: StorageTextureFormat = StorageTextureFormat::r32uint;
+}
+impl Storable for r32sint {
+    const STORAGE_TEXTURE_FORMAT: StorageTextureFormat = StorageTextureFormat::r32sint;
+}
+impl Storable for r32float {
+    const STORAGE_TEXTURE_FORMAT: StorageTextureFormat = StorageTextureFormat::r32float;
+}
+impl Storable for rg32uint {
+    const STORAGE_TEXTURE_FORMAT: StorageTextureFormat = StorageTextureFormat::rg32uint;
+}
+impl Storable for rg32sint {
+    const STORAGE_TEXTURE_FORMAT: StorageTextureFormat = StorageTextureFormat::rg32sint;
+}
+impl Storable for rg32float {
+    const STORAGE_TEXTURE_FORMAT: StorageTextureFormat = StorageTextureFormat::rg32float;
+}
+impl Storable for rgba32uint {
+    const STORAGE_TEXTURE_FORMAT: StorageTextureFormat = StorageTextureFormat::rgba32uint;
+}
+impl Storable for rgba32sint {
+    const STORAGE_TEXTURE_FORMAT: StorageTextureFormat = StorageTextureFormat::rgba32sint;
+}
+impl Storable for rgba32float {
+    const STORAGE_TEXTURE_FORMAT: StorageTextureFormat = StorageTextureFormat::rgba32float;
+}
 
 pub trait Renderable: TextureFormat {}
 

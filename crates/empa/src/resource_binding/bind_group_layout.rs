@@ -1,8 +1,8 @@
 use std::marker;
 
+use empa_smi::{ResourceType, StorageTextureFormat, TexelType};
 use flagset::FlagSet;
 
-use crate::abi::MemoryUnit;
 use crate::device::Device;
 use crate::driver::{
     BufferBindingType, Device as _, Driver, Dvr, SamplerBindingType, ShaderStage,
@@ -32,7 +32,7 @@ impl<T> BindGroupLayout<T> {
 
                 driver::BindGroupLayoutEntry {
                     binding: i as u32,
-                    binding_type: e.binding_type.to_driver(),
+                    binding_type: resource_type_to_driver(&e.resource_type),
                     visibility: e.visibility,
                 }
             });
@@ -169,178 +169,138 @@ impl_typed_bind_group_layout!(
 
 pub struct BindGroupLayoutEntry {
     pub visibility: FlagSet<ShaderStage>,
-    pub binding_type: BindingType,
+    pub resource_type: ResourceType,
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum BindingType {
-    Texture1D(TexelType),
-    Texture2D(TexelType),
-    Texture3D(TexelType),
-    Texture2DArray(TexelType),
-    TextureCube(TexelType),
-    TextureCubeArray(TexelType),
-    TextureMultisampled2D(TexelType),
-    TextureDepth2D,
-    TextureDepth2DArray,
-    TextureDepthCube,
-    TextureDepthCubeArray,
-    TextureDepthMultisampled2D,
-    StorageTexture1D(TextureFormatId),
-    StorageTexture2D(TextureFormatId),
-    StorageTexture2DArray(TextureFormatId),
-    StorageTexture3D(TextureFormatId),
-    FilteringSampler,
-    NonFilteringSampler,
-    ComparisonSampler,
-    Uniform(SizedBufferLayout),
-    Storage(UnsizedBufferLayout),
-    ReadOnlyStorage(UnsizedBufferLayout),
-}
-
-impl BindingType {
-    fn to_driver(&self) -> driver::BindingType {
-        match self {
-            BindingType::Texture1D(texel_type) => driver::BindingType::Texture {
-                sample_type: texel_type.to_driver(),
-                dimension: TextureViewDimension::One,
-                multisampled: false,
-            },
-            BindingType::Texture2D(texel_type) => driver::BindingType::Texture {
-                sample_type: texel_type.to_driver(),
-                dimension: TextureViewDimension::Two,
-                multisampled: false,
-            },
-            BindingType::Texture3D(texel_type) => driver::BindingType::Texture {
-                sample_type: texel_type.to_driver(),
-                dimension: TextureViewDimension::Three,
-                multisampled: false,
-            },
-            BindingType::Texture2DArray(texel_type) => driver::BindingType::Texture {
-                sample_type: texel_type.to_driver(),
-                dimension: TextureViewDimension::TwoArray,
-                multisampled: false,
-            },
-            BindingType::TextureCube(texel_type) => driver::BindingType::Texture {
-                sample_type: texel_type.to_driver(),
-                dimension: TextureViewDimension::Cube,
-                multisampled: false,
-            },
-            BindingType::TextureCubeArray(texel_type) => driver::BindingType::Texture {
-                sample_type: texel_type.to_driver(),
-                dimension: TextureViewDimension::CubeArray,
-                multisampled: false,
-            },
-            BindingType::TextureMultisampled2D(texel_type) => driver::BindingType::Texture {
-                sample_type: texel_type.to_driver(),
-                dimension: TextureViewDimension::Two,
-                multisampled: true,
-            },
-            BindingType::TextureDepth2D => driver::BindingType::Texture {
-                sample_type: TextureSampleType::Depth,
-                dimension: TextureViewDimension::Two,
-                multisampled: false,
-            },
-            BindingType::TextureDepth2DArray => driver::BindingType::Texture {
-                sample_type: TextureSampleType::Depth,
-                dimension: TextureViewDimension::TwoArray,
-                multisampled: false,
-            },
-            BindingType::TextureDepthCube => driver::BindingType::Texture {
-                sample_type: TextureSampleType::Depth,
-                dimension: TextureViewDimension::Cube,
-                multisampled: false,
-            },
-            BindingType::TextureDepthCubeArray => driver::BindingType::Texture {
-                sample_type: TextureSampleType::Depth,
-                dimension: TextureViewDimension::CubeArray,
-                multisampled: false,
-            },
-            BindingType::TextureDepthMultisampled2D => driver::BindingType::Texture {
-                sample_type: TextureSampleType::Depth,
-                dimension: TextureViewDimension::Two,
-                multisampled: true,
-            },
-            BindingType::StorageTexture1D(format) => driver::BindingType::StorageTexture {
-                access: StorageTextureAccess::WriteOnly,
-                dimension: TextureViewDimension::One,
-                format: *format,
-            },
-            BindingType::StorageTexture2D(format) => driver::BindingType::StorageTexture {
-                access: StorageTextureAccess::WriteOnly,
-                dimension: TextureViewDimension::Two,
-                format: *format,
-            },
-            BindingType::StorageTexture2DArray(format) => driver::BindingType::StorageTexture {
-                access: StorageTextureAccess::WriteOnly,
-                dimension: TextureViewDimension::TwoArray,
-                format: *format,
-            },
-            BindingType::StorageTexture3D(format) => driver::BindingType::StorageTexture {
-                access: StorageTextureAccess::WriteOnly,
-                dimension: TextureViewDimension::Three,
-                format: *format,
-            },
-            BindingType::FilteringSampler => {
-                driver::BindingType::Sampler(SamplerBindingType::Filtering)
-            }
-            BindingType::NonFilteringSampler => {
-                driver::BindingType::Sampler(SamplerBindingType::NonFiltering)
-            }
-            BindingType::ComparisonSampler => {
-                driver::BindingType::Sampler(SamplerBindingType::Comparison)
-            }
-            // TODO: min_binding_size
-            // TODO: dynamic offsets
-            BindingType::Uniform(_) => driver::BindingType::Buffer(BufferBindingType::Uniform),
-            BindingType::Storage(_) => driver::BindingType::Buffer(BufferBindingType::Storage),
-            BindingType::ReadOnlyStorage(_) => {
-                driver::BindingType::Buffer(BufferBindingType::ReadonlyStorage)
-            }
+fn resource_type_to_driver(resource_type: &ResourceType) -> driver::BindingType {
+    match resource_type {
+        ResourceType::Texture1D(texel_type) => driver::BindingType::Texture {
+            sample_type: texel_type_to_driver(texel_type),
+            dimension: TextureViewDimension::One,
+            multisampled: false,
+        },
+        ResourceType::Texture2D(texel_type) => driver::BindingType::Texture {
+            sample_type: texel_type_to_driver(texel_type),
+            dimension: TextureViewDimension::Two,
+            multisampled: false,
+        },
+        ResourceType::Texture3D(texel_type) => driver::BindingType::Texture {
+            sample_type: texel_type_to_driver(texel_type),
+            dimension: TextureViewDimension::Three,
+            multisampled: false,
+        },
+        ResourceType::Texture2DArray(texel_type) => driver::BindingType::Texture {
+            sample_type: texel_type_to_driver(texel_type),
+            dimension: TextureViewDimension::TwoArray,
+            multisampled: false,
+        },
+        ResourceType::TextureCube(texel_type) => driver::BindingType::Texture {
+            sample_type: texel_type_to_driver(texel_type),
+            dimension: TextureViewDimension::Cube,
+            multisampled: false,
+        },
+        ResourceType::TextureCubeArray(texel_type) => driver::BindingType::Texture {
+            sample_type: texel_type_to_driver(texel_type),
+            dimension: TextureViewDimension::CubeArray,
+            multisampled: false,
+        },
+        ResourceType::TextureMultisampled2D(texel_type) => driver::BindingType::Texture {
+            sample_type: texel_type_to_driver(texel_type),
+            dimension: TextureViewDimension::Two,
+            multisampled: true,
+        },
+        ResourceType::TextureDepth2D => driver::BindingType::Texture {
+            sample_type: TextureSampleType::Depth,
+            dimension: TextureViewDimension::Two,
+            multisampled: false,
+        },
+        ResourceType::TextureDepth2DArray => driver::BindingType::Texture {
+            sample_type: TextureSampleType::Depth,
+            dimension: TextureViewDimension::TwoArray,
+            multisampled: false,
+        },
+        ResourceType::TextureDepthCube => driver::BindingType::Texture {
+            sample_type: TextureSampleType::Depth,
+            dimension: TextureViewDimension::Cube,
+            multisampled: false,
+        },
+        ResourceType::TextureDepthCubeArray => driver::BindingType::Texture {
+            sample_type: TextureSampleType::Depth,
+            dimension: TextureViewDimension::CubeArray,
+            multisampled: false,
+        },
+        ResourceType::TextureDepthMultisampled2D => driver::BindingType::Texture {
+            sample_type: TextureSampleType::Depth,
+            dimension: TextureViewDimension::Two,
+            multisampled: true,
+        },
+        ResourceType::StorageTexture1D(format) => driver::BindingType::StorageTexture {
+            access: StorageTextureAccess::WriteOnly,
+            dimension: TextureViewDimension::One,
+            format: storage_texture_format_to_driver(format),
+        },
+        ResourceType::StorageTexture2D(format) => driver::BindingType::StorageTexture {
+            access: StorageTextureAccess::WriteOnly,
+            dimension: TextureViewDimension::Two,
+            format: storage_texture_format_to_driver(format),
+        },
+        ResourceType::StorageTexture2DArray(format) => driver::BindingType::StorageTexture {
+            access: StorageTextureAccess::WriteOnly,
+            dimension: TextureViewDimension::TwoArray,
+            format: storage_texture_format_to_driver(format),
+        },
+        ResourceType::StorageTexture3D(format) => driver::BindingType::StorageTexture {
+            access: StorageTextureAccess::WriteOnly,
+            dimension: TextureViewDimension::Three,
+            format: storage_texture_format_to_driver(format),
+        },
+        ResourceType::FilteringSampler => {
+            driver::BindingType::Sampler(SamplerBindingType::Filtering)
+        }
+        ResourceType::NonFilteringSampler => {
+            driver::BindingType::Sampler(SamplerBindingType::NonFiltering)
+        }
+        ResourceType::ComparisonSampler => {
+            driver::BindingType::Sampler(SamplerBindingType::Comparison)
+        }
+        // TODO: min_binding_size
+        // TODO: dynamic offsets
+        ResourceType::Uniform(_) => driver::BindingType::Buffer(BufferBindingType::Uniform),
+        ResourceType::StorageRead(_) => {
+            driver::BindingType::Buffer(BufferBindingType::ReadonlyStorage)
+        }
+        ResourceType::StorageReadWrite(_) => {
+            driver::BindingType::Buffer(BufferBindingType::Storage)
         }
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum TexelType {
-    Float,
-    UnfilterableFloat,
-    SignedInteger,
-    UnsignedInteger,
-}
-
-impl TexelType {
-    pub(crate) fn to_driver(&self) -> driver::TextureSampleType {
-        match self {
-            TexelType::Float => driver::TextureSampleType::Float,
-            TexelType::UnfilterableFloat => driver::TextureSampleType::UnfilterableFloat,
-            TexelType::SignedInteger => driver::TextureSampleType::SignedInteger,
-            TexelType::UnsignedInteger => driver::TextureSampleType::UnsignedInteger,
-        }
+fn texel_type_to_driver(texel_type: &TexelType) -> driver::TextureSampleType {
+    match texel_type {
+        TexelType::Float => driver::TextureSampleType::Float,
+        TexelType::UnfilterableFloat => driver::TextureSampleType::UnfilterableFloat,
+        TexelType::Integer => driver::TextureSampleType::SignedInteger,
+        TexelType::UnsignedInteger => driver::TextureSampleType::UnsignedInteger,
     }
 }
 
-impl PartialEq for TexelType {
-    fn eq(&self, other: &Self) -> bool {
-        // TODO: this is a temporary stop-gap solution around Naga's lack of distinction between
-        // filtered and unfiltered float types.
-        match (*self, *other) {
-            (TexelType::Float, TexelType::Float) => true,
-            (TexelType::UnfilterableFloat, TexelType::UnfilterableFloat) => true,
-            (TexelType::SignedInteger, TexelType::SignedInteger) => true,
-            (TexelType::UnsignedInteger, TexelType::UnsignedInteger) => true,
-            (TexelType::Float, TexelType::UnfilterableFloat) => true,
-            (TexelType::UnfilterableFloat, TexelType::Float) => true,
-            _ => false,
-        }
+fn storage_texture_format_to_driver(format: &StorageTextureFormat) -> TextureFormatId {
+    match format {
+        StorageTextureFormat::rgba8unorm => TextureFormatId::rgba8unorm,
+        StorageTextureFormat::rgba8snorm => TextureFormatId::rgba8snorm,
+        StorageTextureFormat::rgba8uint => TextureFormatId::rgba8uint,
+        StorageTextureFormat::rgba8sint => TextureFormatId::rgba8sint,
+        StorageTextureFormat::rgba16uint => TextureFormatId::rgba16uint,
+        StorageTextureFormat::rgba16sint => TextureFormatId::rgba16sint,
+        StorageTextureFormat::rgba16float => TextureFormatId::rgba16float,
+        StorageTextureFormat::r32uint => TextureFormatId::r32uint,
+        StorageTextureFormat::r32sint => TextureFormatId::r32sint,
+        StorageTextureFormat::r32float => TextureFormatId::r32float,
+        StorageTextureFormat::rg32uint => TextureFormatId::rg32uint,
+        StorageTextureFormat::rg32sint => TextureFormatId::rg32sint,
+        StorageTextureFormat::rg32float => TextureFormatId::rg32float,
+        StorageTextureFormat::rgba32uint => TextureFormatId::rgba32uint,
+        StorageTextureFormat::rgba32sint => TextureFormatId::rgba32sint,
+        StorageTextureFormat::rgba32float => TextureFormatId::rgba32float,
     }
-}
-
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct SizedBufferLayout(pub &'static [MemoryUnit]);
-
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct UnsizedBufferLayout {
-    pub sized_head: &'static [MemoryUnit],
-    pub unsized_tail: Option<&'static [MemoryUnit]>,
 }

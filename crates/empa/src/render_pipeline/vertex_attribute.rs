@@ -1,51 +1,51 @@
 #![allow(non_camel_case_types)]
 
-use empa_reflect::EntryPointBindingType;
+use empa_smi::IoBindingType;
 
 use crate::render_pipeline::VertexFormat;
 
 pub(crate) fn vertex_format_is_compatible(
     format: VertexFormat,
-    binding_type: EntryPointBindingType,
+    binding_type: IoBindingType,
 ) -> bool {
     match binding_type {
-        EntryPointBindingType::SignedInteger => match format {
+        IoBindingType::SignedInteger => match format {
             VertexFormat::sint32 => true,
             _ => false,
         },
-        EntryPointBindingType::SignedIntegerVector2 => match format {
+        IoBindingType::SignedIntegerVector2 => match format {
             VertexFormat::sint8x2 | VertexFormat::sint16x2 | VertexFormat::sint32x2 => true,
             _ => false,
         },
-        EntryPointBindingType::SignedIntegerVector3 => match format {
+        IoBindingType::SignedIntegerVector3 => match format {
             VertexFormat::sint32x3 => true,
             _ => false,
         },
-        EntryPointBindingType::SignedIntegerVector4 => match format {
+        IoBindingType::SignedIntegerVector4 => match format {
             VertexFormat::sint8x4 | VertexFormat::sint16x4 | VertexFormat::sint32x4 => true,
             _ => false,
         },
-        EntryPointBindingType::UnsignedInteger => match format {
+        IoBindingType::UnsignedInteger => match format {
             VertexFormat::uint32 => true,
             _ => false,
         },
-        EntryPointBindingType::UnsignedIntegerVector2 => match format {
+        IoBindingType::UnsignedIntegerVector2 => match format {
             VertexFormat::uint8x2 | VertexFormat::uint16x2 | VertexFormat::uint32x2 => true,
             _ => false,
         },
-        EntryPointBindingType::UnsignedIntegerVector3 => match format {
+        IoBindingType::UnsignedIntegerVector3 => match format {
             VertexFormat::uint32x3 => true,
             _ => false,
         },
-        EntryPointBindingType::UnsignedIntegerVector4 => match format {
+        IoBindingType::UnsignedIntegerVector4 => match format {
             VertexFormat::uint8x4 | VertexFormat::uint16x4 | VertexFormat::uint32x4 => true,
             _ => false,
         },
-        EntryPointBindingType::Float => match format {
+        IoBindingType::Float => match format {
             VertexFormat::float32 => true,
             _ => false,
         },
-        EntryPointBindingType::FloatVector2 => match format {
+        IoBindingType::FloatVector2 => match format {
             VertexFormat::unorm8x2
             | VertexFormat::snorm8x2
             | VertexFormat::unorm16x2
@@ -53,11 +53,11 @@ pub(crate) fn vertex_format_is_compatible(
             | VertexFormat::float32x2 => true,
             _ => false,
         },
-        EntryPointBindingType::FloatVector3 => match format {
+        IoBindingType::FloatVector3 => match format {
             VertexFormat::float32x3 => true,
             _ => false,
         },
-        EntryPointBindingType::FloatVector4 => match format {
+        IoBindingType::FloatVector4 => match format {
             VertexFormat::unorm8x4
             | VertexFormat::snorm8x4
             | VertexFormat::unorm16x4
@@ -65,13 +65,13 @@ pub(crate) fn vertex_format_is_compatible(
             | VertexFormat::float32x4 => true,
             _ => false,
         },
-        EntryPointBindingType::HalfFloat => false,
-        EntryPointBindingType::HalfFloatVector2 => match format {
+        IoBindingType::HalfFloat => false,
+        IoBindingType::HalfFloatVector2 => match format {
             VertexFormat::float16x2 => true,
             _ => false,
         },
-        EntryPointBindingType::HalfFloatVector3 => false,
-        EntryPointBindingType::HalfFloatVector4 => match format {
+        IoBindingType::HalfFloatVector3 => false,
+        IoBindingType::HalfFloatVector4 => match format {
             VertexFormat::float16x4 => true,
             _ => false,
         },

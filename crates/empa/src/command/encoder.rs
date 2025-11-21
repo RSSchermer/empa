@@ -2,7 +2,8 @@ use std::borrow::Cow;
 use std::ops::{Range, Rem};
 use std::{marker, mem};
 
-use crate::abi::{MemoryUnit, MemoryUnitLayout};
+use empa_smi::{MemoryUnit, MemoryUnitLayout};
+
 use crate::buffer::image_copy_buffer_validate;
 use crate::command::{
     BindGroupEncoding, BindGroups, IndexBuffer, IndexBufferEncoding, VertexBufferEncoding,

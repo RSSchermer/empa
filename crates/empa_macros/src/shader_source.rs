@@ -10,17 +10,18 @@ use codespan_reporting::diagnostic::{Diagnostic, Label};
 use codespan_reporting::files::{Error, Files, SimpleFile};
 use codespan_reporting::term;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
-use empa_reflect::{
-    BindingType, ConstantIdentifier, ConstantType, EntryPointBinding, EntryPointBindingType,
-    Interpolation, MemoryUnit, MemoryUnitLayout, Sampling, ShaderSource, ShaderStage,
-    SizedBufferLayoutOld, StorageTextureFormat, TexelType, UnsizedBufferLayoutOld,
+use empa_smi::wgsl::{BuildSmiError, build_smi};
+use empa_smi::{
+    ArrayLayout, EntryPoint, Interpolate, InterpolationType, IoBinding, IoBindingType, MemoryUnit,
+    MemoryUnitLayout, OverridableConstant, OverridableConstantType, ResourceBinding, ResourceType,
+    Sampling, ShaderModuleInterface, ShaderStage, SizedBufferLayout, StorageTextureFormat,
+    TexelType, UnsizedBufferLayout, UnsizedTailLayout,
 };
 use include_preprocessor::{
     Error as IppError, OutputSink, SearchPaths, SourceMappedChunk, SourceTracker, preprocess,
 };
-use naga::valid::{Capabilities, ValidationFlags, Validator};
 use proc_macro::{Span, TokenStream, tracked_path};
-use quote::quote;
+use quote::{quote, quote_spanned};
 use syn::{LitStr, parse_macro_input};
 
 fn gen_file_id(path: &Path) -> u64 {
@@ -185,7 +186,7 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
     let output = if source_join.is_file() {
         let writer = OutputWriter::new();
 
-        match preprocess(source_join, search_paths, writer, &mut source_files) {
+        match preprocess(&source_join, search_paths, writer, &mut source_files) {
             Ok(output) => output,
             Err(error) => {
                 let (file, diagnostic) = match error {
@@ -211,7 +212,7 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
                         (file, diagnostic)
                     }
                     IppError::IO(error) => {
-                        panic!("adsf asdf {}", error);
+                        panic!("{}", error);
                     }
                     IppError::Parse(error) => {
                         let file = SimpleFile::new(
@@ -233,705 +234,599 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
                     }
                 };
 
-                let config = codespan_reporting::term::Config::default();
+                let config = term::Config::default();
                 let writer = StandardStream::stderr(ColorChoice::Auto);
 
                 term::emit(&mut writer.lock(), &config, &file, &diagnostic)
                     .expect("cannot write error");
 
-                panic!("failed to compile shader source");
+                return quote! {
+                    compile_error!("failed to preprocess shader module; see errors reported above");
+                }
+                .into();
             }
         }
     } else {
-        panic!("Entry (`{:?}`) point is not a file!", source_join);
+        let span = path.span();
+
+        return quote_spanned! {span=>
+            compile_error!("the given path does not resolve to a valid file");
+        }
+        .into();
     };
 
     let source_token = LitStr::new(&output.buffer, Span::call_site().into());
 
-    let shader_source = match ShaderSource::parse(output.buffer.clone()) {
-        Ok(shader_source) => shader_source,
+    let smi = match build_smi(&output.buffer) {
+        Ok(smi) => shader_module_interface_to_tokens(&smi),
         Err(err) => {
-            let diagnostic = Diagnostic::error()
-                .with_message(err.message().to_string())
-                .with_labels(
-                    err.labels()
-                        .flat_map(|label| {
-                            let source_range = label.0.clone().to_range()?;
-                            let mapped_span = output.source_map.mapped_span(source_range).unwrap();
+            match err {
+                BuildSmiError::Parse(err) => {
+                    let diagnostic = Diagnostic::error()
+                        .with_message(err.message().to_string())
+                        .with_labels(
+                            err.labels()
+                                .flat_map(|label| {
+                                    let source_range = label.0.clone().to_range()?;
+                                    let mapped_span =
+                                        output.source_map.mapped_span(source_range).unwrap();
 
-                            Some(
-                                Label::primary(mapped_span.file_id, mapped_span.range.clone())
-                                    .with_message(label.1.to_string()),
-                            )
-                        })
-                        .collect(),
-                );
+                                    Some(
+                                        Label::primary(
+                                            mapped_span.file_id,
+                                            mapped_span.range.clone(),
+                                        )
+                                        .with_message(label.1.to_string()),
+                                    )
+                                })
+                                .collect(),
+                        );
 
-            let config = codespan_reporting::term::Config::default();
-            let writer = StandardStream::stderr(ColorChoice::Auto);
+                    let config = codespan_reporting::term::Config::default();
+                    let writer = StandardStream::stderr(ColorChoice::Auto);
 
-            term::emit(&mut writer.lock(), &config, &source_files, &diagnostic)
-                .expect("cannot write error");
+                    term::emit(&mut writer.lock(), &config, &source_files, &diagnostic)
+                        .expect("cannot write error");
+                }
+                BuildSmiError::Validation(err) => {
+                    let mut diagnostic =
+                        Diagnostic::error().with_message(err.as_inner().to_string());
 
-            panic!("failed to compile shader source");
+                    if let Some(location) = err.location(&output.buffer) {
+                        let start = location.offset as usize;
+                        let end = start + location.length as usize;
+
+                        let mapped_span = output.source_map.mapped_span(start..end).unwrap();
+
+                        let mut label =
+                            Label::primary(mapped_span.file_id, mapped_span.range.clone());
+
+                        if let Some(source) = err.source() {
+                            label = label.with_message(source.to_string())
+                        }
+
+                        diagnostic = diagnostic.with_labels(vec![label])
+                    }
+
+                    let config = codespan_reporting::term::Config::default();
+                    let writer = StandardStream::stderr(ColorChoice::Auto);
+
+                    term::emit(&mut writer.lock(), &config, &source_files, &diagnostic)
+                        .expect("cannot write error");
+                }
+            }
+
+            return quote! {
+                compile_error!("invalid shader module; see errors reported above");
+            }
+            .into();
         }
     };
 
-    let mut validator = Validator::new(
-        ValidationFlags::all() & !(ValidationFlags::EXPRESSIONS | ValidationFlags::BLOCKS),
-        Capabilities::all(),
-    );
-
-    if let Err(err) = validator.validate(shader_source.module()) {
-        let mut diagnostic = Diagnostic::error().with_message(err.as_inner().to_string());
-
-        if let Some(location) = err.location(shader_source.raw_str()) {
-            let start = location.offset as usize;
-            let end = start + location.length as usize;
-
-            let mapped_span = output.source_map.mapped_span(start..end).unwrap();
-
-            let mut label = Label::primary(mapped_span.file_id, mapped_span.range.clone());
-
-            if let Some(source) = err.source() {
-                label = label.with_message(source.to_string())
-            }
-
-            diagnostic = diagnostic.with_labels(vec![label])
-        }
-
-        let config = codespan_reporting::term::Config::default();
-        let writer = StandardStream::stderr(ColorChoice::Auto);
-
-        term::emit(&mut writer.lock(), &config, &source_files, &diagnostic)
-            .expect("cannot write error");
-
-        panic!("failed to validate shader source");
-    }
-
-    let mod_path = quote!(empa::shader_module);
-
-    let resource_bindings = shader_source.resource_bindings().iter().map(|b| {
-        let group = b.group();
-        let binding = b.binding();
-        let binding_type = binding_type_tokens(b.binding_type());
-
-        quote! {
-            #mod_path::StaticResourceBinding {
-                group: #group,
-                binding: #binding,
-                binding_type: #binding_type
-            }
-        }
-    });
-
-    let constants = shader_source.constants().iter().map(|c| {
-        let identifier = match c.identifier() {
-            ConstantIdentifier::Number(n) => {
-                quote!(empa::pipeline_constants::PipelineConstantIdentifier::Number(#n))
-            }
-            ConstantIdentifier::Name(n) => {
-                quote!(empa::pipeline_constants::PipelineConstantIdentifier::Name(#n))
-            }
-        };
-        let constant_type = constant_type_tokens(c.constant_type());
-        let required = c.required();
-
-        quote! {
-            #mod_path::StaticConstantDescriptor {
-                identifier: #identifier,
-                constant_type: #constant_type,
-                required: #required,
-            }
-        }
-    });
-
-    let entry_points = shader_source.entry_points().iter().map(|e| {
-        let name = e.name();
-        let stage = shader_stage_tokens(e.stage());
-        let input_bindings = e.input_bindings().iter().map(entry_point_binding_tokens);
-        let output_bindings = e.output_bindings().iter().map(entry_point_binding_tokens);
-
-        quote! {
-            #mod_path::StaticEntryPoint {
-                name: #name,
-                stage: #stage,
-                input_bindings: &[#(#input_bindings),*],
-                output_bindings: &[#(#output_bindings),*],
-            }
-        }
-    });
-
     let result = quote! {
-        #mod_path::ShaderSource::from_static(#mod_path::StaticShaderSource {
-            source: #source_token,
-            resource_bindings: &[#(#resource_bindings),*],
-            constants: &[#(#constants),*],
-            entry_points: &[#(#entry_points),*]
-        })
+        empa::shader_module::ShaderSource::from_static_unchecked(#source_token, &const {#smi})
     };
 
     result.into()
 }
 
-fn binding_type_tokens(binding_type: &BindingType) -> proc_macro2::TokenStream {
-    let mod_path = quote!(empa::resource_binding);
+fn shader_module_interface_to_tokens(smi: &ShaderModuleInterface) -> proc_macro2::TokenStream {
+    let resource_bindings = smi.resource_bindings.iter().map(resource_binding_to_tokens);
+    let overridable_constants = smi
+        .overridable_constants
+        .iter()
+        .map(overridable_constant_to_tokens);
+    let entry_points = smi.entry_points.iter().map(entry_point_to_tokens);
 
-    match binding_type {
-        BindingType::Texture1D(texel_type) => {
-            let texel_type = texel_type_tokens(*texel_type);
-
-            quote!(#mod_path::BindingType::Texture1D(#texel_type))
-        }
-        BindingType::Texture2D(texel_type) => {
-            let texel_type = texel_type_tokens(*texel_type);
-
-            quote!(#mod_path::BindingType::Texture2D(#texel_type))
-        }
-        BindingType::Texture3D(texel_type) => {
-            let texel_type = texel_type_tokens(*texel_type);
-
-            quote!(#mod_path::BindingType::Texture3D(#texel_type))
-        }
-        BindingType::Texture2DArray(texel_type) => {
-            let texel_type = texel_type_tokens(*texel_type);
-
-            quote!(#mod_path::BindingType::Texture2DArray(#texel_type))
-        }
-        BindingType::TextureCube(texel_type) => {
-            let texel_type = texel_type_tokens(*texel_type);
-
-            quote!(#mod_path::BindingType::TextureCube(#texel_type))
-        }
-        BindingType::TextureCubeArray(texel_type) => {
-            let texel_type = texel_type_tokens(*texel_type);
-
-            quote!(#mod_path::BindingType::TextureCubeArray(#texel_type))
-        }
-        BindingType::TextureMultisampled2D(texel_type) => {
-            let texel_type = texel_type_tokens(*texel_type);
-
-            quote!(#mod_path::BindingType::TextureMultisampled2D(#texel_type))
-        }
-        BindingType::TextureDepth2D => {
-            quote!(#mod_path::BindingType::TextureDepth2D)
-        }
-        BindingType::TextureDepth2DArray => {
-            quote!(#mod_path::BindingType::TextureDepth2DArray)
-        }
-        BindingType::TextureDepthCube => {
-            quote!(#mod_path::BindingType::TextureDepthCube)
-        }
-        BindingType::TextureDepthCubeArray => {
-            quote!(#mod_path::BindingType::TextureDepthCubeArray)
-        }
-        BindingType::TextureDepthMultisampled2D => {
-            quote!(#mod_path::BindingType::TextureDepthMultisampled2D)
-        }
-        BindingType::StorageTexture1D(storage_format) => {
-            let storage_format = storage_format_tokens(*storage_format);
-
-            quote!(#mod_path::BindingType::StorageTexture1D(#storage_format))
-        }
-        BindingType::StorageTexture2D(storage_format) => {
-            let storage_format = storage_format_tokens(*storage_format);
-
-            quote!(#mod_path::BindingType::StorageTexture2D(#storage_format))
-        }
-        BindingType::StorageTexture2DArray(storage_format) => {
-            let storage_format = storage_format_tokens(*storage_format);
-
-            quote!(#mod_path::BindingType::StorageTexture2DArray(#storage_format))
-        }
-        BindingType::StorageTexture3D(storage_format) => {
-            let storage_format = storage_format_tokens(*storage_format);
-
-            quote!(#mod_path::BindingType::StorageTexture3D(#storage_format))
-        }
-        BindingType::FilteringSampler => {
-            quote!(#mod_path::BindingType::FilteringSampler)
-        }
-        BindingType::NonFilteringSampler => {
-            quote!(#mod_path::BindingType::NonFilteringSampler)
-        }
-        BindingType::ComparisonSampler => {
-            quote!(#mod_path::BindingType::ComparisonSampler)
-        }
-        BindingType::Uniform(layout) => {
-            let layout = sized_buffer_layout_tokens(layout);
-
-            quote!(#mod_path::BindingType::Uniform(#layout))
-        }
-        BindingType::Storage(layout) => {
-            let layout = unsized_buffer_layout_tokens(layout);
-
-            quote!(#mod_path::BindingType::Storage(#layout))
-        }
-        BindingType::ReadOnlyStorage(layout) => {
-            let layout = unsized_buffer_layout_tokens(layout);
-
-            quote!(#mod_path::BindingType::ReadOnlyStorage(#layout))
+    quote! {
+        empa::smi::ShaderModuleInterface {
+            resource_bindings: std::borrow::Cow::Borrowed(&[#(#resource_bindings),*]),
+            overridable_constants: std::borrow::Cow::Borrowed(&[#(#overridable_constants),*]),
+            entry_points: std::borrow::Cow::Borrowed(&[#(#entry_points),*]),
         }
     }
 }
 
-fn texel_type_tokens(texel_type: TexelType) -> proc_macro2::TokenStream {
-    let mod_path = quote!(empa::resource_binding);
+fn resource_binding_to_tokens(resource_binding: &ResourceBinding) -> proc_macro2::TokenStream {
+    let group = resource_binding.group;
+    let binding = resource_binding.binding;
+    let resource_type = resource_type_to_tokens(&resource_binding.resource_type);
 
+    quote! {
+        empa::smi::ResourceBinding {
+            group: #group,
+            binding: #binding,
+            resource_type: #resource_type
+        }
+    }
+}
+
+fn overridable_constant_to_tokens(
+    overridable_constant: &OverridableConstant,
+) -> proc_macro2::TokenStream {
+    let id = if let Some(id) = overridable_constant.id {
+        quote!(Some(#id))
+    } else {
+        quote!(None)
+    };
+    let name = overridable_constant.name.as_ref();
+    let constant_type = constant_type_to_tokens(overridable_constant.constant_type);
+    let required = overridable_constant.required;
+
+    quote! {
+        empa::smi::OverridableConstant {
+            id: #id,
+            name: std::borrow::Cow::Borrowed(#name),
+            constant_type: #constant_type,
+            required: #required,
+        }
+    }
+}
+
+fn entry_point_to_tokens(entry_point: &EntryPoint) -> proc_macro2::TokenStream {
+    let name = entry_point.name.as_ref();
+    let stage = shader_stage_to_tokens(entry_point.stage);
+    let input_bindings = entry_point.input_bindings.iter().map(io_binding_to_tokens);
+    let output_bindings = entry_point.output_bindings.iter().map(io_binding_to_tokens);
+    let overridable_constants = entry_point.overridable_constants.iter();
+    let resource_bindings = entry_point.resource_bindings.iter();
+
+    quote! {
+        empa::smi::EntryPoint {
+            name: std::borrow::Cow::Borrowed(#name),
+            stage: #stage,
+            input_bindings: std::borrow::Cow::Borrowed(&[#(#input_bindings),*]),
+            output_bindings: std::borrow::Cow::Borrowed(&[#(#output_bindings),*]),
+            overridable_constants: std::borrow::Cow::Borrowed(&[#(#overridable_constants),*]),
+            resource_bindings: std::borrow::Cow::Borrowed(&[#(#resource_bindings),*]),
+        }
+    }
+}
+
+fn resource_type_to_tokens(resource_type: &ResourceType) -> proc_macro2::TokenStream {
+    match resource_type {
+        ResourceType::Texture1D(texel_type) => {
+            let texel_type = texel_type_to_tokens(*texel_type);
+
+            quote!(empa::smi::ResourceType::Texture1D(#texel_type))
+        }
+        ResourceType::Texture2D(texel_type) => {
+            let texel_type = texel_type_to_tokens(*texel_type);
+
+            quote!(empa::smi::ResourceType::Texture2D(#texel_type))
+        }
+        ResourceType::Texture3D(texel_type) => {
+            let texel_type = texel_type_to_tokens(*texel_type);
+
+            quote!(empa::smi::ResourceType::Texture3D(#texel_type))
+        }
+        ResourceType::Texture2DArray(texel_type) => {
+            let texel_type = texel_type_to_tokens(*texel_type);
+
+            quote!(empa::smi::ResourceType::Texture2DArray(#texel_type))
+        }
+        ResourceType::TextureCube(texel_type) => {
+            let texel_type = texel_type_to_tokens(*texel_type);
+
+            quote!(empa::smi::ResourceType::TextureCube(#texel_type))
+        }
+        ResourceType::TextureCubeArray(texel_type) => {
+            let texel_type = texel_type_to_tokens(*texel_type);
+
+            quote!(empa::smi::ResourceType::TextureCubeArray(#texel_type))
+        }
+        ResourceType::TextureMultisampled2D(texel_type) => {
+            let texel_type = texel_type_to_tokens(*texel_type);
+
+            quote!(empa::smi::ResourceType::TextureMultisampled2D(#texel_type))
+        }
+        ResourceType::TextureDepth2D => {
+            quote!(empa::smi::ResourceType::TextureDepth2D)
+        }
+        ResourceType::TextureDepth2DArray => {
+            quote!(empa::smi::ResourceType::TextureDepth2DArray)
+        }
+        ResourceType::TextureDepthCube => {
+            quote!(empa::smi::ResourceType::TextureDepthCube)
+        }
+        ResourceType::TextureDepthCubeArray => {
+            quote!(empa::smi::ResourceType::TextureDepthCubeArray)
+        }
+        ResourceType::TextureDepthMultisampled2D => {
+            quote!(empa::smi::ResourceType::TextureDepthMultisampled2D)
+        }
+        ResourceType::StorageTexture1D(storage_format) => {
+            let storage_format = storage_texture_format_to_tokens(*storage_format);
+
+            quote!(empa::smi::ResourceType::StorageTexture1D(#storage_format))
+        }
+        ResourceType::StorageTexture2D(storage_format) => {
+            let storage_format = storage_texture_format_to_tokens(*storage_format);
+
+            quote!(empa::smi::ResourceType::StorageTexture2D(#storage_format))
+        }
+        ResourceType::StorageTexture2DArray(storage_format) => {
+            let storage_format = storage_texture_format_to_tokens(*storage_format);
+
+            quote!(empa::smi::ResourceType::StorageTexture2DArray(#storage_format))
+        }
+        ResourceType::StorageTexture3D(storage_format) => {
+            let storage_format = storage_texture_format_to_tokens(*storage_format);
+
+            quote!(empa::smi::ResourceType::StorageTexture3D(#storage_format))
+        }
+        ResourceType::FilteringSampler => {
+            quote!(empa::smi::ResourceType::FilteringSampler)
+        }
+        ResourceType::NonFilteringSampler => {
+            quote!(empa::smi::ResourceType::NonFilteringSampler)
+        }
+        ResourceType::ComparisonSampler => {
+            quote!(empa::smi::ResourceType::ComparisonSampler)
+        }
+        ResourceType::Uniform(layout) => {
+            let layout = sized_buffer_layout_to_tokens(layout);
+
+            quote!(empa::smi::ResourceType::Uniform(#layout))
+        }
+        ResourceType::StorageRead(layout) => {
+            let layout = unsized_buffer_layout_to_tokens(layout);
+
+            quote!(empa::smi::ResourceType::StorageRead(#layout))
+        }
+        ResourceType::StorageReadWrite(layout) => {
+            let layout = unsized_buffer_layout_to_tokens(layout);
+
+            quote!(empa::smi::ResourceType::StorageReadWrite(#layout))
+        }
+    }
+}
+
+fn texel_type_to_tokens(texel_type: TexelType) -> proc_macro2::TokenStream {
     match texel_type {
         TexelType::Float => {
-            quote!(#mod_path::TexelType::Float)
+            quote!(empa::smi::TexelType::Float)
         }
         TexelType::UnfilterableFloat => {
-            quote!(#mod_path::TexelType::UnfilterableFloat)
+            quote!(empa::smi::TexelType::UnfilterableFloat)
         }
         TexelType::Integer => {
-            quote!(#mod_path::TexelType::Integer)
+            quote!(empa::smi::TexelType::Integer)
         }
         TexelType::UnsignedInteger => {
-            quote!(#mod_path::TexelType::UnsignedInteger)
+            quote!(empa::smi::TexelType::UnsignedInteger)
         }
     }
 }
 
-fn storage_format_tokens(storage_format: StorageTextureFormat) -> proc_macro2::TokenStream {
-    let mod_path = quote!(empa::texture::format);
-
+fn storage_texture_format_to_tokens(
+    storage_format: StorageTextureFormat,
+) -> proc_macro2::TokenStream {
     match storage_format {
         StorageTextureFormat::rgba8unorm => {
-            quote!(<#mod_path::rgba8unorm as #mod_path::TextureFormat>::FORMAT_ID)
+            quote!(empa::smi::StorageTextureFormat::rgba8unorm)
         }
         StorageTextureFormat::rgba8snorm => {
-            quote!(<#mod_path::rgba8snorm as #mod_path::TextureFormat>::FORMAT_ID)
+            quote!(empa::smi::StorageTextureFormat::rgba8snorm)
         }
         StorageTextureFormat::rgba8uint => {
-            quote!(<#mod_path::rgba8uint as #mod_path::TextureFormat>::FORMAT_ID)
+            quote!(empa::smi::StorageTextureFormat::rgba8uint)
         }
         StorageTextureFormat::rgba8sint => {
-            quote!(<#mod_path::rgba8sint as #mod_path::TextureFormat>::FORMAT_ID)
+            quote!(empa::smi::StorageTextureFormat::rgba8sint)
         }
         StorageTextureFormat::rgba16uint => {
-            quote!(<#mod_path::rgba16uint as #mod_path::TextureFormat>::FORMAT_ID)
+            quote!(empa::smi::StorageTextureFormat::rgba16uint)
         }
         StorageTextureFormat::rgba16sint => {
-            quote!(<#mod_path::rgba16sint as #mod_path::TextureFormat>::FORMAT_ID)
+            quote!(empa::smi::StorageTextureFormat::rgba16sint)
         }
         StorageTextureFormat::rgba16float => {
-            quote!(<#mod_path::rgba16float as #mod_path::TextureFormat>::FORMAT_ID)
+            quote!(empa::smi::StorageTextureFormat::rgba16float)
         }
         StorageTextureFormat::r32uint => {
-            quote!(<#mod_path::r32uint as #mod_path::TextureFormat>::FORMAT_ID)
+            quote!(empa::smi::StorageTextureFormat::r32uint)
         }
         StorageTextureFormat::r32sint => {
-            quote!(<#mod_path::r32sint as #mod_path::TextureFormat>::FORMAT_ID)
+            quote!(empa::smi::StorageTextureFormat::r32sint)
         }
         StorageTextureFormat::r32float => {
-            quote!(<#mod_path::r32float as #mod_path::TextureFormat>::FORMAT_ID)
+            quote!(empa::smi::StorageTextureFormat::r32float)
         }
         StorageTextureFormat::rg32uint => {
-            quote!(<#mod_path::rg32uint as #mod_path::TextureFormat>::FORMAT_ID)
+            quote!(empa::smi::StorageTextureFormat::rg32uint)
         }
         StorageTextureFormat::rg32sint => {
-            quote!(<#mod_path::rg32sint as #mod_path::TextureFormat>::FORMAT_ID)
+            quote!(empa::smi::StorageTextureFormat::rg32sint)
         }
         StorageTextureFormat::rg32float => {
-            quote!(<#mod_path::rg32float as #mod_path::TextureFormat>::FORMAT_ID)
+            quote!(empa::smi::StorageTextureFormat::rg32float)
         }
         StorageTextureFormat::rgba32uint => {
-            quote!(<#mod_path::rgba32uint as #mod_path::TextureFormat>::FORMAT_ID)
+            quote!(empa::smi::StorageTextureFormat::rgba32uint)
         }
         StorageTextureFormat::rgba32sint => {
-            quote!(<#mod_path::rgba32sint as #mod_path::TextureFormat>::FORMAT_ID)
+            quote!(empa::smi::StorageTextureFormat::rgba32sint)
         }
         StorageTextureFormat::rgba32float => {
-            quote!(<#mod_path::rgba32float as #mod_path::TextureFormat>::FORMAT_ID)
+            quote!(empa::smi::StorageTextureFormat::rgba32float)
         }
     }
 }
 
-fn sized_buffer_layout_tokens(layout: &SizedBufferLayoutOld) -> proc_macro2::TokenStream {
-    let recurse = layout.memory_units().iter().map(|u| memory_unit_tokens(u));
+fn sized_buffer_layout_to_tokens(layout: &SizedBufferLayout) -> proc_macro2::TokenStream {
+    let memory_units = layout.memory_units.iter().map(memory_unit_to_tokens);
 
-    let tokens = quote! {
-        empa::resource_binding::SizedBufferLayout(&[#(#recurse),*])
-    };
-
-    tokens
+    quote! {
+        empa::smi::SizedBufferLayout {
+            memory_units: std::borrow::Cow::Borrowed(&[#(#memory_units),*]),
+        }
+    }
 }
 
-fn unsized_buffer_layout_tokens(layout: &UnsizedBufferLayoutOld) -> proc_macro2::TokenStream {
-    let head_recurse = layout.sized_head().iter().map(|u| memory_unit_tokens(u));
+fn unsized_buffer_layout_to_tokens(layout: &UnsizedBufferLayout) -> proc_macro2::TokenStream {
+    let sized_head = layout.sized_head.iter().map(memory_unit_to_tokens);
+    let unsized_tail = if let Some(unsized_tail) = &layout.unsized_tail {
+        let unsized_tail = unsized_tail_layout_to_tokens(unsized_tail);
 
-    let tail = if let Some(layout) = layout.unsized_tail() {
-        let recurse = layout.iter().map(|u| memory_unit_tokens(u));
-
-        quote! {
-            Some(&[#(#recurse),*])
-        }
+        quote!(Some(#unsized_tail))
     } else {
         quote!(None)
     };
 
     quote! {
-        empa::resource_binding::UnsizedBufferLayout {
-            sized_head: &[#(#head_recurse),*],
-            unsized_tail: #tail
+        empa::smi::UnsizedBufferLayout {
+            sized_head: std::borrow::Cow::Borrowed(&[#(#sized_head),*]),
+            unsized_tail: #unsized_tail,
         }
     }
 }
 
-fn memory_unit_tokens(memory_unit: &MemoryUnit) -> proc_macro2::TokenStream {
-    let offset = memory_unit.offset;
-    let layout = memory_unit_layout_tokens(&memory_unit.layout);
+fn unsized_tail_layout_to_tokens(layout: &UnsizedTailLayout) -> proc_macro2::TokenStream {
+    let offset = layout.offset;
+    let element_layout = layout.element_layout.iter().map(memory_unit_to_tokens);
+    let stride = layout.stride;
 
     quote! {
-        empa::abi::MemoryUnit {
+        empa::smi::UnsizedTailLayout {
+            offset: #offset,
+            element_layout: std::borrow::Cow::Borrowed(&[#(#element_layout),*]),
+            stride: #stride,
+        }
+    }
+}
+
+fn memory_unit_to_tokens(memory_unit: &MemoryUnit) -> proc_macro2::TokenStream {
+    let offset = memory_unit.offset;
+    let layout = memory_unit_layout_to_tokens(&memory_unit.layout);
+
+    quote! {
+        empa::smi::MemoryUnit {
             offset: #offset,
             layout: #layout
         }
     }
 }
 
-fn memory_unit_layout_tokens(memory_unit_layout: &MemoryUnitLayout) -> proc_macro2::TokenStream {
-    let mod_path = quote!(empa::abi);
-
+fn memory_unit_layout_to_tokens(memory_unit_layout: &MemoryUnitLayout) -> proc_macro2::TokenStream {
     match memory_unit_layout {
         MemoryUnitLayout::Float => {
-            quote!(#mod_path::MemoryUnitLayout::Float)
-        }
-        MemoryUnitLayout::FloatArray(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::Float
-                }],
-                stride: 4,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::Float)
         }
         MemoryUnitLayout::FloatVector2 => {
-            quote!(#mod_path::MemoryUnitLayout::FloatVector2)
-        }
-        MemoryUnitLayout::FloatVector2Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::FloatVector2
-                }],
-                stride: 8,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::FloatVector2)
         }
         MemoryUnitLayout::FloatVector3 => {
-            quote!(#mod_path::MemoryUnitLayout::FloatVector3)
-        }
-        MemoryUnitLayout::FloatVector3Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::FloatVector3
-                }],
-                stride: 16,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::FloatVector3)
         }
         MemoryUnitLayout::FloatVector4 => {
-            quote!(#mod_path::MemoryUnitLayout::FloatVector4)
-        }
-        MemoryUnitLayout::FloatVector4Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::FloatVector4
-                }],
-                stride: 16,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::FloatVector4)
         }
         MemoryUnitLayout::Integer => {
-            quote!(#mod_path::MemoryUnitLayout::Integer)
-        }
-        MemoryUnitLayout::IntegerArray(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::Integer
-                }],
-                stride: 4,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::Integer)
         }
         MemoryUnitLayout::IntegerVector2 => {
-            quote!(#mod_path::MemoryUnitLayout::IntegerVector2)
-        }
-        MemoryUnitLayout::IntegerVector2Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::IntegerVector2
-                }],
-                stride: 8,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::IntegerVector2)
         }
         MemoryUnitLayout::IntegerVector3 => {
-            quote!(#mod_path::MemoryUnitLayout::IntegerVector3)
-        }
-        MemoryUnitLayout::IntegerVector3Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::IntegerVector3
-                }],
-                stride: 16,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::IntegerVector3)
         }
         MemoryUnitLayout::IntegerVector4 => {
-            quote!(#mod_path::MemoryUnitLayout::IntegerVector4)
-        }
-        MemoryUnitLayout::IntegerVector4Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::IntegerVector4
-                }],
-                stride: 16,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::IntegerVector4)
         }
         MemoryUnitLayout::UnsignedInteger => {
-            quote!(#mod_path::MemoryUnitLayout::UnsignedInteger)
-        }
-        MemoryUnitLayout::UnsignedIntegerArray(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::UnsignedInteger
-                }],
-                stride: 4,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::UnsignedInteger)
         }
         MemoryUnitLayout::UnsignedIntegerVector2 => {
-            quote!(#mod_path::MemoryUnitLayout::UnsignedIntegerVector2)
-        }
-        MemoryUnitLayout::UnsignedIntegerVector2Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::UnsignedIntegerVector2
-                }],
-                stride: 8,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::UnsignedIntegerVector2)
         }
         MemoryUnitLayout::UnsignedIntegerVector3 => {
-            quote!(#mod_path::MemoryUnitLayout::UnsignedIntegerVector3)
-        }
-        MemoryUnitLayout::UnsignedIntegerVector3Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::UnsignedIntegerVector3
-                }],
-                stride: 16,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::UnsignedIntegerVector3)
         }
         MemoryUnitLayout::UnsignedIntegerVector4 => {
-            quote!(#mod_path::MemoryUnitLayout::UnsignedIntegerVector4)
-        }
-        MemoryUnitLayout::UnsignedIntegerVector4Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::UnsignedIntegerVector4
-                }],
-                stride: 16,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::UnsignedIntegerVector4)
         }
         MemoryUnitLayout::Matrix2x2 => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix2x2)
-        }
-        MemoryUnitLayout::Matrix2x2Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::Matrix2x2
-                }],
-                stride: 16,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::Matrix2x2)
         }
         MemoryUnitLayout::Matrix2x3 => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix2x3)
-        }
-        MemoryUnitLayout::Matrix2x3Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::Matrix2x3
-                }],
-                stride: 32,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::Matrix2x3)
         }
         MemoryUnitLayout::Matrix2x4 => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix2x4)
-        }
-        MemoryUnitLayout::Matrix2x4Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::Matrix2x4
-                }],
-                stride: 32,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::Matrix2x4)
         }
         MemoryUnitLayout::Matrix3x2 => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix3x2)
-        }
-        MemoryUnitLayout::Matrix3x2Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::Matrix3x2
-                }],
-                stride: 24,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::Matrix3x2)
         }
         MemoryUnitLayout::Matrix3x3 => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix3x3)
-        }
-        MemoryUnitLayout::Matrix3x3Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::Matrix3x3
-                }],
-                stride: 48,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::Matrix3x3)
         }
         MemoryUnitLayout::Matrix3x4 => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix3x4)
-        }
-        MemoryUnitLayout::Matrix3x4Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::Matrix3x4
-                }],
-                stride: 48,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::Matrix3x4)
         }
         MemoryUnitLayout::Matrix4x2 => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix4x2)
-        }
-        MemoryUnitLayout::Matrix4x2Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::Matrix4x2
-                }],
-                stride: 32,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::Matrix4x2)
         }
         MemoryUnitLayout::Matrix4x3 => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix4x3)
-        }
-        MemoryUnitLayout::Matrix4x3Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::Matrix4x3
-                }],
-                stride: 64,
-                len: #len
-            })
+            quote!(empa::smi::MemoryUnitLayout::Matrix4x3)
         }
         MemoryUnitLayout::Matrix4x4 => {
-            quote!(#mod_path::MemoryUnitLayout::Matrix4x4)
+            quote!(empa::smi::MemoryUnitLayout::Matrix4x4)
         }
-        MemoryUnitLayout::Matrix4x4Array(len) => {
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#mod_path::MemoryUnit {
-                    offset: 0,
-                    layout: #mod_path::MemoryUnitLayout::Matrix4x4
-                }],
-                stride: 64,
-                len: #len
-            })
-        }
-        MemoryUnitLayout::ComplexArray { units, stride, len } => {
-            let recurse = units.iter().map(|unit| memory_unit_tokens(unit));
+        MemoryUnitLayout::Array(array_layout) => {
+            let array_layout = array_layout_to_tokens(array_layout);
 
-            quote!(#mod_path::MemoryUnitLayout::Array {
-                units: &[#(#recurse),*],
-                stride: #stride,
-                len: #len,
-            })
+            quote!(empa::smi::MemoryUnitLayout::Array(#array_layout))
         }
     }
 }
 
-fn constant_type_tokens(constant_type: ConstantType) -> proc_macro2::TokenStream {
-    let mod_path = quote!(empa::shader_module);
+fn array_layout_to_tokens(array_layout: &ArrayLayout) -> proc_macro2::TokenStream {
+    let element_layout = array_layout
+        .element_layout
+        .iter()
+        .map(memory_unit_to_tokens);
+    let stride = array_layout.stride;
+    let len = array_layout.len;
 
+    quote! {
+        empa::smi::ArrayLayout {
+            element_layout: std::borrow::Cow::Borrowed(&[#(#element_layout),*]),
+            stride: #stride,
+            len: #len,
+        }
+    }
+}
+
+fn constant_type_to_tokens(constant_type: OverridableConstantType) -> proc_macro2::TokenStream {
     match constant_type {
-        ConstantType::Float => {
-            quote!(#mod_path::StaticConstantType::Float)
+        OverridableConstantType::Float => {
+            quote!(empa::smi::OverridableConstantType::Float)
         }
-        ConstantType::Bool => {
-            quote!(#mod_path::StaticConstantType::Bool)
+        OverridableConstantType::Bool => {
+            quote!(empa::smi::OverridableConstantType::Bool)
         }
-        ConstantType::SignedInteger => {
-            quote!(#mod_path::StaticConstantType::SignedInteger)
+        OverridableConstantType::SignedInteger => {
+            quote!(empa::smi::OverridableConstantType::SignedInteger)
         }
-        ConstantType::UnsignedInteger => {
-            quote!(#mod_path::StaticConstantType::UnsignedInteger)
+        OverridableConstantType::UnsignedInteger => {
+            quote!(empa::smi::OverridableConstantType::UnsignedInteger)
         }
     }
 }
 
-fn shader_stage_tokens(shader_stage: ShaderStage) -> proc_macro2::TokenStream {
-    let mod_path = quote!(empa::shader_module);
-
+fn shader_stage_to_tokens(shader_stage: ShaderStage) -> proc_macro2::TokenStream {
     match shader_stage {
         ShaderStage::Vertex => {
-            quote!(#mod_path::StaticShaderStage::Vertex)
+            quote!(empa::smi::ShaderStage::Vertex)
         }
         ShaderStage::Fragment => {
-            quote!(#mod_path::StaticShaderStage::Fragment)
+            quote!(empa::smi::ShaderStage::Fragment)
         }
         ShaderStage::Compute => {
-            quote!(#mod_path::StaticShaderStage::Compute)
+            quote!(empa::smi::ShaderStage::Compute)
         }
     }
 }
 
-fn entry_point_binding_tokens(entry_point_binding: &EntryPointBinding) -> proc_macro2::TokenStream {
-    let mod_path = quote!(empa::shader_module);
+fn io_binding_to_tokens(io_binding: &IoBinding) -> proc_macro2::TokenStream {
+    let location = io_binding.location;
+    let binding_type = io_binding_type_to_tokens(io_binding.binding_type);
 
-    let location = entry_point_binding.location();
-    let binding_type = entry_point_binding_type_tokens(entry_point_binding.binding_type());
+    let interpolate = if let Some(interpolate) = &io_binding.interpolate {
+        let interpolate = interpolate_to_tokens(interpolate);
 
-    let interpolation = if let Some(interpolation) = entry_point_binding.interpolation() {
-        let interpolation = interpolation_tokens(interpolation);
-
-        quote!(Some(#interpolation))
+        quote!(Some(#interpolate))
     } else {
         quote!(None)
     };
 
-    let sampling = if let Some(sampling) = entry_point_binding.sampling() {
-        let sampling = sampling_tokens(sampling);
+    quote! {
+        empa::smi::IoBinding {
+            location: #location,
+            binding_type: #binding_type,
+            interpolate: #interpolate,
+        }
+    }
+}
+
+fn io_binding_type_to_tokens(binding_type: IoBindingType) -> proc_macro2::TokenStream {
+    match binding_type {
+        IoBindingType::SignedInteger => {
+            quote!(empa::smi::IoBindingType::SignedInteger)
+        }
+        IoBindingType::SignedIntegerVector2 => {
+            quote!(empa::smi::IoBindingType::SignedIntegerVector2)
+        }
+        IoBindingType::SignedIntegerVector3 => {
+            quote!(empa::smi::IoBindingType::SignedIntegerVector3)
+        }
+        IoBindingType::SignedIntegerVector4 => {
+            quote!(empa::smi::IoBindingType::SignedIntegerVector4)
+        }
+        IoBindingType::UnsignedInteger => {
+            quote!(empa::smi::IoBindingType::UnsignedInteger)
+        }
+        IoBindingType::UnsignedIntegerVector2 => {
+            quote!(empa::smi::IoBindingType::UnsignedIntegerVector2)
+        }
+        IoBindingType::UnsignedIntegerVector3 => {
+            quote!(empa::smi::IoBindingType::UnsignedIntegerVector3)
+        }
+        IoBindingType::UnsignedIntegerVector4 => {
+            quote!(empa::smi::IoBindingType::UnsignedIntegerVector4)
+        }
+        IoBindingType::Float => {
+            quote!(empa::smi::IoBindingType::Float)
+        }
+        IoBindingType::FloatVector2 => {
+            quote!(empa::smi::IoBindingType::FloatVector2)
+        }
+        IoBindingType::FloatVector3 => {
+            quote!(empa::smi::IoBindingType::FloatVector3)
+        }
+        IoBindingType::FloatVector4 => {
+            quote!(empa::smi::IoBindingType::FloatVector4)
+        }
+        IoBindingType::HalfFloat => {
+            quote!(empa::smi::IoBindingType::HalfFloat)
+        }
+        IoBindingType::HalfFloatVector2 => {
+            quote!(empa::smi::IoBindingType::HalfFloatVector2)
+        }
+        IoBindingType::HalfFloatVector3 => {
+            quote!(empa::smi::IoBindingType::HalfFloatVector3)
+        }
+        IoBindingType::HalfFloatVector4 => {
+            quote!(empa::smi::IoBindingType::HalfFloatVector4)
+        }
+    }
+}
+
+fn interpolate_to_tokens(interpolate: &Interpolate) -> proc_macro2::TokenStream {
+    let interpolation_type = interpolation_type_to_tokens(interpolate.interpolation_type);
+    let sampling = if let Some(sampling) = interpolate.sampling {
+        let sampling = sampling_to_tokens(sampling);
 
         quote!(Some(#sampling))
     } else {
@@ -939,100 +834,43 @@ fn entry_point_binding_tokens(entry_point_binding: &EntryPointBinding) -> proc_m
     };
 
     quote! {
-        #mod_path::StaticEntryPointBinding {
-            location: #location,
-            binding_type: #binding_type,
-            interpolation: #interpolation,
+        empa::smi::Interpolate {
+            interpolation_type: #interpolation_type,
             sampling: #sampling,
         }
     }
 }
 
-fn entry_point_binding_type_tokens(
-    binding_type: EntryPointBindingType,
-) -> proc_macro2::TokenStream {
-    let mod_path = quote!(empa::shader_module);
-
-    match binding_type {
-        EntryPointBindingType::SignedInteger => {
-            quote!(#mod_path::StaticEntryPointBindingType::SignedInteger)
-        }
-        EntryPointBindingType::SignedIntegerVector2 => {
-            quote!(#mod_path::StaticEntryPointBindingType::SignedIntegerVector2)
-        }
-        EntryPointBindingType::SignedIntegerVector3 => {
-            quote!(#mod_path::StaticEntryPointBindingType::SignedIntegerVector3)
-        }
-        EntryPointBindingType::SignedIntegerVector4 => {
-            quote!(#mod_path::StaticEntryPointBindingType::SignedIntegerVector4)
-        }
-        EntryPointBindingType::UnsignedInteger => {
-            quote!(#mod_path::StaticEntryPointBindingType::UnsignedInteger)
-        }
-        EntryPointBindingType::UnsignedIntegerVector2 => {
-            quote!(#mod_path::StaticEntryPointBindingType::UnsignedIntegerVector2)
-        }
-        EntryPointBindingType::UnsignedIntegerVector3 => {
-            quote!(#mod_path::StaticEntryPointBindingType::UnsignedIntegerVector3)
-        }
-        EntryPointBindingType::UnsignedIntegerVector4 => {
-            quote!(#mod_path::StaticEntryPointBindingType::UnsignedIntegerVector4)
-        }
-        EntryPointBindingType::Float => {
-            quote!(#mod_path::StaticEntryPointBindingType::Float)
-        }
-        EntryPointBindingType::FloatVector2 => {
-            quote!(#mod_path::StaticEntryPointBindingType::FloatVector2)
-        }
-        EntryPointBindingType::FloatVector3 => {
-            quote!(#mod_path::StaticEntryPointBindingType::FloatVector3)
-        }
-        EntryPointBindingType::FloatVector4 => {
-            quote!(#mod_path::StaticEntryPointBindingType::FloatVector4)
-        }
-        EntryPointBindingType::HalfFloat => {
-            quote!(#mod_path::StaticEntryPointBindingType::HalfFloat)
-        }
-        EntryPointBindingType::HalfFloatVector2 => {
-            quote!(#mod_path::StaticEntryPointBindingType::HalfFloatVector2)
-        }
-        EntryPointBindingType::HalfFloatVector3 => {
-            quote!(#mod_path::StaticEntryPointBindingType::HalfFloatVector3)
-        }
-        EntryPointBindingType::HalfFloatVector4 => {
-            quote!(#mod_path::StaticEntryPointBindingType::HalfFloatVector4)
-        }
-    }
-}
-
-fn interpolation_tokens(interpolation: Interpolation) -> proc_macro2::TokenStream {
-    let mod_path = quote!(empa::shader_module);
-
+fn interpolation_type_to_tokens(interpolation: InterpolationType) -> proc_macro2::TokenStream {
     match interpolation {
-        Interpolation::Perspective => {
-            quote!(#mod_path::StaticInterpolation::Perspective)
+        InterpolationType::Perspective => {
+            quote!(empa::smi::InterpolationType::Perspective)
         }
-        Interpolation::Linear => {
-            quote!(#mod_path::StaticInterpolation::Linear)
+        InterpolationType::Linear => {
+            quote!(empa::smi::InterpolationType::Linear)
         }
-        Interpolation::Flat => {
-            quote!(#mod_path::StaticInterpolation::Flat)
+        InterpolationType::Flat => {
+            quote!(empa::smi::InterpolationType::Flat)
         }
     }
 }
 
-fn sampling_tokens(sampling: Sampling) -> proc_macro2::TokenStream {
-    let mod_path = quote!(empa::shader_module);
-
+fn sampling_to_tokens(sampling: Sampling) -> proc_macro2::TokenStream {
     match sampling {
         Sampling::Center => {
-            quote!(#mod_path::StaticSampling::Center)
+            quote!(empa::smi::Sampling::Center)
         }
         Sampling::Centroid => {
-            quote!(#mod_path::StaticSampling::Centroid)
+            quote!(empa::smi::Sampling::Centroid)
         }
         Sampling::Sample => {
-            quote!(#mod_path::StaticSampling::Sample)
+            quote!(empa::smi::Sampling::Sample)
+        }
+        Sampling::First => {
+            quote!(empa::smi::Sampling::First)
+        }
+        Sampling::Either => {
+            quote!(empa::smi::Sampling::Either)
         }
     }
 }

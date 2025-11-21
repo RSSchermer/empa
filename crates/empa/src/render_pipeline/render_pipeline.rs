@@ -77,16 +77,16 @@ impl<O, V, I, R> RenderPipelineDescriptor<O, V, I, R> {
             layout: &self.layout,
             primitive_state: &self.primitive_state,
             vertex_state: driver::VertexState {
-                shader_module: &self.vertex_state.shader_module,
-                entry_point: &self.vertex_state.entry_point,
-                constants: &self.vertex_state.constants,
+                shader_module: &self.vertex_state.shader_module_data.handle,
+                entry_point: &self.vertex_state.entry_point_name(),
+                constants: &self.vertex_state.pipeline_constants,
                 vertex_buffer_layouts: self.vertex_state.vertex_buffer_layouts.borrow(),
             },
             depth_stencil_state: self.depth_stencil_state.as_ref(),
             fragment_state: self.fragment_state.as_ref().map(|f| driver::FragmentState {
-                shader_module: &f.shader_module,
-                entry_point: &f.entry_point,
-                constants: &f.constants,
+                shader_module: &f.shader_module_data.handle,
+                entry_point: &f.entry_point_name(),
+                constants: &f.pipeline_constants,
                 targets: &f.targets,
             }),
             multisample_state: self.multisample_state.as_ref(),
@@ -232,7 +232,7 @@ where
     > {
         let layout = Layout::BIND_GROUP_LAYOUTS;
 
-        for resource_binding in vertex_stage.shader_meta.resource_bindings() {
+        for resource_binding in vertex_stage.state.entry_point().resource_bindings() {
             let group = if let Some(group) = layout.get(resource_binding.group as usize) {
                 group
             } else {
@@ -255,20 +255,20 @@ where
                 );
             }
 
-            if entry.binding_type != resource_binding.binding_type {
+            if entry.resource_type != resource_binding.resource_type {
                 panic!(
                     "the binding type for binding `{}` in group `{}` does not match the shader \
-                type (shader: {:#?}, actual: {:#?})",
+                    type (shader: {:#?}, actual: {:#?})",
                     resource_binding.binding,
                     resource_binding.group,
-                    &resource_binding.binding_type,
-                    &entry.binding_type
+                    &resource_binding.resource_type,
+                    &entry.resource_type
                 )
             }
         }
 
         RenderPipelineDescriptorBuilder {
-            vertex_state: Some(vertex_stage.vertex_state),
+            vertex_state: Some(vertex_stage.state),
             fragment_state: self.fragment_state,
             layout: self.layout,
             primitive_state: self.primitive_state,
@@ -296,7 +296,7 @@ where
     > {
         let layout = Layout::BIND_GROUP_LAYOUTS;
 
-        for resource_binding in fragment_stage.shader_meta.resource_bindings() {
+        for resource_binding in fragment_stage.state.entry_point().resource_bindings() {
             let group = if let Some(group) = layout.get(resource_binding.group as usize) {
                 group
             } else {
@@ -319,7 +319,7 @@ where
                 );
             }
 
-            if entry.binding_type != resource_binding.binding_type {
+            if entry.resource_type != resource_binding.resource_type {
                 panic!(
                     "the binding type for binding `{}` in group `{}` does not match the shader type",
                     resource_binding.binding, resource_binding.group
@@ -329,7 +329,7 @@ where
 
         RenderPipelineDescriptorBuilder {
             vertex_state: self.vertex_state,
-            fragment_state: Some(fragment_stage.fragment_state),
+            fragment_state: Some(fragment_stage.state),
             layout: self.layout,
             primitive_state: self.primitive_state,
             depth_stencil_state: self.depth_stencil_state,

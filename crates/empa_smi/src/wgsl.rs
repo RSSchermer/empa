@@ -1,12 +1,3 @@
-use empa_smi::dynamic::{
-    ArrayLayout, EntryPoint as SmiEntryPoint, MemoryUnit, MemoryUnitLayout, OverridableConstant,
-    ResourceBinding, ResourceType, ShaderModuleInterface, SizedBufferLayout, UnsizedBufferLayout,
-    UnsizedTailLayout,
-};
-use empa_smi::{
-    Interpolate, InterpolationType, IoBinding, IoBindingType, OverridableConstantType,
-    Sampling as SmiSampling, ShaderStage as SmiShaderStage, StorageTextureFormat, TexelType,
-};
 use indexmap::IndexMap;
 use naga::front::wgsl;
 use naga::proc::IndexableLength;
@@ -18,29 +9,19 @@ use naga::{
 };
 pub use wgsl::ParseError;
 
+use crate::{
+    ArrayLayout, EntryPoint as SmiEntryPoint, Interpolate, InterpolationType, IoBinding,
+    IoBindingType, MemoryUnit, MemoryUnitLayout, OverridableConstant, OverridableConstantType,
+    ResourceBinding, ResourceType, Sampling as SmiSampling, ShaderModuleInterface,
+    ShaderStage as SmiShaderStage, SizedBufferLayout, StorageTextureFormat, TexelType,
+    UnsizedBufferLayout, UnsizedTailLayout,
+};
+
 type ResourceBindingMap = IndexMap<BindingKey, ResourceBinding>;
 type OverridableConstantMap = IndexMap<OverridableConstantKey, OverridableConstant>;
 
-#[derive(Clone, Debug)]
-pub enum Error {
-    Parse(ParseError),
-    Validation(WithSpan<ValidationError>),
-}
-
-impl From<ParseError> for Error {
-    fn from(e: ParseError) -> Self {
-        Self::Parse(e)
-    }
-}
-
-impl From<WithSpan<ValidationError>> for Error {
-    fn from(e: WithSpan<ValidationError>) -> Self {
-        Self::Validation(e)
-    }
-}
-
-pub fn build_smi(source: String) -> Result<ShaderModuleInterface, Error> {
-    let module = wgsl::parse_str(&source)?;
+pub fn build_smi(source: &str) -> Result<ShaderModuleInterface, BuildSmiError> {
+    let module = wgsl::parse_str(source)?;
 
     let mut validator = Validator::new(ValidationFlags::default(), Capabilities::default());
 
@@ -69,8 +50,74 @@ pub fn build_smi(source: String) -> Result<ShaderModuleInterface, Error> {
     Ok(ShaderModuleInterface {
         overridable_constants: overridable_constants.into_values().collect(),
         resource_bindings: resource_bindings.into_values().collect(),
-        entry_points,
+        entry_points: entry_points.into(),
     })
+}
+
+#[derive(Clone, Debug)]
+pub enum BuildSmiError {
+    Parse(ParseError),
+    Validation(WithSpan<ValidationError>),
+}
+
+impl From<ParseError> for BuildSmiError {
+    fn from(e: ParseError) -> Self {
+        Self::Parse(e)
+    }
+}
+
+impl From<WithSpan<ValidationError>> for BuildSmiError {
+    fn from(e: WithSpan<ValidationError>) -> Self {
+        Self::Validation(e)
+    }
+}
+
+impl BuildSmiError {
+    pub fn emit_to_stderr(&self, source: &str) {
+        match self {
+            Self::Parse(e) => e.emit_to_stderr(source),
+            Self::Validation(e) => e.emit_to_stderr(source),
+        }
+    }
+
+    pub fn emit_to_stderr_with_path<P>(&self, source: &str, path: P)
+    where
+        P: AsRef<std::path::Path>,
+    {
+        match self {
+            Self::Parse(e) => e.emit_to_stderr_with_path(source, path),
+            Self::Validation(e) => e.emit_to_stderr_with_path(
+                source,
+                path.as_ref()
+                    .as_os_str()
+                    .to_str()
+                    .unwrap_or("<unknown path>"),
+            ),
+        }
+    }
+
+    pub fn emit_to_string(&self, source: &str) -> String {
+        match self {
+            Self::Parse(e) => e.emit_to_string(source),
+            Self::Validation(e) => e.emit_to_string(source),
+        }
+    }
+
+    pub fn emit_to_string_with_path<P>(&self, source: &str, path: P) -> String
+    where
+        P: AsRef<std::path::Path>,
+    {
+        match self {
+            Self::Parse(e) => e.emit_to_string_with_path(source, path),
+            Self::Validation(e) => e.emit_to_string_with_path(
+                source,
+                path.as_ref()
+                    .as_os_str()
+                    .to_str()
+                    .unwrap_or("<unknown path>"),
+            ),
+        }
+    }
 }
 
 fn override_to_smi(module: &Module, c: &Override) -> OverridableConstant {
@@ -93,7 +140,7 @@ fn override_to_smi(module: &Module, c: &Override) -> OverridableConstant {
     let required = c.init.is_none();
 
     OverridableConstant {
-        name: c.name.clone().unwrap_or_default(),
+        name: c.name.clone().unwrap_or_default().into(),
         id: c.id,
         constant_type,
         required,
@@ -203,7 +250,7 @@ fn array_layout(
     }
 
     MemoryUnitLayout::Array(ArrayLayout {
-        element_layout: head,
+        element_layout: head.into(),
         stride: stride as u64,
         len: len as u64,
     })
@@ -226,7 +273,7 @@ fn unsized_tail_layout(
 
     UnsizedTailLayout {
         offset,
-        element_layout: head,
+        element_layout: head.into(),
         stride: stride as u64,
     }
 }
@@ -303,7 +350,7 @@ fn type_to_smi_sized_buffer_layout(module: &Module, ty: Handle<Type>) -> SizedBu
     }
 
     SizedBufferLayout {
-        memory_units: head_units,
+        memory_units: head_units.into(),
     }
 }
 
@@ -314,7 +361,7 @@ fn type_to_smi_unsized_buffer_layout(module: &Module, ty: Handle<Type>) -> Unsiz
     collect_layout(0, module, ty, &mut sized_head, &mut unsized_tail);
 
     UnsizedBufferLayout {
-        sized_head,
+        sized_head: sized_head.into(),
         unsized_tail,
     }
 }
@@ -683,6 +730,15 @@ fn entry_point_to_smi(
 
     let info = info.get_entry_point(index);
 
+    // TODO: per the WebGPU spec, a pipeline should be valid if all "statically accessible"
+    // override constants that don't have a default value are specified; override constants that
+    // are not statically accessible from the pipeline's entry points do not need to be specified.
+    // However, webgpu-core/naga currently don't seem to be spec compliant on this front; they
+    // instead require that all override constants declared in the module be specified. While we
+    // could implement our own analysis here, this would produce pipeline's that webgpu-core would
+    // reject, so for now we simply consider all override constants to be used by all entry points.
+    let overridable_constants = (0..overridable_constant_map.len()).collect();
+
     let mut resource_bindings = Vec::new();
 
     for (handle, global) in module.global_variables.iter() {
@@ -708,11 +764,11 @@ fn entry_point_to_smi(
     resource_bindings.sort();
 
     SmiEntryPoint {
-        name: entry_point.name.clone(),
+        name: entry_point.name.clone().into(),
         stage: shader_stage_to_smi(&entry_point.stage),
-        input_bindings,
-        output_bindings,
-        overridable_constants: todo!(),
-        resource_bindings,
+        input_bindings: input_bindings.into(),
+        output_bindings: output_bindings.into(),
+        overridable_constants,
+        resource_bindings: resource_bindings.into(),
     }
 }

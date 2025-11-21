@@ -4,7 +4,6 @@ members = [
     "crates/empa",
     "crates/empa_glam",
     "crates/empa_macros",
-    "crates/empa_reflect",
     "crates/empa_smi",
     "crates/empa_test",
     "examples/native/0_triangle",
@@ -28,7 +27,6 @@ default-members = [
     "crates/empa",
     "crates/empa_glam",
     "crates/empa_macros",
-    "crates/empa_reflect",
     "crates/empa_smi",
     "crates/empa_test",
     "examples/native/0_triangle",
@@ -57,7 +55,6 @@ bytemuck = "1.14.0"
 empa = { version = "0.1.0", path = "crates/empa" }
 empa-glam = { version = "0.1.0", path = "crates/empa_glam" }
 empa-macros = { version = "0.1.0", path = "crates/empa_macros" }
-empa-reflect = { version = "0.1.0", path = "crates/empa_reflect" }
 empa-smi = { version = "0.1.0", path = "crates/empa_smi" }
 flagset = "^0.4"
 futures = "0.3.21"

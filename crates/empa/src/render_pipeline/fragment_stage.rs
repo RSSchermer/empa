@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 use std::marker;
 
-use empa_reflect::ShaderStage;
+use empa_smi::{IoBindingType, ShaderStage};
 use flagset::{FlagSet, flags};
 
-use crate::driver::{ColorTargetState, Driver, Dvr};
+use crate::driver::ColorTargetState;
 use crate::pipeline_constants::PipelineConstants;
 use crate::render_target::TypedColorLayout;
-use crate::shader_module::{ShaderModule, ShaderSourceInternal};
+use crate::shader_module::{EntryPointExt, ShaderModule, ShaderModuleData};
 use crate::texture::format::{Blendable, ColorRenderable};
 
 flags! {
@@ -187,16 +187,27 @@ impl_typed_color_outputs!(7, C0, C1, C2, C3, C4, C5, C6);
 impl_typed_color_outputs!(8, C0, C1, C2, C3, C4, C5, C6, C7);
 
 pub(crate) struct FragmentState {
-    pub(crate) shader_module: <Dvr as Driver>::ShaderModuleHandle,
-    pub(crate) entry_point: String,
-    pub(crate) constants: HashMap<String, f64>,
+    pub(crate) shader_module_data: ShaderModuleData,
+    pub(crate) entry_point_index: usize,
+    pub(crate) pipeline_constants: HashMap<String, f64>,
     pub(crate) targets: Vec<ColorTargetState>,
 }
 
+impl FragmentState {
+    pub(crate) fn entry_point(&self) -> EntryPointExt<'_> {
+        self.shader_module_data
+            .entry_point_ext(self.entry_point_index)
+    }
+
+    pub(crate) fn entry_point_name(&self) -> &str {
+        self.shader_module_data.smi.entry_points[self.entry_point_index]
+            .name
+            .as_ref()
+    }
+}
+
 pub struct FragmentStage<O> {
-    pub(crate) fragment_state: FragmentState,
-    pub(crate) shader_meta: ShaderSourceInternal,
-    entry_index: usize,
+    pub(crate) state: FragmentState,
     _marker: marker::PhantomData<*const O>,
 }
 
@@ -207,28 +218,27 @@ pub struct FragmentStageBuilder<O> {
 
 impl FragmentStageBuilder<()> {
     pub fn begin(shader_module: &ShaderModule, entry_point: &str) -> Self {
-        let shader_meta = shader_module.meta.clone();
+        let shader_module_data = shader_module.data.clone();
 
-        let entry_index = shader_meta
+        let entry_point_index = shader_module_data
             .resolve_entry_point_index(entry_point)
             .expect("could not find entry point in shader module");
-        let stage = shader_meta.entry_point_stage(entry_index);
+        let stage = shader_module_data.smi.entry_points[entry_point_index].stage;
 
-        assert!(
-            stage == Some(ShaderStage::Fragment),
+        assert_eq!(
+            stage,
+            ShaderStage::Fragment,
             "entry point is not a fragment stage"
         );
 
         FragmentStageBuilder {
             inner: FragmentStage {
-                fragment_state: FragmentState {
-                    shader_module: shader_module.handle.clone(),
-                    entry_point: entry_point.to_string(),
-                    constants: Default::default(),
+                state: FragmentState {
+                    shader_module_data,
+                    entry_point_index,
+                    pipeline_constants: Default::default(),
                     targets: vec![],
                 },
-                shader_meta,
-                entry_index,
                 _marker: Default::default(),
             },
             has_constants: false,
@@ -241,43 +251,39 @@ impl FragmentStageBuilder<()> {
     ) -> FragmentStageBuilder<O::Layout> {
         let layout = O::Layout::COLOR_FORMATS;
 
-        let output_bindings = self
-            .inner
-            .shader_meta
-            .entry_point_output_bindings(self.inner.entry_index)
-            .unwrap();
-
-        for binding in output_bindings {
-            let location = binding.location();
-            let binding_type = binding.binding_type();
+        for binding in self.inner.state.entry_point().output_bindings.as_ref() {
+            let location = binding.location;
+            let binding_type = binding.binding_type;
 
             if let Some(format) = layout.get(location as usize) {
                 // TODO: it's not clear from the spec what it means for a format to be compatible
                 // with an output. Assuming for now that compatibility is solely about the main
                 // component type (float, half-float, uint, sint) and not the number of components
                 // (as this is how it works in OpenGL); needs confirmation.
-                if binding_type.is_float() && !format.is_float() {
+                if io_binding_type_is_float(&binding_type) && !format.is_float() {
                     panic!(
                         "shader expects a float format binding for location `{}`",
                         location
                     );
                 }
 
-                if binding_type.is_half_float() && !format.is_half_float() {
+                if io_binding_type_is_half_float(&binding_type) && !format.is_half_float() {
                     panic!(
                         "shader expects a half-float format binding for location `{}`",
                         location
                     );
                 }
 
-                if binding_type.is_signed_integer() && !format.is_signed_integer() {
+                if io_binding_type_is_signed_integer(&binding_type) && !format.is_signed_integer() {
                     panic!(
                         "shader expects a signed integer format binding for location `{}`",
                         location
                     );
                 }
 
-                if binding_type.is_unsigned_integer() && !format.is_unsigned_integer() {
+                if io_binding_type_is_unsigned_integer(&binding_type)
+                    && !format.is_unsigned_integer()
+                {
                     panic!(
                         "shader expects an unsigned integer format binding for location `{}`",
                         location
@@ -291,13 +297,11 @@ impl FragmentStageBuilder<()> {
             }
         }
 
-        self.inner.fragment_state.targets = color_outputs.targets().collect();
+        self.inner.state.targets = color_outputs.targets().collect();
 
         FragmentStageBuilder {
             inner: FragmentStage {
-                fragment_state: self.inner.fragment_state,
-                shader_meta: self.inner.shader_meta,
-                entry_index: self.inner.entry_index,
+                state: self.inner.state,
                 _marker: Default::default(),
             },
             has_constants: self.has_constants,
@@ -310,8 +314,11 @@ impl<O> FragmentStageBuilder<O> {
         mut self,
         pipeline_constants: &C,
     ) -> FragmentStageBuilder<O> {
-        self.inner.fragment_state.constants =
-            self.inner.shader_meta.build_constants(pipeline_constants);
+        self.inner.state.pipeline_constants = self
+            .inner
+            .state
+            .entry_point()
+            .build_constants(pipeline_constants);
 
         self.has_constants = true;
 
@@ -324,12 +331,53 @@ where
     O: TypedColorLayout,
 {
     pub fn finish(self) -> FragmentStage<O> {
-        if !self.has_constants && self.inner.shader_meta.has_required_constants() {
+        if !self.has_constants && self.inner.state.entry_point().has_required_constants() {
             panic!(
-                "the shader declares pipeline constants without fallback values, but no pipeline constants were set"
+                "the shader declares pipeline constants without fallback values, but no pipeline \
+                constants were set"
             );
         }
 
         self.inner
+    }
+}
+
+fn io_binding_type_is_float(io_binding_type: &IoBindingType) -> bool {
+    match io_binding_type {
+        IoBindingType::Float
+        | IoBindingType::FloatVector2
+        | IoBindingType::FloatVector3
+        | IoBindingType::FloatVector4 => true,
+        _ => false,
+    }
+}
+
+fn io_binding_type_is_half_float(io_binding_type: &IoBindingType) -> bool {
+    match io_binding_type {
+        IoBindingType::HalfFloat
+        | IoBindingType::HalfFloatVector2
+        | IoBindingType::HalfFloatVector3
+        | IoBindingType::HalfFloatVector4 => true,
+        _ => false,
+    }
+}
+
+fn io_binding_type_is_signed_integer(io_binding_type: &IoBindingType) -> bool {
+    match io_binding_type {
+        IoBindingType::SignedInteger
+        | IoBindingType::SignedIntegerVector2
+        | IoBindingType::SignedIntegerVector3
+        | IoBindingType::SignedIntegerVector4 => true,
+        _ => false,
+    }
+}
+
+fn io_binding_type_is_unsigned_integer(io_binding_type: &IoBindingType) -> bool {
+    match io_binding_type {
+        IoBindingType::UnsignedInteger
+        | IoBindingType::UnsignedIntegerVector2
+        | IoBindingType::UnsignedIntegerVector3
+        | IoBindingType::UnsignedIntegerVector4 => true,
+        _ => false,
     }
 }

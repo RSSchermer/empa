@@ -8,5 +8,10 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[features]
+wgsl = ["dep:indexmap", "dep:naga"]
+
 [dependencies]
+indexmap = { workspace = true, optional = true }
+naga = { workspace = true, optional = true, features = ["wgsl-in"] }
 serde = { workspace = true, features = ["derive"] }
