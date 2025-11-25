@@ -1,6 +1,6 @@
 [package]
 name = "empa-smi"
-description = "Shader Module Interface descriptions from Empa."
+description = "Shader Module Interface descriptions based on the WGSL specification."
 version = { workspace = true }
 authors = { workspace = true }
 edition = { workspace = true }
