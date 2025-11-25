@@ -1,29 +1,25 @@
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::Span;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::spanned::Spanned;
-use syn::{Attribute, Data, DeriveInput, Field, Ident, Lit, Meta, NestedMeta, Type};
+use syn::{Data, DeriveInput, Field, Ident, LitInt, Type};
 
-use crate::error_log::ErrorLog;
-
-pub fn expand_derive_pipeline_constants(input: &DeriveInput) -> Result<TokenStream, String> {
+pub fn expand_derive_pipeline_constants(input: &DeriveInput) -> proc_macro::TokenStream {
     if let Data::Struct(ref data) = input.data {
         let struct_name = &input.ident;
         let mod_path = quote!(empa::pipeline_constants);
-        let mut log = ErrorLog::new();
 
+        let mut errors = Vec::new();
         let mut fields: Vec<ConstantField> = Vec::new();
 
-        'outer: for (i, field) in data.fields.iter().enumerate() {
-            let field = ConstantField::from_ast(field, i, &mut log);
+        for (i, field) in data.fields.iter().enumerate() {
+            let field = ConstantField::from_ast(field, i, &mut errors);
 
-            for f in fields.iter() {
-                if field.id == f.id {
-                    log.log_error(format!(
-                        "Fields `{}` and `{}` declare the same ID.",
-                        &f.name, &field.name
+            for other in &fields {
+                if field.id.is_some() && field.id == other.id {
+                    errors.push(syn::Error::new(
+                        field.span,
+                        format!("cannot declare the same ID as field `{}`", other.name),
                     ));
-
-                    continue 'outer;
                 }
             }
 
@@ -68,7 +64,9 @@ pub fn expand_derive_pipeline_constants(input: &DeriveInput) -> Result<TokenStre
             }
         };
 
-        let generated = quote! {
+        let errors = errors.iter().map(|e| e.to_compile_error());
+
+        quote! {
             #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
             const _: () = {
                 #[allow(unknown_lints)]
@@ -76,12 +74,16 @@ pub fn expand_derive_pipeline_constants(input: &DeriveInput) -> Result<TokenStre
                 #[allow(rust_2018_idioms)]
 
                 #impl_block
-            };
-        };
 
-        log.compile().map(|_| generated)
+                #(#errors;)*
+            };
+        }
+        .into()
     } else {
-        Err("`PipelineConstants` can only be derived for a struct.".into())
+        quote! {
+            compile_error!("`PipelineConstants` can only be derived for a struct");
+        }
+        .into()
     }
 }
 
@@ -90,70 +92,44 @@ struct ConstantField {
     position: usize,
     name: String,
     ty: Type,
-    id: Option<u32>,
+    id: Option<u16>,
     span: Span,
 }
 
 impl ConstantField {
-    pub fn from_ast(ast: &Field, position: usize, log: &mut ErrorLog) -> Self {
+    pub fn from_ast(ast: &Field, position: usize, errors: &mut Vec<syn::Error>) -> Self {
         let field_name = ast
             .ident
             .clone()
             .map(|i| i.to_string())
             .unwrap_or(position.to_string());
 
-        let id_attributes: Vec<&Attribute> = ast
+        let mut id_attributes = ast
             .attrs
             .iter()
-            .filter(|a| a.path.is_ident("constant_id"))
-            .collect();
-
-        if id_attributes.len() > 1 {
-            log.log_error(format!(
-                "Multiple #[constant_id] attributes for field `{}`.",
-                field_name
-            ));
-        }
+            .filter(|a| a.path().is_ident("constant_id"));
 
         let mut id = None;
 
-        if let Some(attr) = id_attributes.first() {
-            match attr.parse_meta() {
-                Ok(Meta::List(meta)) => {
-                    if meta.nested.len() != 1 {
-                        log.log_error(format!(
-                            "Malformed #[constant_id] attribute for field `{}`; expected a single \
-                            integer.",
-                            field_name
-                        ));
-                    } else {
-                        let nested = meta.nested.first().unwrap();
+        if let Some(attr) = id_attributes.next() {
+            while let Some(attr) = id_attributes.next() {
+                errors.push(syn::Error::new(
+                    attr.span(),
+                    "attribute may only be declared once per field",
+                ));
+            }
 
-                        if let NestedMeta::Lit(Lit::Int(lit)) = nested {
-                            if let Ok(parsed) = lit.base10_parse::<u32>() {
-                                id = Some(parsed);
-                            } else {
-                                log.log_error(format!(
-                                    "Malformed #[constant_id] attribute for field `{}`; expected \
-                                    ID to be a positive integer.",
-                                    field_name
-                                ));
-                            }
-                        } else {
-                            log.log_error(format!(
-                                "Malformed #[constant_id] attribute for field `{}`; expected ID to \
-                                be an integer literal.",
-                                field_name
-                            ));
-                        }
-                    }
-                }
-                _ => {
-                    log.log_error(format!(
-                        "Malformed #[constant_id] attribute for field `{}`.",
-                        field_name
+            if let Ok(lit) = attr.parse_args::<LitInt>() {
+                if let Ok(parsed) = lit.base10_parse::<u16>() {
+                    id = Some(parsed);
+                } else {
+                    errors.push(syn::Error::new(
+                        lit.span(),
+                        "expected an integer between 0 and 65535 (inclusive)",
                     ));
                 }
+            } else {
+                errors.push(syn::Error::new(attr.span(), "expected an integer argument"));
             }
         }
 

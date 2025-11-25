@@ -14,9 +14,8 @@ use crate::device::Device;
 use crate::driver::{
     ClearBuffer, CommandEncoder as _, ComputePassEncoder as _, CopyBufferToBuffer,
     CopyBufferToTexture, CopyTextureToBuffer, CopyTextureToTexture, Device as _, Driver, Dvr,
-    ExecuteRenderBundlesEncoder, ImageCopyBuffer, ProgrammablePassEncoder,
-    RenderBundleEncoder as _, RenderEncoder, RenderPassEncoder as _, ResolveQuerySet,
-    SetIndexBuffer, SetVertexBuffer,
+    ExecuteRenderBundlesEncoder, ProgrammablePassEncoder, RenderBundleEncoder as _, RenderEncoder,
+    RenderPassEncoder as _, ResolveQuerySet, SetIndexBuffer, SetVertexBuffer, TexelCopyBufferInfo,
 };
 use crate::query::{OcclusionQuerySet, TimestampQuerySet};
 use crate::render_pipeline::{PipelineIndexFormat, PipelineIndexFormatCompatible, RenderPipeline};
@@ -186,7 +185,7 @@ impl CommandEncoder {
 
     fn image_copy_buffer_to_texture_internal<F>(
         mut self,
-        src: ImageCopyBuffer<Dvr>,
+        src: TexelCopyBufferInfo<Dvr>,
         dst: texture::ImageCopyTexture<F>,
     ) -> Self {
         let width = dst.width;
@@ -231,7 +230,7 @@ impl CommandEncoder {
 
     fn sub_image_copy_buffer_to_texture_internal<F>(
         mut self,
-        src: ImageCopyBuffer<Dvr>,
+        src: TexelCopyBufferInfo<Dvr>,
         dst: texture::ImageCopyTexture<F>,
         size: ImageCopySize3D,
     ) -> Self {
@@ -284,7 +283,7 @@ impl CommandEncoder {
     fn image_copy_texture_to_buffer_internal<F>(
         mut self,
         src: texture::ImageCopyTexture<F>,
-        dst: ImageCopyBuffer<Dvr>,
+        dst: TexelCopyBufferInfo<Dvr>,
     ) -> Self {
         let width = src.width;
         let height = src.height;
@@ -329,7 +328,7 @@ impl CommandEncoder {
     fn sub_image_copy_texture_to_buffer_internal<F>(
         mut self,
         src: texture::ImageCopyTexture<F>,
-        dst: ImageCopyBuffer<Dvr>,
+        dst: TexelCopyBufferInfo<Dvr>,
         size: ImageCopySize3D,
     ) -> Self {
         let ImageCopySize3D {

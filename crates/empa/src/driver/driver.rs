@@ -300,8 +300,8 @@ pub struct CopyBufferToTexture<'a, D>
 where
     D: Driver,
 {
-    pub source: ImageCopyBuffer<'a, D>,
-    pub destination: ImageCopyTexture<'a, D>,
+    pub source: TexelCopyBufferInfo<'a, D>,
+    pub destination: TexelCopyTextureInfo<'a, D>,
     pub copy_size: (u32, u32, u32),
 }
 
@@ -309,8 +309,8 @@ pub struct CopyTextureToBuffer<'a, D>
 where
     D: Driver,
 {
-    pub source: ImageCopyTexture<'a, D>,
-    pub destination: ImageCopyBuffer<'a, D>,
+    pub source: TexelCopyTextureInfo<'a, D>,
+    pub destination: TexelCopyBufferInfo<'a, D>,
     pub copy_size: (u32, u32, u32),
 }
 
@@ -318,8 +318,8 @@ pub struct CopyTextureToTexture<'a, D>
 where
     D: Driver,
 {
-    pub source: ImageCopyTexture<'a, D>,
-    pub destination: ImageCopyTexture<'a, D>,
+    pub source: TexelCopyTextureInfo<'a, D>,
+    pub destination: TexelCopyTextureInfo<'a, D>,
     pub copy_size: (u32, u32, u32),
 }
 
@@ -378,7 +378,7 @@ pub enum TextureAspect {
     DepthOnly,
 }
 
-pub struct ImageCopyBuffer<'a, D>
+pub struct TexelCopyBufferInfo<'a, D>
 where
     D: Driver,
 {
@@ -390,12 +390,12 @@ where
     pub rows_per_image: u32,
 }
 
-impl<D> Clone for ImageCopyBuffer<'_, D>
+impl<D> Clone for TexelCopyBufferInfo<'_, D>
 where
     D: Driver,
 {
     fn clone(&self) -> Self {
-        ImageCopyBuffer {
+        TexelCopyBufferInfo {
             buffer_handle: self.buffer_handle,
             offset: self.offset,
             size: self.size,
@@ -406,10 +406,10 @@ where
     }
 }
 
-impl<D> Copy for ImageCopyBuffer<'_, D> where D: Driver {}
+impl<D> Copy for TexelCopyBufferInfo<'_, D> where D: Driver {}
 
 #[derive(Clone, Copy)]
-pub struct ImageCopyTexture<'a, D>
+pub struct TexelCopyTextureInfo<'a, D>
 where
     D: Driver,
 {
@@ -430,50 +430,18 @@ where
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub struct ImageDataLayout {
+pub struct TexelCopyBufferLayout {
     pub offset: usize,
     pub bytes_per_row: u32,
     pub rows_per_image: u32,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct ImageCopySize2D {
-    pub width: u32,
-    pub height: u32,
-}
-
-impl Default for ImageCopySize2D {
-    fn default() -> Self {
-        ImageCopySize2D {
-            width: 1,
-            height: 1,
-        }
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct ImageCopySize3D {
-    pub width: u32,
-    pub height: u32,
-    pub depth_or_layers: u32,
-}
-
-impl Default for ImageCopySize3D {
-    fn default() -> Self {
-        ImageCopySize3D {
-            width: 1,
-            height: 1,
-            depth_or_layers: 1,
-        }
-    }
 }
 
 pub struct WriteTextureOperation<'a, D>
 where
     D: Driver,
 {
-    pub image_copy_texture: ImageCopyTexture<'a, D>,
-    pub image_data_layout: ImageDataLayout,
+    pub image_copy_texture: TexelCopyTextureInfo<'a, D>,
+    pub image_data_layout: TexelCopyBufferLayout,
     pub extent: (u32, u32, u32),
     pub data: &'a [u8],
 }

@@ -1426,7 +1426,7 @@ impl<F, U> Texture2D<F, U> {
             "mipmap level out of bounds"
         );
 
-        let inner = driver::ImageCopyTexture {
+        let inner = driver::TexelCopyTextureInfo {
             texture_handle: &self.handle,
             mip_level: mipmap_level as u32,
             origin: (0, 0, 0),
@@ -1478,7 +1478,7 @@ impl<F, U> Texture2D<F, U> {
             block_height
         );
 
-        let inner = driver::ImageCopyTexture {
+        let inner = driver::TexelCopyTextureInfo {
             texture_handle: &self.handle,
             mip_level: mipmap_level as u32,
             origin: (origin_x, origin_y, origin_layer),

@@ -386,7 +386,7 @@ impl<F, U> Texture3D<F, U> {
             "mipmap level out of bounds"
         );
 
-        let inner = driver::ImageCopyTexture {
+        let inner = driver::TexelCopyTextureInfo {
             texture_handle: &self.handle,
             mip_level: mipmap_level as u32,
             origin: (0, 0, 0),
@@ -425,7 +425,7 @@ impl<F, U> Texture3D<F, U> {
         assert!(origin_y < self.height, "`y` origin out of bounds");
         assert!(origin_z < self.depth, "layer origin out of bounds");
 
-        let inner = driver::ImageCopyTexture {
+        let inner = driver::TexelCopyTextureInfo {
             texture_handle: &self.handle,
             mip_level: mipmap_level as u32,
             origin: (origin_x, origin_y, origin_z),

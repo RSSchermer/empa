@@ -73,6 +73,7 @@ impl From<WithSpan<ValidationError>> for BuildSmiError {
 }
 
 impl BuildSmiError {
+    #[cfg(feature = "stderr")]
     pub fn emit_to_stderr(&self, source: &str) {
         match self {
             Self::Parse(e) => e.emit_to_stderr(source),
@@ -80,6 +81,7 @@ impl BuildSmiError {
         }
     }
 
+    #[cfg(feature = "stderr")]
     pub fn emit_to_stderr_with_path<P>(&self, source: &str, path: P)
     where
         P: AsRef<std::path::Path>,
@@ -412,7 +414,7 @@ fn global_to_resource_type(
             ResourceType::Uniform(layout)
         }
         AddressSpace::Storage { access } => {
-            if *access == naga::StorageAccess::all() {
+            if access.contains(naga::StorageAccess::STORE) {
                 let layout = type_to_smi_unsized_buffer_layout(module, ty);
 
                 ResourceType::StorageReadWrite(layout)
@@ -556,6 +558,9 @@ fn shader_stage_to_smi(stage: &ShaderStage) -> SmiShaderStage {
         ShaderStage::Vertex => SmiShaderStage::Vertex,
         ShaderStage::Fragment => SmiShaderStage::Fragment,
         ShaderStage::Compute => SmiShaderStage::Compute,
+        ShaderStage::Mesh | ShaderStage::Task => {
+            panic!("should not be valid with default capabilities")
+        }
     }
 }
 
@@ -629,6 +634,8 @@ fn sampling_to_smi(sampling: Sampling) -> SmiSampling {
         Sampling::Center => SmiSampling::Center,
         Sampling::Centroid => SmiSampling::Centroid,
         Sampling::Sample => SmiSampling::Sample,
+        Sampling::First => SmiSampling::First,
+        Sampling::Either => SmiSampling::Either,
     }
 }
 

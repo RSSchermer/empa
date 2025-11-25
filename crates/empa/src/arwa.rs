@@ -11,9 +11,9 @@ use arwa::worker::WorkerNavigator;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    Gpu, GpuCanvasAlphaMode, GpuCanvasConfiguration, GpuCanvasContext, GpuImageCopyExternalImage,
-    GpuImageCopyTextureTagged, GpuOrigin2dDict, GpuOrigin3dDict, GpuPowerPreference,
-    GpuRequestAdapterOptions,
+    Gpu, GpuCanvasAlphaMode, GpuCanvasConfiguration, GpuCanvasContext,
+    GpuCopyExternalImageDestInfo, GpuCopyExternalImageSourceInfo, GpuOrigin2dDict, GpuOrigin3dDict,
+    GpuPowerPreference, GpuRequestAdapterOptions,
 };
 
 use crate::adapter::Adapter;
@@ -91,19 +91,19 @@ impl Empa {
             force_fallback_adapter,
         } = *options;
 
-        let mut opts = GpuRequestAdapterOptions::new();
+        let opts = GpuRequestAdapterOptions::new();
 
         match power_preference {
             PowerPreference::LowPower => {
-                opts.power_preference(GpuPowerPreference::LowPower);
+                opts.set_power_preference(GpuPowerPreference::LowPower);
             }
             PowerPreference::HighPerformance => {
-                opts.power_preference(GpuPowerPreference::HighPerformance);
+                opts.set_power_preference(GpuPowerPreference::HighPerformance);
             }
             PowerPreference::DontCare => (),
         }
 
-        opts.force_fallback_adapter(force_fallback_adapter);
+        opts.set_force_fallback_adapter(force_fallback_adapter);
 
         let promise = self.inner.request_adapter_with_options(&opts);
 
@@ -222,12 +222,12 @@ impl CanvasContext {
             ..
         } = configuration;
 
-        let mut config = GpuCanvasConfiguration::new(
+        let config = GpuCanvasConfiguration::new(
             &device.device_handle.inner,
             texture_format_to_web_sys(&F::FORMAT_ID),
         );
 
-        config.usage(U::FLAG_SET.bits());
+        config.set_usage(U::FLAG_SET.bits());
 
         let formats = js_sys::Array::new();
 
@@ -239,9 +239,9 @@ impl CanvasContext {
 
         // Ignoring for now, see comment above.
         // config.color_space(color_space.to_web_sys());
-        config.alpha_mode(alpha_mode.to_web_sys());
+        config.set_alpha_mode(alpha_mode.to_web_sys());
 
-        self.inner.configure(&config);
+        self.inner.configure(&config).unwrap_throw();
 
         ConfiguredCanvasContext {
             inner: self.inner,
@@ -272,7 +272,7 @@ where
 
     pub fn get_current_texture(&self) -> Texture2D<F, U> {
         Texture2D::from_swap_chain_texture(
-            self.inner.get_current_texture().into(),
+            self.inner.get_current_texture().unwrap().into(),
             self.canvas.width(),
             self.canvas.height(),
             &self.view_formats,
@@ -347,7 +347,8 @@ impl QueueExt for Queue {
                 &src.inner,
                 &dst.inner,
                 &size_3d_to_web_sys((width, height, 1)),
-            );
+            )
+            .unwrap_throw();
     }
 }
 
@@ -359,7 +360,7 @@ pub struct ExternalImageCopySrcOptions {
 }
 
 pub struct ExternalImageCopySrc {
-    inner: GpuImageCopyExternalImage,
+    inner: GpuCopyExternalImageSourceInfo,
     width: u32,
     height: u32,
 }
@@ -377,15 +378,15 @@ impl ExternalImageCopySrc {
             flip_y,
         } = options;
 
-        let mut origin = GpuOrigin2dDict::new();
+        let origin = GpuOrigin2dDict::new();
 
-        origin.x(origin_x);
-        origin.y(origin_y);
+        origin.set_x(origin_x);
+        origin.set_y(origin_y);
 
-        let mut inner = GpuImageCopyExternalImage::new(source);
+        let inner = GpuCopyExternalImageSourceInfo::new(source);
 
-        inner.origin(origin.as_ref());
-        inner.flip_y(flip_y);
+        inner.set_origin(origin.as_ref());
+        inner.set_flip_y(flip_y);
 
         ExternalImageCopySrc {
             inner,
@@ -449,7 +450,7 @@ pub struct ExternalSubImageCopyDstDescriptor {
 }
 
 pub struct ExternalImageCopyDst {
-    inner: GpuImageCopyTextureTagged,
+    inner: GpuCopyExternalImageDestInfo,
     width: u32,
     height: u32,
 }
@@ -514,12 +515,12 @@ impl<F, U> Texture2DExt<F, U> for Texture2D<F, U> {
             "mipmap level out of bounds"
         );
 
-        let mut inner = GpuImageCopyTextureTagged::new(&self.handle.inner);
+        let inner = GpuCopyExternalImageDestInfo::new(&self.handle.inner);
 
-        inner.mip_level(mipmap_level as u32);
+        inner.set_mip_level(mipmap_level as u32);
         // Ignoring for now, see comment above
         // inner.color_space(color_space.to_web_sys());
-        inner.premultiplied_alpha(premultiplied_alpha);
+        inner.set_premultiplied_alpha(premultiplied_alpha);
 
         ExternalImageCopyDst {
             inner,
@@ -554,19 +555,19 @@ impl<F, U> Texture2DExt<F, U> for Texture2D<F, U> {
         assert!(origin_y < self.height, "`y` origin out of bounds");
         assert!(origin_layer < self.layers, "layer origin out of bounds");
 
-        let mut origin = GpuOrigin3dDict::new();
+        let origin = GpuOrigin3dDict::new();
 
-        origin.x(origin_x);
-        origin.y(origin_y);
-        origin.z(origin_layer);
+        origin.set_x(origin_x);
+        origin.set_y(origin_y);
+        origin.set_z(origin_layer);
 
-        let mut inner = GpuImageCopyTextureTagged::new(&self.handle.inner);
+        let inner = GpuCopyExternalImageDestInfo::new(&self.handle.inner);
 
-        inner.origin(origin.as_ref());
-        inner.mip_level(mipmap_level as u32);
+        inner.set_origin(origin.as_ref());
+        inner.set_mip_level(mipmap_level as u32);
         // Ignoring for now, see comment above
         // inner.color_space(color_space.to_web_sys());
-        inner.premultiplied_alpha(premultiplied_alpha);
+        inner.set_premultiplied_alpha(premultiplied_alpha);
 
         ExternalImageCopyDst {
             inner,

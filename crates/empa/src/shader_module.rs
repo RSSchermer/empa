@@ -121,7 +121,7 @@ impl EntryPointExt<'_> {
             let constant = &self.smi.overridable_constants[constant_index];
 
             let identifier = if let Some(id) = constant.id {
-                PipelineConstantIdentifier::Number(id as u32)
+                PipelineConstantIdentifier::Number(id)
             } else {
                 PipelineConstantIdentifier::Name(constant.name.as_ref())
             };

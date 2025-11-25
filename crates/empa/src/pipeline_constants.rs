@@ -5,7 +5,7 @@ use empa_smi::OverridableConstantType;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PipelineConstantIdentifier<'a> {
-    Number(u32),
+    Number(u16),
     Name(&'a str),
 }
 

@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 use std::ops::Deref;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::{error, fmt};
 
@@ -9,10 +8,10 @@ use flagset::{FlagSet, flags};
 use raw_window_handle::{
     HandleError, HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle,
 };
-use wgc::gfx_select;
 use wgc::global::Global;
 use wgc::id::SurfaceId;
 use wgc::present::SurfaceOutput;
+pub use wgt::BackendOptions;
 use wgt::SurfaceStatus;
 
 use crate::adapter::Adapter;
@@ -41,20 +40,9 @@ flags! {
     }
 }
 
-#[derive(Clone, PartialEq, Debug, Default)]
-pub enum Dx12ShaderCompiler {
-    #[default]
-    Fxc,
-    Dxc {
-        dxil_path: Option<PathBuf>,
-        dxc_path: Option<PathBuf>,
-    },
-}
-
 pub struct InstanceDescriptor<B, F> {
     pub backends: B,
     pub flags: F,
-    pub dx12_shader_comiler: Dx12ShaderCompiler,
 }
 
 impl Default for InstanceDescriptor<FlagSet<Backend>, FlagSet<InstanceFlag>> {
@@ -62,7 +50,6 @@ impl Default for InstanceDescriptor<FlagSet<Backend>, FlagSet<InstanceFlag>> {
         InstanceDescriptor {
             backends: Backend::All.into(),
             flags: InstanceFlag::None.into(),
-            dx12_shader_comiler: Default::default(),
         }
     }
 }
@@ -138,11 +125,11 @@ impl Instance {
 
         let global = Global::new(
             "wgpu",
-            wgt::InstanceDescriptor {
+            &wgt::InstanceDescriptor {
                 backends: backends_to_wgc(requested_backends),
                 flags: instance_flags_to_wgc(descriptor.flags.into()),
-                dx12_shader_compiler: dx12_shader_compiler_to_wgc(descriptor.dx12_shader_comiler),
-                gles_minor_version: Default::default(),
+                backend_options: Default::default(),
+                memory_budget_thresholds: Default::default(),
             },
         );
 
@@ -206,10 +193,7 @@ impl Instance {
         };
 
         self.global
-            .request_adapter(
-                &descriptor,
-                wgc::instance::AdapterInputs::Mask(wgt::Backends::all(), |_| None),
-            )
+            .request_adapter(&descriptor, wgt::Backends::all(), None)
             .map(|id| {
                 Adapter::from_handle(driver::native::AdapterHandle::new(self.global.clone(), id))
             })
@@ -226,7 +210,7 @@ impl Instance {
 
 #[derive(Clone, Debug)]
 pub struct GetAdapterError {
-    inner: wgc::instance::RequestAdapterError,
+    inner: wgt::RequestAdapterError,
 }
 
 impl fmt::Display for GetAdapterError {
@@ -330,7 +314,11 @@ impl<'a> Surface<'a> {
         U: texture::UsageFlags,
         V: ViewFormats<F>,
     {
-        let err = gfx_select!(device.device_handle.id() => self.global.surface_configure(self.id, device.device_handle.id(), &surface_configuration_to_wgc(config)));
+        let err = self.global.surface_configure(
+            self.id,
+            device.device_handle.id(),
+            &surface_configuration_to_wgc(config),
+        );
 
         if let Some(err) = err {
             panic!("{}", err);
@@ -382,16 +370,20 @@ where
 
         let view_formats = view_formats.iter().map(texture_format_to_wgc).collect();
 
-        let err = gfx_select!(device.device_handle.id() => surface.global.surface_configure(surface.id, device.device_handle.id(), &wgt::SurfaceConfiguration {
-            usage: texture_usage_to_wgc(&U::FLAG_SET),
-            format: texture_format_to_wgc(&F::FORMAT_ID),
-            width,
-            height,
-            present_mode: present_mode_to_wgc(present_mode),
-            desired_maximum_frame_latency: *desired_maximum_frame_latency,
-            alpha_mode: alpha_mode_to_wgc(alpha_mode),
-            view_formats,
-        }));
+        let err = surface.global.surface_configure(
+            surface.id,
+            device.device_handle.id(),
+            &wgt::SurfaceConfiguration {
+                usage: texture_usage_to_wgc(&U::FLAG_SET),
+                format: texture_format_to_wgc(&F::FORMAT_ID),
+                width,
+                height,
+                present_mode: present_mode_to_wgc(present_mode),
+                desired_maximum_frame_latency: *desired_maximum_frame_latency,
+                alpha_mode: alpha_mode_to_wgc(alpha_mode),
+                view_formats,
+            },
+        );
 
         if let Some(err) = err {
             panic!("{}", err);
@@ -402,20 +394,22 @@ where
     }
 
     pub fn get_current_texture(&self) -> Result<SurfaceTexture<F, U>, SurfaceError> {
-        let surface = &self.surface;
-        let res = gfx_select!(self.device.device_handle.id() => surface.global.surface_get_current_texture(self.surface.id, None));
+        let res = self
+            .surface
+            .global
+            .surface_get_current_texture(self.surface.id, None);
 
         match res {
-            Ok(SurfaceOutput { status, texture_id }) => {
+            Ok(SurfaceOutput { status, texture }) => {
                 let suboptimal = match status {
                     SurfaceStatus::Good => false,
                     SurfaceStatus::Suboptimal => true,
                     SurfaceStatus::Timeout => return Err(SurfaceError::Timeout),
                     SurfaceStatus::Outdated => return Err(SurfaceError::Outdated),
-                    SurfaceStatus::Lost => return Err(SurfaceError::Lost),
+                    SurfaceStatus::Lost | SurfaceStatus::Unknown => return Err(SurfaceError::Lost),
                 };
 
-                let texture_id = if let Some(id) = texture_id {
+                let texture_id = if let Some(id) = texture {
                     id
                 } else {
                     return Err(SurfaceError::Lost);
@@ -433,8 +427,8 @@ where
                 );
 
                 Ok(SurfaceTexture {
-                    global: surface.global.clone(),
-                    surface_id: surface.id,
+                    global: self.surface.global.clone(),
+                    surface_id: self.surface.id,
                     texture,
                     suboptimal,
                 })
@@ -468,12 +462,7 @@ impl<F, U> SurfaceTexture<F, U> {
     }
 
     pub fn present(self) {
-        let res =
-            gfx_select!(self.texture.handle.id() => self.global.surface_present(self.surface_id));
-
-        if let Err(err) = res {
-            panic!("{}", err);
-        }
+        self.global.surface_present(self.surface_id).unwrap();
     }
 }
 
@@ -527,19 +516,6 @@ fn instance_flags_to_wgc(flags: FlagSet<InstanceFlag>) -> wgt::InstanceFlags {
     }
 
     res
-}
-
-fn dx12_shader_compiler_to_wgc(dx12shader_compiler: Dx12ShaderCompiler) -> wgt::Dx12Compiler {
-    match dx12shader_compiler {
-        Dx12ShaderCompiler::Fxc => wgt::Dx12Compiler::Fxc,
-        Dx12ShaderCompiler::Dxc {
-            dxil_path,
-            dxc_path,
-        } => wgt::Dx12Compiler::Dxc {
-            dxil_path,
-            dxc_path,
-        },
-    }
 }
 
 fn present_mode_to_wgc(present_mode: &PresentMode) -> wgt::PresentMode {

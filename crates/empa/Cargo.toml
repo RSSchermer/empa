@@ -31,6 +31,7 @@ empa-macros = { workspace = true }
 empa-smi = { workspace = true, features = ["wgsl"] }
 flagset = { workspace = true }
 futures = { workspace = true }
+hashbrown = { workspace = true }
 lazy_static = { workspace = true }
 pin-project = { workspace = true }
 js-sys = { workspace = true, optional = true }
@@ -84,6 +85,8 @@ features = [
     "GpuComputePipeline",
     "GpuComputePipelineDescriptor",
     "GpuCompareFunction",
+    "GpuCopyExternalImageDestInfo",
+    "GpuCopyExternalImageSourceInfo",
     "GpuCullMode",
     "GpuDepthStencilState",
     "GpuDevice",
@@ -92,11 +95,6 @@ features = [
     "GpuFilterMode",
     "GpuFragmentState",
     "GpuFrontFace",
-    "GpuImageCopyBuffer",
-    "GpuImageCopyExternalImage",
-    "GpuImageCopyTexture",
-    "GpuImageCopyTextureTagged",
-    "GpuImageDataLayout",
     "GpuIndexFormat",
     "GpuLoadOp",
     "GpuMipmapFilterMode",
@@ -137,6 +135,9 @@ features = [
     "GpuSupportedFeatures",
     "GpuSupportedLimits",
     "GpuTexture",
+    "GpuTexelCopyBufferInfo",
+    "GpuTexelCopyBufferLayout",
+    "GpuTexelCopyTextureInfo",
     "GpuTextureAspect",
     "GpuTextureBindingLayout",
     "GpuTextureDescriptor",

@@ -237,7 +237,7 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
                 let config = term::Config::default();
                 let writer = StandardStream::stderr(ColorChoice::Auto);
 
-                term::emit(&mut writer.lock(), &config, &file, &diagnostic)
+                term::emit_to_write_style(&mut writer.lock(), &config, &file, &diagnostic)
                     .expect("cannot write error");
 
                 return quote! {
@@ -285,8 +285,13 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
                     let config = codespan_reporting::term::Config::default();
                     let writer = StandardStream::stderr(ColorChoice::Auto);
 
-                    term::emit(&mut writer.lock(), &config, &source_files, &diagnostic)
-                        .expect("cannot write error");
+                    term::emit_to_write_style(
+                        &mut writer.lock(),
+                        &config,
+                        &source_files,
+                        &diagnostic,
+                    )
+                    .expect("cannot write error");
                 }
                 BuildSmiError::Validation(err) => {
                     let mut diagnostic =
@@ -311,8 +316,13 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
                     let config = codespan_reporting::term::Config::default();
                     let writer = StandardStream::stderr(ColorChoice::Auto);
 
-                    term::emit(&mut writer.lock(), &config, &source_files, &diagnostic)
-                        .expect("cannot write error");
+                    term::emit_to_write_style(
+                        &mut writer.lock(),
+                        &config,
+                        &source_files,
+                        &diagnostic,
+                    )
+                    .expect("cannot write error");
                 }
             }
 

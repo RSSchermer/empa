@@ -268,7 +268,7 @@ impl<F, U> Texture1D<F, U> {
     ) -> ImageCopyTexture<'_, F> {
         assert!(origin < self.size, "origin out of bounds");
 
-        let inner = driver::ImageCopyTexture {
+        let inner = driver::TexelCopyTextureInfo {
             texture_handle: &self.handle,
             mip_level: 0,
             origin: (origin, 0, 0),

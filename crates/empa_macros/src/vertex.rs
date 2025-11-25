@@ -1,22 +1,22 @@
-use proc_macro2::{Span, TokenStream};
+use indexmap::IndexMap;
+use proc_macro2::Span;
 use quote::{ToTokens, quote, quote_spanned};
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{Attribute, Data, DeriveInput, Field, Ident, Lit, Meta, NestedMeta, Type};
+use syn::{Data, DeriveInput, Expr, Field, Ident, Lit, Meta, Token, Type};
 
-use crate::error_log::ErrorLog;
-
-pub fn expand_derive_vertex(input: &DeriveInput) -> Result<TokenStream, String> {
+pub fn expand_derive_vertex(input: &DeriveInput) -> proc_macro::TokenStream {
     if let Data::Struct(ref data) = input.data {
         let struct_name = &input.ident;
         let mod_path = quote!(empa::render_pipeline);
-        let mut log = ErrorLog::new();
 
+        let mut errors = Vec::new();
         let mut per_instance = false;
 
         for attribute in &input.attrs {
-            if attribute.path.is_ident("vertex_per_instance") {
-                if !attribute.tokens.is_empty() {
-                    log.log_error("The `vertex_per_instance` attribute does not take parameters.");
+            if attribute.path().is_ident("vertex_per_instance") {
+                if let Err(err) = attribute.meta.require_path_only() {
+                    errors.push(err);
                 } else {
                     per_instance = true;
                 }
@@ -29,18 +29,29 @@ pub fn expand_derive_vertex(input: &DeriveInput) -> Result<TokenStream, String> 
             quote!(#mod_path::VertexStepMode::Vertex)
         };
 
-        let mut position = 0;
-        let mut vertex_attributes = Vec::new();
+        let mut vertex_attributes: IndexMap<u32, AttributeField> = Default::default();
 
-        for field in data.fields.iter() {
-            if let VertexField::Attribute(attr) = VertexField::from_ast(field, position, &mut log) {
-                vertex_attributes.push(attr);
+        for (position, field) in data.fields.iter().enumerate() {
+            let field = VertexField::from_ast(field, position, &mut errors);
+
+            if let VertexField::Attribute(attr) = field {
+                if let Some(other) = vertex_attributes.get(&attr.location) {
+                    errors.push(syn::Error::new(
+                        attr.span,
+                        format!(
+                            "cannot declare the same location as field `{}`",
+                            other.field_name()
+                        ),
+                    ));
+                }
+
+                vertex_attributes.insert(attr.location, attr);
             }
-
-            position += 1;
         }
 
-        let recurse = vertex_attributes.iter().map(|a| {
+        vertex_attributes.sort_keys();
+
+        let recurse = vertex_attributes.values().map(|a| {
             let field_name = a
                 .ident
                 .clone()
@@ -87,7 +98,9 @@ pub fn expand_derive_vertex(input: &DeriveInput) -> Result<TokenStream, String> 
             }
         };
 
-        let generated = quote! {
+        let errors = errors.iter().map(|err| err.to_compile_error());
+
+        quote! {
             #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
             const _: () = {
                 #[allow(unknown_lints)]
@@ -101,12 +114,16 @@ pub fn expand_derive_vertex(input: &DeriveInput) -> Result<TokenStream, String> 
                 {}
 
                 #impl_block
-            };
-        };
 
-        log.compile().map(|_| generated)
+                #(#errors;)*
+            };
+        }
+        .into()
     } else {
-        Err("`Vertex` can only be derived for a struct.".into())
+        quote! {
+            compile_error!("`Vertex` can only be derived for a struct");
+        }
+        .into()
     }
 }
 
@@ -116,120 +133,106 @@ enum VertexField {
 }
 
 impl VertexField {
-    pub fn from_ast(ast: &Field, position: usize, log: &mut ErrorLog) -> Self {
-        let vertex_attributes: Vec<&Attribute> = ast
+    pub fn from_ast(ast: &Field, position: usize, errors: &mut Vec<syn::Error>) -> Self {
+        let mut vertex_attributes = ast
             .attrs
             .iter()
-            .filter(|a| a.path.is_ident("vertex_attribute"))
-            .collect();
-        let field_name = ast
-            .ident
-            .clone()
-            .map(|i| i.to_string())
-            .unwrap_or(position.to_string());
+            .filter(|a| a.path().is_ident("vertex_attribute"));
 
-        match vertex_attributes.len() {
-            0 => VertexField::Excluded,
-            1 => {
-                let attr = vertex_attributes[0];
-
-                let meta_items: Vec<NestedMeta> = match attr.parse_meta() {
-                    Ok(Meta::List(meta)) => meta.nested.iter().cloned().collect(),
-                    Ok(Meta::Path(path)) if path.is_ident("vertex_attribute") => Vec::new(),
-                    _ => {
-                        log.log_error(format!(
-                            "Malformed #[vertex_attribute] attribute for field `{}`.",
-                            field_name
-                        ));
-
-                        Vec::new()
-                    }
-                };
-
-                let mut location = None;
-                let mut format = None;
-
-                for meta_item in meta_items.into_iter() {
-                    match meta_item {
-                        NestedMeta::Meta(Meta::NameValue(m)) if m.path.is_ident("location") => {
-                            if let Lit::Int(i) = &m.lit {
-                                if let Ok(value) = i.base10_parse::<u32>() {
-                                    location = Some(value);
-                                } else {
-                                    log.log_error(format!(
-                                        "Malformed #[vertex_attribute] attribute for field `{}`: \
-                                        expected `location` to be representable as a u32.",
-                                        field_name
-                                    ));
-                                }
-                            } else {
-                                log.log_error(format!(
-                                    "Malformed #[vertex_attribute] attribute for field `{}`: \
-                                     expected `location` to be a positive integer.",
-                                    field_name
-                                ));
-                            };
-                        }
-                        NestedMeta::Meta(Meta::NameValue(m)) if m.path.is_ident("format") => {
-                            if let Lit::Str(f) = &m.lit {
-                                format = Some(f.value());
-                            } else {
-                                log.log_error(format!(
-                                    "Malformed #[vertex_attribute] attribute for field `{}`: \
-                                     expected `format` to be a string.",
-                                    field_name
-                                ));
-                            };
-                        }
-                        _ => log.log_error(format!(
-                            "Malformed #[vertex_attribute] attribute for field `{}`: unrecognized \
-                             option `{}`.",
-                            field_name,
-                            meta_item.into_token_stream()
-                        )),
-                    }
-                }
-
-                if location.is_none() {
-                    log.log_error(format!(
-                        "Field `{}` is marked a vertex attribute, but does not declare a binding \
-                         location.",
-                        field_name
-                    ));
-                }
-
-                if format.is_none() {
-                    log.log_error(format!(
-                        "Field `{}` is marked a vertex attribute, but does not declare a format.",
-                        field_name
-                    ));
-                }
-
-                if location.is_some() && format.is_some() {
-                    let location = location.unwrap();
-                    let format = format.unwrap();
-
-                    VertexField::Attribute(AttributeField {
-                        ident: ast.ident.clone(),
-                        ty: ast.ty.clone(),
-                        position,
-                        location,
-                        format,
-                        span: ast.span(),
-                    })
-                } else {
-                    VertexField::Excluded
-                }
-            }
-            _ => {
-                log.log_error(format!(
-                    "#[vertex_attribute] must not be defined more than once for field `{}`.",
-                    field_name
+        if let Some(attr) = vertex_attributes.next() {
+            while let Some(attr) = vertex_attributes.next() {
+                errors.push(syn::Error::new(
+                    attr.span(),
+                    "attribute may only be declared once per field",
                 ));
+            }
 
-                VertexField::Excluded
+            let mut location = None;
+            let mut format = None;
+
+            match attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated) {
+                Ok(nested) => {
+                    for meta in nested {
+                        if meta.path().is_ident("location") {
+                            match parse_location(meta) {
+                                Ok(v) => {
+                                    location = Some(v);
+                                }
+                                Err(err) => errors.push(err),
+                            }
+                        } else if meta.path().is_ident("format") {
+                            match parse_format(meta) {
+                                Ok(v) => {
+                                    format = Some(v);
+                                }
+                                Err(err) => errors.push(err),
+                            }
+                        }
+                    }
+                }
+                Err(err) => errors.push(err),
+            }
+
+            if location.is_none() {
+                errors.push(syn::Error::new(
+                    attr.span(),
+                    "vertex attribute must declare a `location` argument",
+                ));
+            }
+
+            if format.is_none() {
+                errors.push(syn::Error::new(
+                    attr.span(),
+                    "vertex attribute must declare a `format` argument",
+                ));
+            }
+
+            if location.is_some() && format.is_some() {
+                let location = location.unwrap();
+                let format = format.unwrap();
+
+                return VertexField::Attribute(AttributeField {
+                    ident: ast.ident.clone(),
+                    ty: ast.ty.clone(),
+                    position,
+                    location,
+                    format,
+                    span: ast.span(),
+                });
             }
         }
+
+        VertexField::Excluded
+    }
+}
+
+fn parse_location(meta: Meta) -> syn::Result<u32> {
+    let meta = meta.require_name_value()?;
+
+    if let Expr::Lit(expr) = &meta.value
+        && let Lit::Int(lit) = &expr.lit
+    {
+        lit.base10_parse::<u32>()
+    } else {
+        Err(syn::Error::new(
+            meta.value.span(),
+            "expected an integer literal",
+        ))
+    }
+}
+
+fn parse_format(meta: Meta) -> syn::Result<String> {
+    let meta = meta.require_name_value()?;
+
+    if let Expr::Lit(expr) = &meta.value
+        && let Lit::Str(lit) = &expr.lit
+    {
+        Ok(lit.value())
+    } else {
+        Err(syn::Error::new(
+            meta.value.span(),
+            "expected a format string",
+        ))
     }
 }
 
@@ -240,4 +243,14 @@ struct AttributeField {
     location: u32,
     format: String,
     span: Span,
+}
+
+impl AttributeField {
+    fn field_name(&self) -> String {
+        if let Some(ident) = &self.ident {
+            ident.to_string()
+        } else {
+            format!("{}", self.position)
+        }
+    }
 }

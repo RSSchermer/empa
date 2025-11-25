@@ -1,6 +1,6 @@
 use std::marker;
 
-use crate::driver::{Dvr, ImageCopyTexture as ImageCopyTextureInternal};
+use crate::driver::{Dvr, TexelCopyTextureInfo as ImageCopyTextureInternal};
 use crate::texture::ImageCopySize3D;
 
 pub(crate) struct ImageCopyTexture<'a, F> {

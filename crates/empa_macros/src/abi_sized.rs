@@ -1,9 +1,8 @@
-use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::spanned::Spanned;
 use syn::{Data, DeriveInput};
 
-pub fn expand_derive_sized(input: &DeriveInput) -> Result<TokenStream, String> {
+pub fn expand_derive_sized(input: &DeriveInput) -> proc_macro::TokenStream {
     if let Data::Struct(data) = &input.data {
         let struct_name = &input.ident;
 
@@ -67,7 +66,7 @@ pub fn expand_derive_sized(input: &DeriveInput) -> Result<TokenStream, String> {
             }
         };
 
-        let generated = quote! {
+        quote! {
             #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
             const _: () = {
                 #[allow(unknown_lints)]
@@ -76,10 +75,12 @@ pub fn expand_derive_sized(input: &DeriveInput) -> Result<TokenStream, String> {
 
                 #impl_block
             };
-        };
-
-        Ok(generated)
+        }
+        .into()
     } else {
-        Err("`Sized` can only be derived for a struct.".to_string())
+        quote! {
+            compile_error!("`Sized` can only be derived for a struct");
+        }
+        .into()
     }
 }

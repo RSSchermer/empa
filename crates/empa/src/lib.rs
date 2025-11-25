@@ -64,7 +64,7 @@ pub mod smi {
                 };
 
                 MemoryUnitLayout::Array(ArrayLayout {
-                    element_layout: std::borrow::Cow::Borrowed(element_layout),
+                    element_layout: Cow::Borrowed(element_layout),
                     stride: array_layout.stride,
                     len: array_layout.len,
                 })

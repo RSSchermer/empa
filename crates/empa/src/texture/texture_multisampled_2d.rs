@@ -78,7 +78,7 @@ where
     }
 
     fn image_copy_internal(&self) -> ImageCopyTexture<'_, F> {
-        let inner = driver::ImageCopyTexture {
+        let inner = driver::TexelCopyTextureInfo {
             texture_handle: &self.handle,
             mip_level: 0,
             origin: (0, 0, 0),

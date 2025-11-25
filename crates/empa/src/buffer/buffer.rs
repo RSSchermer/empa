@@ -17,7 +17,7 @@ use crate::buffer::{
 };
 use crate::device::{Device, ID_GEN};
 use crate::driver::{
-    Buffer as _, BufferDescriptor, Device as _, Driver, Dvr, ImageCopyBuffer, MapMode,
+    Buffer as _, BufferDescriptor, Device as _, Driver, Dvr, MapMode, TexelCopyBufferInfo,
 };
 use crate::texture::{ImageDataByteLayout, ImageDataLayout};
 use crate::{abi, driver};
@@ -557,7 +557,7 @@ impl<T, U> Buffer<[T], U> {
         );
 
         ImageCopySrc {
-            inner: ImageCopyBuffer {
+            inner: TexelCopyBufferInfo {
                 buffer_handle: &self.internal.handle,
                 offset: 0,
                 size: self.size_in_bytes(),
@@ -589,7 +589,7 @@ impl<T, U> Buffer<[T], U> {
         );
 
         ImageCopyDst {
-            inner: ImageCopyBuffer {
+            inner: TexelCopyBufferInfo {
                 buffer_handle: &self.internal.handle,
                 offset: 0,
                 size: self.size_in_bytes(),
@@ -627,7 +627,7 @@ impl<U> Buffer<[u8], U> {
         );
 
         ImageCopySrcRaw {
-            inner: ImageCopyBuffer {
+            inner: TexelCopyBufferInfo {
                 buffer_handle: &self.internal.handle,
                 offset: 0,
                 size: self.size_in_bytes(),
@@ -658,7 +658,7 @@ impl<U> Buffer<[u8], U> {
         );
 
         ImageCopyDstRaw {
-            inner: ImageCopyBuffer {
+            inner: TexelCopyBufferInfo {
                 buffer_handle: &self.internal.handle,
                 offset: 0,
                 size: self.size_in_bytes(),
@@ -974,7 +974,7 @@ impl<'a, T, U> View<'a, [T], U> {
         );
 
         ImageCopySrc {
-            inner: ImageCopyBuffer {
+            inner: TexelCopyBufferInfo {
                 buffer_handle: &self.buffer.handle,
                 offset: self.offset_in_bytes(),
                 size: self.size_in_bytes(),
@@ -1006,7 +1006,7 @@ impl<'a, T, U> View<'a, [T], U> {
         );
 
         ImageCopyDst {
-            inner: ImageCopyBuffer {
+            inner: TexelCopyBufferInfo {
                 buffer_handle: &self.buffer.handle,
                 offset: self.offset_in_bytes(),
                 size: self.size_in_bytes(),
@@ -1048,7 +1048,7 @@ impl<'a, U> View<'a, [u8], U> {
         );
 
         ImageCopySrcRaw {
-            inner: ImageCopyBuffer {
+            inner: TexelCopyBufferInfo {
                 buffer_handle: &self.buffer.handle,
                 offset: self.offset_in_bytes(),
                 size: self.size_in_bytes(),
@@ -1079,7 +1079,7 @@ impl<'a, U> View<'a, [u8], U> {
         );
 
         ImageCopyDstRaw {
-            inner: ImageCopyBuffer {
+            inner: TexelCopyBufferInfo {
                 buffer_handle: &self.buffer.handle,
                 offset: self.offset_in_bytes(),
                 size: self.size_in_bytes(),
@@ -1406,7 +1406,7 @@ where
 }
 
 pub(crate) fn image_copy_buffer_validate(
-    image_copy_buffer: &ImageCopyBuffer<Dvr>,
+    image_copy_buffer: &TexelCopyBufferInfo<Dvr>,
     size: (u32, u32, u32),
     block_size: [u32; 2],
 ) {
@@ -1442,24 +1442,24 @@ pub(crate) fn image_copy_buffer_validate(
 
 #[derive(Clone)]
 pub struct ImageCopySrc<'a, T> {
-    pub(crate) inner: ImageCopyBuffer<'a, Dvr>,
+    pub(crate) inner: TexelCopyBufferInfo<'a, Dvr>,
     _marker: marker::PhantomData<*const T>,
 }
 
 #[derive(Clone)]
 pub struct ImageCopySrcRaw<'a> {
-    pub(crate) inner: ImageCopyBuffer<'a, Dvr>,
+    pub(crate) inner: TexelCopyBufferInfo<'a, Dvr>,
 }
 
 #[derive(Clone)]
 pub struct ImageCopyDst<'a, T> {
-    pub(crate) inner: ImageCopyBuffer<'a, Dvr>,
+    pub(crate) inner: TexelCopyBufferInfo<'a, Dvr>,
     _marker: marker::PhantomData<*const T>,
 }
 
 #[derive(Clone)]
 pub struct ImageCopyDstRaw<'a> {
-    pub(crate) inner: ImageCopyBuffer<'a, Dvr>,
+    pub(crate) inner: TexelCopyBufferInfo<'a, Dvr>,
 }
 
 // Struct modified from https://github.com/gfx-rs/wgpu

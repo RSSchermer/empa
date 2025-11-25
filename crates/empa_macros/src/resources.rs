@@ -1,32 +1,32 @@
 use std::cmp::max;
-use std::collections::HashMap;
 
-use proc_macro2::{Span, TokenStream};
+use indexmap::IndexMap;
+use proc_macro2::Span;
 use quote::{ToTokens, quote, quote_spanned};
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{Attribute, Data, DeriveInput, Field, Ident, Lit, Meta, NestedMeta, Type};
+use syn::{Data, DeriveInput, Expr, Field, Ident, Lit, Meta, Token, Type};
 
-use crate::error_log::ErrorLog;
-
-pub fn expand_derive_resources(input: &DeriveInput) -> Result<TokenStream, String> {
+pub fn expand_derive_resources(input: &DeriveInput) -> proc_macro::TokenStream {
     if let Data::Struct(ref data) = input.data {
         let struct_name = &input.ident;
         let mod_path = quote!(empa::resource_binding);
-        let mut log = ErrorLog::new();
 
-        let mut resource_fields: HashMap<usize, ResourceField> = HashMap::new();
+        let mut errors = Vec::new();
+        let mut resource_fields: IndexMap<u32, ResourceField> = Default::default();
         let mut max_binding = 0;
 
         for (position, field) in data.fields.iter().enumerate() {
-            match ResourcesField::from_ast(field, position, &mut log) {
+            match ResourcesField::from_ast(field, position, &mut errors) {
                 ResourcesField::Resource(resource_field) => {
-                    for field in resource_fields.values() {
-                        if field.binding == resource_field.binding {
-                            log.log_error(format!(
-                                "Fields `{}` and `{}` cannot both use binding `{}`.",
-                                field.name, resource_field.name, field.binding
-                            ));
-                        }
+                    if let Some(other) = resource_fields.get(&resource_field.binding) {
+                        errors.push(syn::Error::new(
+                            resource_field.span,
+                            format!(
+                                "cannot declare the same binding index as field `{}`",
+                                other.name
+                            ),
+                        ));
                     }
 
                     max_binding = max(max_binding, resource_field.binding);
@@ -36,8 +36,9 @@ pub fn expand_derive_resources(input: &DeriveInput) -> Result<TokenStream, Strin
             };
         }
 
-        let mut bindings = Vec::with_capacity(max_binding as usize);
-        let mut entries = Vec::with_capacity(max_binding as usize);
+        resource_fields.sort_keys();
+
+        let mut bindings = Vec::new();
 
         for i in 0..=max_binding {
             let tokens = if let Some(field) = resource_fields.get(&i) {
@@ -78,6 +79,8 @@ pub fn expand_derive_resources(input: &DeriveInput) -> Result<TokenStream, Strin
             bindings.push(tokens);
         }
 
+        let mut entries = Vec::new();
+
         for (binding, field) in resource_fields.iter() {
             let ty = &field.ty;
             let field_name = field
@@ -97,15 +100,15 @@ pub fn expand_derive_resources(input: &DeriveInput) -> Result<TokenStream, Strin
             entries.push(tokens);
         }
 
-        let iter_len = max_binding + 1;
         let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+        let len = entries.len();
 
         let impl_block = quote! {
             #[automatically_derived]
             unsafe impl #impl_generics #mod_path::Resources for #struct_name #ty_generics #where_clause {
                 type Layout = (#(#bindings,)*);
 
-                type ToEntries<'__a> = [#mod_path::BindGroupEntry<'__a>; #iter_len] where Self: '__a;
+                type ToEntries<'__a> = [#mod_path::BindGroupEntry<'__a>; #len] where Self: '__a;
 
                 fn to_entries<'__a>(&'__a self) -> Self::ToEntries<'__a> {
                     [#(#entries,)*]
@@ -113,7 +116,9 @@ pub fn expand_derive_resources(input: &DeriveInput) -> Result<TokenStream, Strin
             }
         };
 
-        let generated = quote! {
+        let errors = errors.iter().map(|e| e.to_compile_error());
+
+        quote! {
             #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
             const _: () = {
                 #[allow(unknown_lints)]
@@ -121,12 +126,16 @@ pub fn expand_derive_resources(input: &DeriveInput) -> Result<TokenStream, Strin
                 #[allow(rust_2018_idioms)]
 
                 #impl_block
-            };
-        };
 
-        log.compile().map(|_| generated)
+                #(#errors;)*
+            };
+        }
+        .into()
     } else {
-        Err("`Resources` can only be derived for a struct.".into())
+        quote! {
+            compile_error!("`Resources` can only be derived for a struct");
+        }
+        .into()
     }
 }
 
@@ -136,37 +145,22 @@ enum ResourcesField {
 }
 
 impl ResourcesField {
-    pub fn from_ast(ast: &Field, position: usize, log: &mut ErrorLog) -> Self {
+    pub fn from_ast(ast: &Field, position: usize, errors: &mut Vec<syn::Error>) -> Self {
         let field_name = ast
             .ident
             .clone()
             .map(|i| i.to_string())
             .unwrap_or(position.to_string());
 
-        let mut iter = ast.attrs.iter().filter(|a| is_resource_attribute(a));
+        let mut resource_attributes = ast.attrs.iter().filter(|a| a.path().is_ident("resource"));
 
-        if let Some(attr) = iter.next() {
-            if iter.next().is_some() {
-                log.log_error(format!(
-                    "Cannot add more than 1 #[resource] attribute to field `{}`.",
-                    field_name
+        if let Some(attr) = resource_attributes.next() {
+            while let Some(attr) = resource_attributes.next() {
+                errors.push(syn::Error::new(
+                    attr.span(),
+                    "attribute may only be declared once per field",
                 ));
-
-                return ResourcesField::Excluded;
             }
-
-            let meta_items: Vec<NestedMeta> = match attr.parse_meta() {
-                Ok(Meta::List(list)) => list.nested.iter().cloned().collect(),
-                Ok(Meta::Path(path)) if path.is_ident("resource") => Vec::new(),
-                _ => {
-                    log.log_error(format!(
-                        "Malformed #[resource] attribute for field `{}`.",
-                        field_name
-                    ));
-
-                    Vec::new()
-                }
-            };
 
             let mut binding = None;
             let mut visibility = Visibility {
@@ -175,112 +169,31 @@ impl ResourcesField {
                 compute: false,
             };
 
-            for meta_item in meta_items.into_iter() {
-                match meta_item {
-                    NestedMeta::Meta(Meta::NameValue(m)) if m.path.is_ident("binding") => {
-                        if let Lit::Int(i) = &m.lit {
-                            if let Ok(value) = i.base10_parse::<usize>() {
-                                binding = Some(value);
-                            } else {
-                                log.log_error(format!(
-                                    "Malformed #[resource] attribute for field `{}`: \
-                                    expected `binding` to be representable as a u32.",
-                                    field_name
-                                ));
-                            }
-                        } else {
-                            log.log_error(format!(
-                                "Malformed #[resource] attribute for field `{}`: \
-                                 expected `binding` to be a positive integer.",
-                                field_name
-                            ));
-                        };
-                    }
-                    NestedMeta::Meta(Meta::NameValue(ref m)) if m.path.is_ident("visibility") => {
-                        if let Lit::Str(n) = &m.lit {
-                            for segment in n.value().split('|') {
-                                match segment.trim() {
-                                    "VERTEX" => {
-                                        if visibility.vertex {
-                                            log.log_error(format!(
-                                                "Malformed #[resource] attribute for field `{}`: \
-                                            `visibility` contains `VERTEX` twice.",
-                                                field_name
-                                            ));
-
-                                            break;
-                                        } else {
-                                            visibility.vertex = true;
-                                        }
-                                    }
-                                    "FRAGMENT" => {
-                                        if visibility.fragment {
-                                            log.log_error(format!(
-                                                "Malformed #[resource] attribute for field `{}`: \
-                                                `visibility` contains `FRAGMENT` twice.",
-                                                field_name
-                                            ));
-
-                                            break;
-                                        } else {
-                                            visibility.fragment = true;
-                                        }
-                                    }
-                                    "COMPUTE" => {
-                                        if visibility.compute {
-                                            log.log_error(format!(
-                                                "Malformed #[resource] attribute for field `{}`: \
-                                                `visibility` contains `COMPUTE` twice.",
-                                                field_name
-                                            ));
-
-                                            break;
-                                        } else {
-                                            visibility.compute = true;
-                                        }
-                                    }
-                                    unknown => {
-                                        log.log_error(format!(
-                                            "Malformed #[resource] attribute for field `{}`: \
-                                             unknown `visiblity` token `{}`; must be `VERTEX`, \
-                                             `FRAGMENT` or `COMPUTE, or a combination separated by \
-                                             pipes (e.g. `VERTEX|FRAGMENT`).",
-                                            field_name, unknown
-                                        ));
-
-                                        break;
-                                    }
+            match attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated) {
+                Ok(nested) => {
+                    for meta in nested {
+                        if meta.path().is_ident("binding") {
+                            match parse_binding(meta) {
+                                Ok(v) => {
+                                    binding = Some(v);
                                 }
+                                Err(err) => errors.push(err),
                             }
-                        } else {
-                            log.log_error(format!(
-                                "Malformed #[resource] attribute for field `{}`: \
-                                 expected `visibility` to be a string.",
-                                field_name
-                            ));
-                        };
+                        } else if meta.path().is_ident("visibility") {
+                            match parse_visibility(meta) {
+                                Ok(v) => {
+                                    visibility = v;
+                                }
+                                Err(err) => errors.push(err),
+                            }
+                        }
                     }
-                    _ => log.log_error(format!(
-                        "Malformed #[resource] attribute for field `{}`: unrecognized \
-                         option `{}`.",
-                        field_name,
-                        meta_item.into_token_stream()
-                    )),
                 }
+                Err(err) => errors.push(err),
             }
 
-            if binding.is_none() {
-                log.log_error(format!(
-                    "Field `{}` is marked with #[resource], but does not declare a `binding` \
-                     index.",
-                    field_name
-                ));
-            }
-
-            if binding.is_some() {
-                let binding = binding.unwrap();
-
-                ResourcesField::Resource(ResourceField {
+            if let Some(binding) = binding {
+                return ResourcesField::Resource(ResourceField {
                     name: field_name,
                     ident: ast.ident.clone(),
                     ty: ast.ty.clone(),
@@ -288,16 +201,90 @@ impl ResourcesField {
                     binding,
                     visibility,
                     span: ast.span(),
-                })
+                });
             } else {
-                ResourcesField::Excluded
+                errors.push(syn::Error::new(
+                    attr.span(),
+                    "resource must declare a `binding` argument",
+                ));
             }
-        } else {
-            ResourcesField::Excluded
         }
+
+        ResourcesField::Excluded
     }
 }
 
+fn parse_binding(meta: Meta) -> syn::Result<u32> {
+    let meta = meta.require_name_value()?;
+
+    if let Expr::Lit(expr) = &meta.value
+        && let Lit::Int(lit) = &expr.lit
+    {
+        lit.base10_parse::<u32>()
+    } else {
+        Err(syn::Error::new(
+            meta.value.span(),
+            "expected an integer literal",
+        ))
+    }
+}
+
+fn parse_visibility(meta: Meta) -> syn::Result<Visibility> {
+    let meta = meta.require_name_value()?;
+
+    if let Expr::Lit(expr) = &meta.value
+        && let Lit::Str(lit) = &expr.lit
+    {
+        let value = lit.value();
+
+        let mut visibility = Visibility::default();
+
+        for segment in value.split("|") {
+            match segment.trim() {
+                "VERTEX" => {
+                    if visibility.vertex {
+                        return Err(syn::Error::new(lit.span(), "contains `VERTEX` twice"));
+                    } else {
+                        visibility.vertex = true;
+                    }
+                }
+                "FRAGMENT" => {
+                    if visibility.fragment {
+                        return Err(syn::Error::new(lit.span(), "contains `FRAGMENT` twice"));
+                    } else {
+                        visibility.fragment = true;
+                    }
+                }
+                "COMPUTE" => {
+                    if visibility.compute {
+                        return Err(syn::Error::new(lit.span(), "contains `COMPUTE` twice"));
+                    } else {
+                        visibility.compute = true;
+                    }
+                }
+                v => {
+                    return Err(syn::Error::new(
+                        lit.span(),
+                        format!(
+                            "unknown value `{}`; expected one or more of VERTEX, FRAGMENT, or \
+                            COMPUTE separated by |",
+                            v
+                        ),
+                    ));
+                }
+            }
+        }
+
+        Ok(visibility)
+    } else {
+        Err(syn::Error::new(
+            meta.value.span(),
+            "expected a string literal",
+        ))
+    }
+}
+
+#[derive(Clone, Copy, Default)]
 struct Visibility {
     vertex: bool,
     fragment: bool,
@@ -309,11 +296,7 @@ struct ResourceField {
     ident: Option<Ident>,
     ty: Type,
     position: usize,
-    binding: usize,
+    binding: u32,
     visibility: Visibility,
     span: Span,
-}
-
-fn is_resource_attribute(attribute: &Attribute) -> bool {
-    attribute.path.segments[0].ident == "resource"
 }

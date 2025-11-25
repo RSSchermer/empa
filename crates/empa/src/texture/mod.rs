@@ -96,10 +96,10 @@ pub struct ImageDataByteLayout {
 }
 
 impl ImageDataByteLayout {
-    pub(crate) fn to_driver(&self) -> driver::ImageDataLayout {
+    pub(crate) fn to_driver(&self) -> driver::TexelCopyBufferLayout {
         let bytes_per_row = self.blocks_per_row * self.bytes_per_block;
 
-        driver::ImageDataLayout {
+        driver::TexelCopyBufferLayout {
             offset: 0,
             bytes_per_row,
             rows_per_image: self.rows_per_image,

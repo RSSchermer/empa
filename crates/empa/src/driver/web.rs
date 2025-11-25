@@ -24,15 +24,15 @@ use crate::driver::{
     ColorTargetState, CommandEncoder, ComputePassEncoder, ComputePipelineDescriptor,
     CopyBufferToBuffer, CopyBufferToTexture, CopyTextureToBuffer, CopyTextureToTexture,
     DepthStencilOperations, DepthStencilState, Device, ExecuteRenderBundlesEncoder, FragmentState,
-    ImageCopyBuffer, ImageCopyTexture, ImageDataLayout, MapMode, MultisampleState,
-    PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, ProgrammablePassEncoder,
-    QuerySetDescriptor, QueryType, Queue, RenderBundleEncoder, RenderBundleEncoderDescriptor,
-    RenderEncoder, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
-    RenderPassDescriptor, RenderPassEncoder, RenderPipelineDescriptor, ResolveQuerySet,
-    SamplerBindingType, SamplerDescriptor, SetIndexBuffer, SetVertexBuffer, StencilFaceState,
-    StencilOperation, StorageTextureAccess, Texture, TextureAspect, TextureDescriptor,
-    TextureDimensions, TextureSampleType, TextureViewDescriptor, TextureViewDimension, VertexState,
-    WriteBufferOperation, WriteTextureOperation,
+    MapMode, MultisampleState, PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology,
+    ProgrammablePassEncoder, QuerySetDescriptor, QueryType, Queue, RenderBundleEncoder,
+    RenderBundleEncoderDescriptor, RenderEncoder, RenderPassColorAttachment,
+    RenderPassDepthStencilAttachment, RenderPassDescriptor, RenderPassEncoder,
+    RenderPipelineDescriptor, ResolveQuerySet, SamplerBindingType, SamplerDescriptor,
+    SetIndexBuffer, SetVertexBuffer, StencilFaceState, StencilOperation, StorageTextureAccess,
+    TexelCopyBufferInfo, TexelCopyBufferLayout, TexelCopyTextureInfo, Texture, TextureAspect,
+    TextureDescriptor, TextureDimensions, TextureSampleType, TextureViewDescriptor,
+    TextureViewDimension, VertexState, WriteBufferOperation, WriteTextureOperation,
 };
 use crate::render_pipeline::{
     BlendComponent, BlendFactor, BlendState, CullMode, FrontFace, IndexFormat, VertexFormat,
@@ -101,12 +101,12 @@ impl Adapter<Driver> for AdapterHandle {
             required_limits,
         } = descriptor;
 
-        let mut desc = web_sys::GpuDeviceDescriptor::new();
+        let desc = web_sys::GpuDeviceDescriptor::new();
 
         let required_features = (*required_features).into();
 
         if required_features != FlagSet::from(Feature::None) {
-            desc.required_features(features_to_web_sys(&required_features).as_ref());
+            desc.set_required_features(features_to_web_sys(&required_features).as_ref());
         }
 
         if required_limits != &Limits::default() {
@@ -185,13 +185,13 @@ impl Device<Driver> for DeviceHandle {
             mapped_at_creation,
         } = *descriptor;
 
-        let mut desc = web_sys::GpuBufferDescriptor::new(size as f64, usage_flags.bits());
+        let desc = web_sys::GpuBufferDescriptor::new(size as f64, usage_flags.bits());
 
         if mapped_at_creation {
-            desc.mapped_at_creation(true);
+            desc.set_mapped_at_creation(true);
         }
 
-        let inner = self.inner.create_buffer(&desc);
+        let inner = self.inner.create_buffer(&desc).unwrap_throw();
 
         BufferHandle { inner }
     }
@@ -216,15 +216,14 @@ impl Device<Driver> for DeviceHandle {
             .map(|f| JsValue::from_str(texture_format_to_str(f)))
             .collect::<js_sys::Array>();
 
-        let mut desc =
-            web_sys::GpuTextureDescriptor::new(format, size.as_ref(), usage_flags.bits());
+        let desc = web_sys::GpuTextureDescriptor::new(format, size.as_ref(), usage_flags.bits());
 
-        desc.dimension(dimensions);
-        desc.mip_level_count(mipmap_levels);
-        desc.sample_count(sample_count);
-        desc.view_formats(view_formats.as_ref());
+        desc.set_dimension(dimensions);
+        desc.set_mip_level_count(mipmap_levels);
+        desc.set_sample_count(sample_count);
+        desc.set_view_formats(view_formats.as_ref());
 
-        let inner = self.inner.create_texture(&desc);
+        let inner = self.inner.create_texture(&desc).unwrap_throw();
 
         TextureHandle { inner }
     }
@@ -242,20 +241,20 @@ impl Device<Driver> for DeviceHandle {
             compare,
         } = descriptor;
 
-        let mut desc = web_sys::GpuSamplerDescriptor::new();
+        let desc = web_sys::GpuSamplerDescriptor::new();
 
-        desc.address_mode_u(address_mode_to_web_sys(address_mode_u));
-        desc.address_mode_v(address_mode_to_web_sys(address_mode_v));
-        desc.address_mode_w(address_mode_to_web_sys(address_mode_w));
-        desc.lod_min_clamp(*lod_clamp.start());
-        desc.lod_max_clamp(*lod_clamp.end());
-        desc.min_filter(filter_mode_to_web_sys(minification_filter));
-        desc.mag_filter(filter_mode_to_web_sys(magnification_filter));
-        desc.mipmap_filter(filter_mode_to_web_sys_mipmap(mipmap_filter));
-        desc.max_anisotropy(*max_anisotropy);
+        desc.set_address_mode_u(address_mode_to_web_sys(address_mode_u));
+        desc.set_address_mode_v(address_mode_to_web_sys(address_mode_v));
+        desc.set_address_mode_w(address_mode_to_web_sys(address_mode_w));
+        desc.set_lod_min_clamp(*lod_clamp.start());
+        desc.set_lod_max_clamp(*lod_clamp.end());
+        desc.set_min_filter(filter_mode_to_web_sys(minification_filter));
+        desc.set_mag_filter(filter_mode_to_web_sys(magnification_filter));
+        desc.set_mipmap_filter(filter_mode_to_web_sys_mipmap(mipmap_filter));
+        desc.set_max_anisotropy(*max_anisotropy);
 
         if let Some(compare) = compare {
-            desc.compare(compare_function_to_web_sys(compare));
+            desc.set_compare(compare_function_to_web_sys(compare));
         }
 
         let inner = self.inner.create_sampler_with_descriptor(&desc);
@@ -278,7 +277,7 @@ impl Device<Driver> for DeviceHandle {
 
         let desc = web_sys::GpuBindGroupLayoutDescriptor::new(entries.as_ref());
 
-        let inner = self.inner.create_bind_group_layout(&desc);
+        let inner = self.inner.create_bind_group_layout(&desc).unwrap_throw();
 
         BindGroupLayoutHandle { inner }
     }
@@ -352,7 +351,7 @@ impl Device<Driver> for DeviceHandle {
 
         let desc =
             web_sys::GpuQuerySetDescriptor::new(*len as u32, query_type_to_web_sys(query_type));
-        let inner = self.inner.create_query_set(&desc);
+        let inner = self.inner.create_query_set(&desc).unwrap_throw();
 
         QuerySetHandle { inner }
     }
@@ -368,7 +367,7 @@ impl Device<Driver> for DeviceHandle {
         &self,
         descriptor: &ComputePipelineDescriptor<Driver>,
     ) -> ComputePipelineHandle {
-        let desc = compute_pipeline_descriptor_to_web_sys(descriptor);
+        let desc = compute_pipeline_descriptor_to_web_sys(&descriptor);
         let inner = self.inner.create_compute_pipeline(&desc);
 
         ComputePipelineHandle { inner }
@@ -378,7 +377,7 @@ impl Device<Driver> for DeviceHandle {
         &self,
         descriptor: &ComputePipelineDescriptor<Driver>,
     ) -> CreateComputePipelineAsync {
-        let desc = compute_pipeline_descriptor_to_web_sys(descriptor);
+        let desc = compute_pipeline_descriptor_to_web_sys(&descriptor);
         let promise = self.inner.create_compute_pipeline_async(&desc);
 
         CreateComputePipelineAsync {
@@ -390,8 +389,8 @@ impl Device<Driver> for DeviceHandle {
         &self,
         descriptor: &RenderPipelineDescriptor<Driver>,
     ) -> RenderPipelineHandle {
-        let desc = render_pipeline_descriptor_to_web_sys(descriptor);
-        let inner = self.inner.create_render_pipeline(&desc);
+        let desc = render_pipeline_descriptor_to_web_sys(&descriptor);
+        let inner = self.inner.create_render_pipeline(&desc).unwrap_throw();
 
         RenderPipelineHandle { inner }
     }
@@ -400,7 +399,7 @@ impl Device<Driver> for DeviceHandle {
         &self,
         descriptor: &RenderPipelineDescriptor<Driver>,
     ) -> CreateRenderPipelineAsync {
-        let desc = render_pipeline_descriptor_to_web_sys(descriptor);
+        let desc = render_pipeline_descriptor_to_web_sys(&descriptor);
         let promise = self.inner.create_render_pipeline_async(&desc);
 
         CreateRenderPipelineAsync {
@@ -431,17 +430,20 @@ impl Device<Driver> for DeviceHandle {
             .map(|f| JsValue::from_str(texture_format_to_str(f)))
             .collect();
 
-        let mut desc = web_sys::GpuRenderBundleEncoderDescriptor::new(&color_formats);
+        let desc = web_sys::GpuRenderBundleEncoderDescriptor::new(&color_formats);
 
         if let Some(depth_stencil_format) = depth_stencil_format {
-            desc.depth_stencil_format(texture_format_to_web_sys(depth_stencil_format));
+            desc.set_depth_stencil_format(texture_format_to_web_sys(depth_stencil_format));
         }
 
-        desc.depth_read_only(*depth_read_only);
-        desc.stencil_read_only(*stencil_read_only);
-        desc.sample_count(*sample_count);
+        desc.set_depth_read_only(*depth_read_only);
+        desc.set_stencil_read_only(*stencil_read_only);
+        desc.set_sample_count(*sample_count);
 
-        let inner = self.inner.create_render_bundle_encoder(&desc);
+        let inner = self
+            .inner
+            .create_render_bundle_encoder(&desc)
+            .unwrap_throw();
 
         RenderBundleEncoderHandle { inner }
     }
@@ -535,11 +537,11 @@ impl Buffer<Driver> for BufferHandle {
     fn mapped<'a, E>(&'a self, offset_in_bytes: usize, size_in_elements: usize) -> Mapped<E> {
         let size_in_bytes = (size_in_elements * mem::size_of::<E>()) as u32;
 
-        let mapped_bytes = Uint8Array::new(
-            &self
-                .inner
-                .get_mapped_range_with_u32_and_u32(offset_in_bytes as u32, size_in_bytes),
-        );
+        let array_buffer = self
+            .inner
+            .get_mapped_range_with_u32_and_u32(offset_in_bytes as u32, size_in_bytes)
+            .unwrap_throw();
+        let mapped_bytes = Uint8Array::new(&array_buffer);
         let mut buffered = Box::<[E]>::new_uninit_slice(size_in_elements);
         let ptr = buffered.as_mut_ptr() as *mut ();
 
@@ -563,11 +565,11 @@ impl Buffer<Driver> for BufferHandle {
     ) -> MappedMut<E> {
         let size_in_bytes = (size_in_elements * mem::size_of::<E>()) as u32;
 
-        let mapped_bytes = Uint8Array::new(
-            &self
-                .inner
-                .get_mapped_range_with_u32_and_u32(offset_in_bytes as u32, size_in_bytes),
-        );
+        let array_buffer = self
+            .inner
+            .get_mapped_range_with_u32_and_u32(offset_in_bytes as u32, size_in_bytes)
+            .unwrap_throw();
+        let mapped_bytes = Uint8Array::new(&array_buffer);
         let mut buffered = Box::<[E]>::new_uninit_slice(size_in_elements);
         let ptr = buffered.as_mut_ptr() as *mut ();
 
@@ -592,10 +594,10 @@ impl Buffer<Driver> for BufferHandle {
     }
 
     fn binding(&self, offset: usize, size: usize) -> BufferBinding {
-        let mut inner = web_sys::GpuBufferBinding::new(&self.inner);
+        let inner = web_sys::GpuBufferBinding::new(&self.inner);
 
-        inner.offset(offset as f64);
-        inner.size(size as f64);
+        inner.set_offset(offset as f64);
+        inner.set_size(size as f64);
 
         BufferBinding { inner }
     }
@@ -622,17 +624,17 @@ impl Texture<Driver> for TextureHandle {
             layers,
         } = descriptor;
 
-        let mut desc = web_sys::GpuTextureViewDescriptor::new();
+        let desc = web_sys::GpuTextureViewDescriptor::new();
 
-        desc.format(texture_format_to_web_sys(format));
-        desc.dimension(texture_view_dimension_to_web_sys(dimension));
-        desc.aspect(texture_aspect_to_web_sys(aspect));
-        desc.base_mip_level(mip_levels.start);
-        desc.mip_level_count(mip_levels.len() as u32);
-        desc.base_array_layer(layers.start);
-        desc.array_layer_count(layers.len() as u32);
+        desc.set_format(texture_format_to_web_sys(format));
+        desc.set_dimension(texture_view_dimension_to_web_sys(dimension));
+        desc.set_aspect(texture_aspect_to_web_sys(aspect));
+        desc.set_base_mip_level(mip_levels.start);
+        desc.set_mip_level_count(mip_levels.len() as u32);
+        desc.set_base_array_layer(layers.start);
+        desc.set_array_layer_count(layers.len() as u32);
 
-        let inner = self.inner.create_view_with_descriptor(&desc);
+        let inner = self.inner.create_view_with_descriptor(&desc).unwrap_throw();
 
         TextureView { inner }
     }
@@ -700,7 +702,8 @@ impl Queue<Driver> for QueueHandle {
         } = operation;
 
         self.inner
-            .write_buffer_with_u32_and_u8_array(&buffer_handle.inner, offset as u32, data);
+            .write_buffer_with_u32_and_u8_slice(&buffer_handle.inner, offset as u32, data)
+            .unwrap_throw();
     }
 
     fn write_texture(&self, operation: WriteTextureOperation<Driver>) {
@@ -712,12 +715,13 @@ impl Queue<Driver> for QueueHandle {
         } = operation;
 
         self.inner
-            .write_texture_with_u8_array_and_gpu_extent_3d_dict(
-                &image_copy_texture_to_web_sys(image_copy_texture),
+            .write_texture_with_u8_slice_and_gpu_extent_3d_dict(
+                &texel_copy_texture_info_to_web_sys(image_copy_texture),
                 data,
-                &image_data_layout_to_web_sys(&image_data_layout),
+                &texel_copy_buffer_layout_to_web_sys(&image_data_layout),
                 &size_3d_to_web_sys(extent),
-            );
+            )
+            .unwrap_throw();
     }
 }
 
@@ -782,13 +786,15 @@ impl CommandEncoder<Driver> for CommandEncoderHandle {
             size,
         } = op;
 
-        self.inner.copy_buffer_to_buffer_with_u32_and_u32_and_u32(
-            &source.inner,
-            source_offset as u32,
-            &destination.inner,
-            destination_offset as u32,
-            size as u32,
-        );
+        self.inner
+            .copy_buffer_to_buffer_with_u32_and_u32_and_u32(
+                &source.inner,
+                source_offset as u32,
+                &destination.inner,
+                destination_offset as u32,
+                size as u32,
+            )
+            .unwrap_throw();
     }
 
     fn copy_buffer_to_texture(&mut self, op: CopyBufferToTexture<Driver>) {
@@ -798,11 +804,13 @@ impl CommandEncoder<Driver> for CommandEncoderHandle {
             copy_size,
         } = op;
 
-        self.inner.copy_buffer_to_texture_with_gpu_extent_3d_dict(
-            &image_copy_buffer_to_web_sys(source),
-            &image_copy_texture_to_web_sys(destination),
-            &size_3d_to_web_sys(copy_size),
-        );
+        self.inner
+            .copy_buffer_to_texture_with_gpu_extent_3d_dict(
+                &texel_copy_buffer_info_to_web_sys(source),
+                &texel_copy_texture_info_to_web_sys(destination),
+                &size_3d_to_web_sys(copy_size),
+            )
+            .unwrap_throw();
     }
 
     fn copy_texture_to_buffer(&mut self, op: CopyTextureToBuffer<Driver>) {
@@ -812,11 +820,13 @@ impl CommandEncoder<Driver> for CommandEncoderHandle {
             copy_size,
         } = op;
 
-        self.inner.copy_texture_to_buffer_with_gpu_extent_3d_dict(
-            &image_copy_texture_to_web_sys(source),
-            &image_copy_buffer_to_web_sys(destination),
-            &size_3d_to_web_sys(copy_size),
-        );
+        self.inner
+            .copy_texture_to_buffer_with_gpu_extent_3d_dict(
+                &texel_copy_texture_info_to_web_sys(source),
+                &texel_copy_buffer_info_to_web_sys(destination),
+                &size_3d_to_web_sys(copy_size),
+            )
+            .unwrap_throw();
     }
 
     fn copy_texture_to_texture(&mut self, op: CopyTextureToTexture<Driver>) {
@@ -826,11 +836,13 @@ impl CommandEncoder<Driver> for CommandEncoderHandle {
             copy_size,
         } = op;
 
-        self.inner.copy_texture_to_texture_with_gpu_extent_3d_dict(
-            &image_copy_texture_to_web_sys(source),
-            &image_copy_texture_to_web_sys(destination),
-            &size_3d_to_web_sys(copy_size),
-        );
+        self.inner
+            .copy_texture_to_texture_with_gpu_extent_3d_dict(
+                &texel_copy_texture_info_to_web_sys(source),
+                &texel_copy_texture_info_to_web_sys(destination),
+                &size_3d_to_web_sys(copy_size),
+            )
+            .unwrap_throw();
     }
 
     fn clear_buffer(&mut self, op: ClearBuffer<Driver>) {
@@ -867,19 +879,19 @@ impl CommandEncoder<Driver> for CommandEncoderHandle {
             }
         }
 
-        let mut desc = web_sys::GpuRenderPassDescriptor::new(color_attachments.as_ref());
+        let desc = web_sys::GpuRenderPassDescriptor::new(color_attachments.as_ref());
 
         if let Some(depth_stencil_attachment) = &descriptor.depth_stencil_attachment {
-            desc.depth_stencil_attachment(&render_pass_depth_stencil_attachment_to_web_sys(
+            desc.set_depth_stencil_attachment(&render_pass_depth_stencil_attachment_to_web_sys(
                 depth_stencil_attachment,
             ));
         }
 
         if let Some(query_set) = descriptor.occlusion_query_set {
-            desc.occlusion_query_set(&query_set.inner);
+            desc.set_occlusion_query_set(&query_set.inner);
         }
 
-        let inner = self.inner.begin_render_pass(&desc);
+        let inner = self.inner.begin_render_pass(&desc).unwrap_throw();
 
         RenderPassEncoderHandle { inner }
     }
@@ -1088,7 +1100,9 @@ impl RenderPassEncoder<Driver> for RenderPassEncoderHandle {
 
         let color = web_sys::GpuColorDict::new(r as f64, g as f64, b as f64, a as f64);
 
-        self.inner.set_blend_constant_with_gpu_color_dict(&color);
+        self.inner
+            .set_blend_constant_with_gpu_color_dict(&color)
+            .unwrap_throw();
     }
 
     fn set_stencil_reference(&mut self, stencil_reference: u32) {
@@ -1103,7 +1117,7 @@ impl RenderPassEncoder<Driver> for RenderPassEncoderHandle {
         self.inner.end_occlusion_query();
     }
 
-    fn execute_bundles(&mut self) -> ExecuteRenderBundlesEncoderHandle {
+    fn execute_bundles(&mut self) -> ExecuteRenderBundlesEncoderHandle<'_> {
         ExecuteRenderBundlesEncoderHandle {
             inner: &self.inner,
             bundles: js_sys::Array::new(),
@@ -1285,51 +1299,51 @@ pub fn filter_mode_to_web_sys_mipmap(filter_mode: &FilterMode) -> web_sys::GpuMi
 pub fn bind_group_layout_entry_to_web_sys(
     bind_group_layout_entry: &BindGroupLayoutEntry,
 ) -> web_sys::GpuBindGroupLayoutEntry {
-    let mut entry = web_sys::GpuBindGroupLayoutEntry::new(
+    let entry = web_sys::GpuBindGroupLayoutEntry::new(
         bind_group_layout_entry.binding,
         bind_group_layout_entry.visibility.bits(),
     );
 
     match &bind_group_layout_entry.binding_type {
         BindingType::Buffer(binding_type) => {
-            let mut layout = web_sys::GpuBufferBindingLayout::new();
+            let layout = web_sys::GpuBufferBindingLayout::new();
 
-            layout.type_(buffer_binding_type_to_web_sys(binding_type));
+            layout.set_type(buffer_binding_type_to_web_sys(binding_type));
 
-            entry.buffer(&layout);
+            entry.set_buffer(&layout);
         }
         BindingType::Sampler(binding_type) => {
-            let mut layout = web_sys::GpuSamplerBindingLayout::new();
+            let layout = web_sys::GpuSamplerBindingLayout::new();
 
-            layout.type_(sampler_binding_type_to_web_sys(binding_type));
+            layout.set_type(sampler_binding_type_to_web_sys(binding_type));
 
-            entry.sampler(&layout);
+            entry.set_sampler(&layout);
         }
         BindingType::Texture {
             sample_type,
             dimension,
             multisampled,
         } => {
-            let mut layout = web_sys::GpuTextureBindingLayout::new();
+            let layout = web_sys::GpuTextureBindingLayout::new();
 
-            layout.sample_type(texture_sample_type_to_web_sys(sample_type));
-            layout.view_dimension(texture_view_dimension_to_web_sys(dimension));
-            layout.multisampled(*multisampled);
+            layout.set_sample_type(texture_sample_type_to_web_sys(sample_type));
+            layout.set_view_dimension(texture_view_dimension_to_web_sys(dimension));
+            layout.set_multisampled(*multisampled);
 
-            entry.texture(&layout);
+            entry.set_texture(&layout);
         }
         BindingType::StorageTexture {
             access,
             format,
             dimension,
         } => {
-            let mut layout =
+            let layout =
                 web_sys::GpuStorageTextureBindingLayout::new(texture_format_to_web_sys(format));
 
-            layout.access(storage_texture_access_to_web_sys(access));
-            layout.view_dimension(texture_view_dimension_to_web_sys(dimension));
+            layout.set_access(storage_texture_access_to_web_sys(access));
+            layout.set_view_dimension(texture_view_dimension_to_web_sys(dimension));
 
-            entry.storage_texture(&layout);
+            entry.set_storage_texture(&layout);
         }
     }
 
@@ -1393,57 +1407,56 @@ pub fn compare_function_to_web_sys(
     }
 }
 
-pub fn image_copy_buffer_to_web_sys(
-    image_copy_buffer: ImageCopyBuffer<Driver>,
-) -> web_sys::GpuImageCopyBuffer {
-    let mut copy_buffer = web_sys::GpuImageCopyBuffer::new(&image_copy_buffer.buffer_handle.inner);
+pub fn texel_copy_buffer_info_to_web_sys(
+    info: TexelCopyBufferInfo<Driver>,
+) -> web_sys::GpuTexelCopyBufferInfo {
+    let copy_buffer = web_sys::GpuTexelCopyBufferInfo::new(&info.buffer_handle.inner);
 
-    copy_buffer.offset(image_copy_buffer.offset as f64);
-    copy_buffer.bytes_per_row(image_copy_buffer.bytes_per_block * image_copy_buffer.blocks_per_row);
-    copy_buffer.rows_per_image(image_copy_buffer.rows_per_image);
+    copy_buffer.set_offset(info.offset as f64);
+    copy_buffer.set_bytes_per_row(info.bytes_per_block * info.blocks_per_row);
+    copy_buffer.set_rows_per_image(info.rows_per_image);
 
     copy_buffer
 }
 
-pub fn image_copy_texture_to_web_sys(
-    image_copy_texture: ImageCopyTexture<Driver>,
-) -> web_sys::GpuImageCopyTexture {
-    let mut copy_texture =
-        web_sys::GpuImageCopyTexture::new(&image_copy_texture.texture_handle.inner);
+pub fn texel_copy_texture_info_to_web_sys(
+    info: TexelCopyTextureInfo<Driver>,
+) -> web_sys::GpuTexelCopyTextureInfo {
+    let copy_texture = web_sys::GpuTexelCopyTextureInfo::new(&info.texture_handle.inner);
 
-    copy_texture.aspect(texture_aspect_to_web_sys(&image_copy_texture.aspect));
-    copy_texture.mip_level(image_copy_texture.mip_level);
-    copy_texture.origin(origin_3d_to_web_sys(image_copy_texture.origin).as_ref());
+    copy_texture.set_aspect(texture_aspect_to_web_sys(&info.aspect));
+    copy_texture.set_mip_level(info.mip_level);
+    copy_texture.set_origin(origin_3d_to_web_sys(info.origin).as_ref());
 
     copy_texture
 }
 
-pub fn image_data_layout_to_web_sys(
-    image_data_layout: &ImageDataLayout,
-) -> web_sys::GpuImageDataLayout {
-    let ImageDataLayout {
+pub fn texel_copy_buffer_layout_to_web_sys(
+    texel_copy_buffer_layout: &TexelCopyBufferLayout,
+) -> web_sys::GpuTexelCopyBufferLayout {
+    let TexelCopyBufferLayout {
         offset,
         bytes_per_row,
         rows_per_image,
-    } = *image_data_layout;
+    } = *texel_copy_buffer_layout;
 
-    let mut image_data_layout = web_sys::GpuImageDataLayout::new();
+    let texel_copy_buffer_layout = web_sys::GpuTexelCopyBufferLayout::new();
 
-    image_data_layout.offset(offset as f64);
-    image_data_layout.bytes_per_row(bytes_per_row);
-    image_data_layout.rows_per_image(rows_per_image);
+    texel_copy_buffer_layout.set_offset(offset as f64);
+    texel_copy_buffer_layout.set_bytes_per_row(bytes_per_row);
+    texel_copy_buffer_layout.set_rows_per_image(rows_per_image);
 
-    image_data_layout
+    texel_copy_buffer_layout
 }
 
 pub fn origin_3d_to_web_sys(origin: (u32, u32, u32)) -> web_sys::GpuOrigin3dDict {
     let (x, y, z) = origin;
 
-    let mut origin = web_sys::GpuOrigin3dDict::new();
+    let origin = web_sys::GpuOrigin3dDict::new();
 
-    origin.x(x);
-    origin.y(y);
-    origin.z(z);
+    origin.set_x(x);
+    origin.set_y(y);
+    origin.set_z(z);
 
     origin
 }
@@ -1451,10 +1464,10 @@ pub fn origin_3d_to_web_sys(origin: (u32, u32, u32)) -> web_sys::GpuOrigin3dDict
 pub fn size_3d_to_web_sys(size: (u32, u32, u32)) -> web_sys::GpuExtent3dDict {
     let (width, height, depth_or_layers) = size;
 
-    let mut size = web_sys::GpuExtent3dDict::new(width);
+    let size = web_sys::GpuExtent3dDict::new(width);
 
-    size.height(height);
-    size.depth_or_array_layers(depth_or_layers);
+    size.set_height(height);
+    size.set_depth_or_array_layers(depth_or_layers);
 
     size
 }
@@ -1713,16 +1726,10 @@ pub fn pipeline_constants_to_web_sys(pipeline_constants: &HashMap<String, f64>) 
 pub fn compute_pipeline_descriptor_to_web_sys(
     descriptor: &ComputePipelineDescriptor<Driver>,
 ) -> web_sys::GpuComputePipelineDescriptor {
-    let mut compute_stage = web_sys::GpuProgrammableStage::new(&descriptor.shader_module.inner);
+    let compute_stage = web_sys::GpuProgrammableStage::new(&descriptor.shader_module.inner);
 
-    compute_stage.entry_point(descriptor.entry_point);
-
-    js_sys::Reflect::set(
-        compute_stage.as_ref(),
-        &JsValue::from("constants"),
-        pipeline_constants_to_web_sys(descriptor.constants).as_ref(),
-    )
-    .unwrap_throw();
+    compute_stage.set_entry_point(descriptor.entry_point);
+    compute_stage.set_constants(&pipeline_constants_to_web_sys(&descriptor.constants));
 
     web_sys::GpuComputePipelineDescriptor::new(descriptor.layout.inner.as_ref(), &compute_stage)
 }
@@ -1752,12 +1759,12 @@ pub fn stencil_face_state_to_web_sys(
         pass_op,
     } = stencil_face_state;
 
-    let mut state = web_sys::GpuStencilFaceState::new();
+    let state = web_sys::GpuStencilFaceState::new();
 
-    state.compare(compare_function_to_web_sys(compare));
-    state.depth_fail_op(stencil_operation_to_web_sys(depth_fail_op));
-    state.fail_op(stencil_operation_to_web_sys(fail_op));
-    state.pass_op(stencil_operation_to_web_sys(pass_op));
+    state.set_compare(compare_function_to_web_sys(compare));
+    state.set_depth_fail_op(stencil_operation_to_web_sys(depth_fail_op));
+    state.set_fail_op(stencil_operation_to_web_sys(fail_op));
+    state.set_pass_op(stencil_operation_to_web_sys(pass_op));
 
     state
 }
@@ -1778,17 +1785,17 @@ pub fn depth_stencil_state_to_web_sys(
         depth_bias_clamp,
     } = depth_stencil_state;
 
-    let mut state = web_sys::GpuDepthStencilState::new(texture_format_to_web_sys(format));
+    let state = web_sys::GpuDepthStencilState::new(texture_format_to_web_sys(format));
 
-    state.depth_bias(*depth_bias);
-    state.depth_bias_clamp(*depth_bias_clamp);
-    state.depth_bias_slope_scale(*depth_bias_slope_scale);
-    state.depth_compare(compare_function_to_web_sys(depth_compare));
-    state.depth_write_enabled(*depth_write_enabled);
-    state.stencil_back(&stencil_face_state_to_web_sys(stencil_back));
-    state.stencil_front(&stencil_face_state_to_web_sys(stencil_front));
-    state.stencil_read_mask(*stencil_read_mask);
-    state.stencil_write_mask(*stencil_write_mask);
+    state.set_depth_bias(*depth_bias);
+    state.set_depth_bias_clamp(*depth_bias_clamp);
+    state.set_depth_bias_slope_scale(*depth_bias_slope_scale);
+    state.set_depth_compare(compare_function_to_web_sys(depth_compare));
+    state.set_depth_write_enabled(*depth_write_enabled);
+    state.set_stencil_back(&stencil_face_state_to_web_sys(stencil_back));
+    state.set_stencil_front(&stencil_face_state_to_web_sys(stencil_front));
+    state.set_stencil_read_mask(*stencil_read_mask);
+    state.set_stencil_write_mask(*stencil_write_mask);
 
     state
 }
@@ -1802,11 +1809,11 @@ pub fn multisample_state_to_web_sys(
         alpha_to_coverage_enabled,
     } = *multisample_state;
 
-    let mut state = web_sys::GpuMultisampleState::new();
+    let state = web_sys::GpuMultisampleState::new();
 
-    state.alpha_to_coverage_enabled(alpha_to_coverage_enabled);
-    state.count(count);
-    state.mask(mask);
+    state.set_alpha_to_coverage_enabled(alpha_to_coverage_enabled);
+    state.set_count(count);
+    state.set_mask(mask);
 
     state
 }
@@ -1852,17 +1859,17 @@ pub fn primitive_state_to_web_sys(primitive_state: &PrimitiveState) -> web_sys::
         cull_mode,
     } = primitive_state;
 
-    let mut state = web_sys::GpuPrimitiveState::new();
+    let state = web_sys::GpuPrimitiveState::new();
 
-    state.topology(primitive_topology_to_web_sys(topology));
-    state.front_face(front_face_to_web_sys(front_face));
+    state.set_topology(primitive_topology_to_web_sys(topology));
+    state.set_front_face(front_face_to_web_sys(front_face));
 
     if let Some(cull_mode) = cull_mode {
-        state.cull_mode(cull_mode_to_web_sys(cull_mode));
+        state.set_cull_mode(cull_mode_to_web_sys(cull_mode));
     }
 
     if let Some(strip_index_format) = strip_index_format {
-        state.strip_index_format(index_format_to_web_sys(strip_index_format));
+        state.set_strip_index_format(index_format_to_web_sys(strip_index_format));
     }
 
     state
@@ -1922,42 +1929,42 @@ pub fn blend_factor_to_web_sys(blend_factor: &BlendFactor) -> web_sys::GpuBlendF
 }
 
 pub fn blend_component_to_web_sys(blend_component: &BlendComponent) -> web_sys::GpuBlendComponent {
-    let mut blend = web_sys::GpuBlendComponent::new();
+    let blend = web_sys::GpuBlendComponent::new();
 
     match blend_component {
         BlendComponent::Add {
             src_factor,
             dst_factor,
         } => {
-            blend.operation(web_sys::GpuBlendOperation::Add);
-            blend.src_factor(blend_factor_to_web_sys(src_factor));
-            blend.dst_factor(blend_factor_to_web_sys(dst_factor));
+            blend.set_operation(web_sys::GpuBlendOperation::Add);
+            blend.set_src_factor(blend_factor_to_web_sys(src_factor));
+            blend.set_dst_factor(blend_factor_to_web_sys(dst_factor));
         }
         BlendComponent::Subtract {
             src_factor,
             dst_factor,
         } => {
-            blend.operation(web_sys::GpuBlendOperation::Subtract);
-            blend.src_factor(blend_factor_to_web_sys(src_factor));
-            blend.dst_factor(blend_factor_to_web_sys(dst_factor));
+            blend.set_operation(web_sys::GpuBlendOperation::Subtract);
+            blend.set_src_factor(blend_factor_to_web_sys(src_factor));
+            blend.set_dst_factor(blend_factor_to_web_sys(dst_factor));
         }
         BlendComponent::ReverseSubtract {
             src_factor,
             dst_factor,
         } => {
-            blend.operation(web_sys::GpuBlendOperation::ReverseSubtract);
-            blend.src_factor(blend_factor_to_web_sys(src_factor));
-            blend.dst_factor(blend_factor_to_web_sys(dst_factor));
+            blend.set_operation(web_sys::GpuBlendOperation::ReverseSubtract);
+            blend.set_src_factor(blend_factor_to_web_sys(src_factor));
+            blend.set_dst_factor(blend_factor_to_web_sys(dst_factor));
         }
         BlendComponent::Min => {
-            blend.operation(web_sys::GpuBlendOperation::Min);
-            blend.src_factor(web_sys::GpuBlendFactor::One);
-            blend.dst_factor(web_sys::GpuBlendFactor::One);
+            blend.set_operation(web_sys::GpuBlendOperation::Min);
+            blend.set_src_factor(web_sys::GpuBlendFactor::One);
+            blend.set_dst_factor(web_sys::GpuBlendFactor::One);
         }
         BlendComponent::Max => {
-            blend.operation(web_sys::GpuBlendOperation::Max);
-            blend.src_factor(web_sys::GpuBlendFactor::One);
-            blend.dst_factor(web_sys::GpuBlendFactor::One);
+            blend.set_operation(web_sys::GpuBlendOperation::Max);
+            blend.set_src_factor(web_sys::GpuBlendFactor::One);
+            blend.set_dst_factor(web_sys::GpuBlendFactor::One);
         }
     }
 
@@ -1994,27 +2001,21 @@ pub fn vertex_state_to_web_sys(vertex_state: &VertexState<Driver>) -> web_sys::G
             })
             .collect();
 
-        let mut web_sys_layout = web_sys::GpuVertexBufferLayout::new(
+        let web_sys_layout = web_sys::GpuVertexBufferLayout::new(
             buffer_layout.array_stride as f64,
             attributes.as_ref(),
         );
 
-        web_sys_layout.step_mode(vertex_step_mode_to_web_sys(&buffer_layout.step_mode));
+        web_sys_layout.set_step_mode(vertex_step_mode_to_web_sys(&buffer_layout.step_mode));
 
         layouts.push(web_sys_layout.as_ref());
     }
 
-    let mut web_sys_state = web_sys::GpuVertexState::new(&vertex_state.shader_module.inner);
+    let web_sys_state = web_sys::GpuVertexState::new(&vertex_state.shader_module.inner);
 
-    web_sys_state.entry_point(vertex_state.entry_point);
-    web_sys_state.buffers(layouts.as_ref());
-
-    js_sys::Reflect::set(
-        web_sys_state.as_ref(),
-        &JsValue::from("constants"),
-        pipeline_constants_to_web_sys(vertex_state.constants).as_ref(),
-    )
-    .unwrap_throw();
+    web_sys_state.set_entry_point(vertex_state.entry_point);
+    web_sys_state.set_buffers(layouts.as_ref());
+    web_sys_state.set_constants(&pipeline_constants_to_web_sys(&vertex_state.constants));
 
     web_sys_state
 }
@@ -2022,13 +2023,13 @@ pub fn vertex_state_to_web_sys(vertex_state: &VertexState<Driver>) -> web_sys::G
 pub fn color_target_state_to_web_sys(
     color_target_state: &ColorTargetState,
 ) -> web_sys::GpuColorTargetState {
-    let mut target =
+    let target =
         web_sys::GpuColorTargetState::new(texture_format_to_web_sys(&color_target_state.format));
 
-    target.write_mask(color_target_state.write_mask.bits());
+    target.set_write_mask(color_target_state.write_mask.bits());
 
     if let Some(blend) = &color_target_state.blend {
-        target.blend(&blend_state_to_web_sys(blend));
+        target.set_blend(&blend_state_to_web_sys(blend));
     }
 
     target
@@ -2043,10 +2044,11 @@ pub fn fragment_state_to_web_sys(
         .map(color_target_state_to_web_sys)
         .collect();
 
-    let mut state =
+    let state =
         web_sys::GpuFragmentState::new(&fragment_state.shader_module.inner, targets.as_ref());
 
-    state.entry_point(fragment_state.entry_point);
+    state.set_entry_point(fragment_state.entry_point);
+    state.set_constants(&pipeline_constants_to_web_sys(&fragment_state.constants));
 
     state
 }
@@ -2063,23 +2065,23 @@ pub fn render_pipeline_descriptor_to_web_sys(
         multisample_state,
     } = descriptor;
 
-    let mut desc = web_sys::GpuRenderPipelineDescriptor::new(
+    let desc = web_sys::GpuRenderPipelineDescriptor::new(
         layout.inner.as_ref(),
         &vertex_state_to_web_sys(vertex_state),
     );
 
-    desc.primitive(&primitive_state_to_web_sys(primitive_state));
+    desc.set_primitive(&primitive_state_to_web_sys(primitive_state));
 
     if let Some(depth_stencil_state) = depth_stencil_state {
-        desc.depth_stencil(&depth_stencil_state_to_web_sys(depth_stencil_state));
+        desc.set_depth_stencil(&depth_stencil_state_to_web_sys(depth_stencil_state));
     }
 
     if let Some(fragment_state) = fragment_state {
-        desc.fragment(&fragment_state_to_web_sys(fragment_state));
+        desc.set_fragment(&fragment_state_to_web_sys(fragment_state));
     }
 
     if let Some(multisample_state) = multisample_state {
-        desc.multisample(&multisample_state_to_web_sys(multisample_state));
+        desc.set_multisample(&multisample_state_to_web_sys(multisample_state));
     }
 
     desc
@@ -2109,7 +2111,7 @@ pub fn render_pass_color_attachment_to_web_sys(
         store_op,
     } = attachment;
 
-    let mut attachment = web_sys::GpuRenderPassColorAttachment::new(
+    let attachment = web_sys::GpuRenderPassColorAttachment::new(
         load_op_to_web_sys(load_op),
         store_op_to_web_sys(store_op),
         &view.inner,
@@ -2123,11 +2125,11 @@ pub fn render_pass_color_attachment_to_web_sys(
             clear_value[3],
         );
 
-        attachment.clear_value(clear_value.as_ref());
+        attachment.set_clear_value(clear_value.as_ref());
     }
 
     if let Some(resolve_target) = resolve_target {
-        attachment.resolve_target(&resolve_target.inner);
+        attachment.set_resolve_target(&resolve_target.inner);
     }
 
     attachment
@@ -2142,28 +2144,28 @@ pub fn render_pass_depth_stencil_attachment_to_web_sys(
         stencil_operations,
     } = attachment;
 
-    let mut attachment = web_sys::GpuRenderPassDepthStencilAttachment::new(&view.inner);
+    let attachment = web_sys::GpuRenderPassDepthStencilAttachment::new(&view.inner);
 
     if let Some(DepthStencilOperations { load_op, store_op }) = depth_operations {
-        attachment.depth_load_op(load_op_to_web_sys(load_op));
-        attachment.depth_store_op(store_op_to_web_sys(store_op));
+        attachment.set_depth_load_op(load_op_to_web_sys(load_op));
+        attachment.set_depth_store_op(store_op_to_web_sys(store_op));
 
         if let LoadOp::Clear(clear_value) = load_op {
-            attachment.depth_clear_value(*clear_value);
+            attachment.set_depth_clear_value(*clear_value);
         }
     } else {
-        attachment.depth_read_only(true);
+        attachment.set_depth_read_only(true);
     }
 
     if let Some(DepthStencilOperations { load_op, store_op }) = stencil_operations {
-        attachment.stencil_load_op(load_op_to_web_sys(load_op));
-        attachment.stencil_store_op(store_op_to_web_sys(store_op));
+        attachment.set_stencil_load_op(load_op_to_web_sys(load_op));
+        attachment.set_stencil_store_op(store_op_to_web_sys(store_op));
 
         if let LoadOp::Clear(clear_value) = load_op {
-            attachment.stencil_clear_value(*clear_value);
+            attachment.set_stencil_clear_value(*clear_value);
         }
     } else {
-        attachment.stencil_read_only(true);
+        attachment.set_stencil_read_only(true);
     }
 
     attachment
@@ -2302,7 +2304,7 @@ pub fn limits_from_web_sys(limits: &web_sys::GpuSupportedLimits) -> Limits {
         max_buffer_size: limits.max_buffer_size() as u64,
         max_vertex_attributes: limits.max_vertex_attributes(),
         max_vertex_buffer_array_stride: limits.max_vertex_buffer_array_stride(),
-        max_inter_stage_shader_components: limits.max_inter_stage_shader_components(),
+        max_inter_stage_shader_components: limits.max_inter_stage_shader_variables(),
         max_color_attachments: limits.max_color_attachments(),
         max_color_attachment_bytes_per_sample: limits.max_color_attachment_bytes_per_sample(),
         max_compute_workgroup_storage_size: limits.max_compute_workgroup_storage_size(),

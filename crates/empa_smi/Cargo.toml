@@ -10,6 +10,7 @@ license = { workspace = true }
 
 [features]
 wgsl = ["dep:indexmap", "dep:naga"]
+stderr = ["naga?/stderr"]
 
 [dependencies]
 indexmap = { workspace = true, optional = true }
