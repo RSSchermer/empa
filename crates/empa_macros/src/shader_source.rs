@@ -18,7 +18,8 @@ use empa_smi::{
     TexelType, UnsizedBufferLayout, UnsizedTailLayout,
 };
 use include_preprocessor::{
-    Error as IppError, OutputSink, SearchPaths, SourceMappedChunk, SourceTracker, preprocess,
+    Error as IppError, OutputSink, SearchPaths, SourceMappedChunk, SourceTracker,
+    preprocess_with_source_tracker,
 };
 use proc_macro::{Span, TokenStream, tracked_path};
 use quote::{quote, quote_spanned};
@@ -186,7 +187,8 @@ pub fn expand_shader_source(input: TokenStream) -> TokenStream {
     let output = if source_join.is_file() {
         let writer = OutputWriter::new();
 
-        match preprocess(&source_join, search_paths, writer, &mut source_files) {
+        match preprocess_with_source_tracker(&source_join, search_paths, writer, &mut source_files)
+        {
             Ok(output) => output,
             Err(error) => {
                 let (file, diagnostic) = match error {

@@ -60,7 +60,7 @@ flagset = "^0.4"
 futures = "0.3"
 glam = "^0.30"
 hashbrown = "0.16"
-include-preprocessor = { version = "0.1.0", path = "../include_preprocessor/include_preprocessor" }
+include-preprocessor = "0.1"
 indexmap = "2"
 js-sys = "0.3.82"
 lazy_static = "1"
