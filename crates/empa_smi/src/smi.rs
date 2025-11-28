@@ -226,6 +226,24 @@ pub struct ResourceBinding {
     pub resource_type: ResourceType,
 }
 
+impl PartialOrd for ResourceBinding {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match self.group.partial_cmp(&other.group) {
+            Some(Ordering::Equal) => self.binding.partial_cmp(&other.binding),
+            ordering => ordering,
+        }
+    }
+}
+
+impl Ord for ResourceBinding {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.group.cmp(&other.group) {
+            Ordering::Equal => self.binding.cmp(&other.binding),
+            ordering => ordering,
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub struct EntryPoint {
     pub name: Cow<'static, str>,
