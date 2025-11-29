@@ -11,8 +11,11 @@ license = { workspace = true }
 [features]
 wgsl = ["dep:indexmap", "dep:naga"]
 stderr = ["naga?/stderr"]
+to-tokenstream = ["dep:proc-macro2", "dep:quote"]
 
 [dependencies]
 indexmap = { workspace = true, optional = true }
 naga = { workspace = true, optional = true, features = ["wgsl-in"] }
+proc-macro2 = { workspace = true, optional = true }
+quote = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
