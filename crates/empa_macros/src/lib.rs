@@ -1,4 +1,4 @@
-#![feature(proc_macro_span, track_path)]
+#![feature(proc_macro_span, proc_macro_tracked_path)]
 
 mod abi_sized;
 mod buffer_usage;

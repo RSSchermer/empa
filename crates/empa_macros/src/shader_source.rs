@@ -16,7 +16,7 @@ use include_preprocessor::{
     Error as IppError, OutputSink, SearchPaths, SourceMappedChunk, SourceTracker,
     preprocess_with_source_tracker,
 };
-use proc_macro::{Span, TokenStream, tracked_path};
+use proc_macro::{Span, TokenStream, tracked};
 use quote::{quote, quote_spanned};
 use syn::{LitStr, parse_macro_input};
 
@@ -49,7 +49,7 @@ impl SourceTracker for SourceFiles {
             .to_string();
         let source = source.to_string();
 
-        tracked_path::path(&path);
+        tracked::path(&path);
         self.map.insert(id, SimpleFile::new(path, source));
     }
 }
