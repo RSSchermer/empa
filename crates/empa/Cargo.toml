@@ -15,6 +15,7 @@ web = ["dep:js-sys", "dep:web-sys", "dep:wasm-bindgen", "dep:wasm-bindgen-future
 arwa = ["web", "dep:arwa"]
 dx12 = ["wgc/dx12"]
 metal = ["wgc/metal"]
+risl = ["dep:risl"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.features]
 default = ["dx12", "metal"]
@@ -35,6 +36,7 @@ hashbrown = { workspace = true }
 lazy_static = { workspace = true }
 pin-project = { workspace = true }
 js-sys = { workspace = true, optional = true }
+risl = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { workspace = true, optional = true }
 

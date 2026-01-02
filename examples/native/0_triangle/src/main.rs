@@ -11,7 +11,7 @@ use empa::render_pipeline::{
     RenderPipelineDescriptorBuilder, VertexStageBuilder,
 };
 use empa::render_target::{FloatAttachment, LoadOp, RenderLayout, RenderTarget, StoreOp};
-use empa::shader_module::{ShaderSource, shader_source};
+use empa::shader_module::{ShaderSource, shader_wgsl};
 use empa::texture::format::bgra8unorm;
 use empa::texture::{AttachableImageDescriptor, TextureUsages};
 use empa::{buffer, texture};
@@ -28,7 +28,7 @@ struct Vertex {
     color: [u8; 4],
 }
 
-const SHADER: ShaderSource = shader_source!("shader.wgsl");
+const SHADER: ShaderSource = shader_wgsl!("shader.wgsl");
 
 struct AppState {
     device: Device,

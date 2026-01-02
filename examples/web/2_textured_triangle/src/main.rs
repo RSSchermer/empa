@@ -21,7 +21,7 @@ use empa::render_pipeline::{
 use empa::render_target::{FloatAttachment, LoadOp, RenderTarget, StoreOp};
 use empa::resource_binding::Resources;
 use empa::sampler::{FilterMode, Sampler, SamplerDescriptor};
-use empa::shader_module::{ShaderSource, shader_source};
+use empa::shader_module::{ShaderSource, shader_wgsl};
 use empa::texture::format::{rgba8unorm, rgba8unorm_srgb};
 use empa::texture::{
     AttachableImageDescriptor, ImageCopySize2D, MipmapLevels, Sampled2DFloat, Texture2DDescriptor,
@@ -45,7 +45,7 @@ struct MyResources<'a> {
     sampler: &'a Sampler,
 }
 
-const SHADER: ShaderSource = shader_source!("shader.wgsl");
+const SHADER: ShaderSource = shader_wgsl!("shader.wgsl");
 
 fn main() {
     arwa::spawn_local(render().map(|res| res.unwrap()));

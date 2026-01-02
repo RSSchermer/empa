@@ -8,7 +8,7 @@ use empa::command::{DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{ComputePipelineDescriptorBuilder, ComputeStageBuilder};
 use empa::device::DeviceDescriptor;
 use empa::native::Instance;
-use empa::shader_module::{ShaderSource, shader_source};
+use empa::shader_module::{ShaderSource, shader_wgsl};
 use futures::FutureExt;
 
 #[derive(empa::resource_binding::Resources)]
@@ -19,7 +19,7 @@ struct Resources<'a> {
 
 type ResourceLayout = <Resources<'static> as empa::resource_binding::Resources>::Layout;
 
-const SHADER: ShaderSource = shader_source!("shader.wgsl");
+const SHADER: ShaderSource = shader_wgsl!("shader.wgsl");
 const WORKGROUP_SIZE: u32 = 64;
 
 fn main() {

@@ -23,7 +23,7 @@ use empa::render_target::{
     DepthAttachment, DepthValue, FloatAttachment, LoadOp, RenderTarget, StoreOp,
 };
 use empa::resource_binding::Resources;
-use empa::shader_module::{ShaderSource, shader_source};
+use empa::shader_module::{ShaderSource, shader_wgsl};
 use empa::texture::format::{depth24plus, rgba8unorm};
 use empa::texture::{AttachableImageDescriptor, MipmapLevels, Texture2DDescriptor};
 use empa::{CompareFunction, abi, buffer, texture};
@@ -51,7 +51,7 @@ struct MyResources<'a> {
     uniform_buffer: Uniform<'a, Uniforms>,
 }
 
-const SHADER: ShaderSource = shader_source!("shader.wgsl");
+const SHADER: ShaderSource = shader_wgsl!("shader.wgsl");
 
 fn main() {
     arwa::spawn_local(render().map(|res| res.unwrap()));

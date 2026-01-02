@@ -4,7 +4,7 @@ use std::fmt;
 use std::ops::Deref;
 use std::sync::Arc;
 
-pub use empa_macros::shader_source;
+pub use empa_macros::shader_wgsl;
 use empa_smi::wgsl::BuildSmiError;
 use empa_smi::{EntryPoint, ResourceBinding, ShaderModuleInterface};
 

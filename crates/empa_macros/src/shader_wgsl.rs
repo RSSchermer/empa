@@ -164,7 +164,7 @@ impl OutputSink for OutputWriter {
     }
 }
 
-pub fn expand_shader_source(input: TokenStream) -> TokenStream {
+pub fn expand_shader_wgsl(input: TokenStream) -> TokenStream {
     let path = parse_macro_input!(input as LitStr);
 
     let span = Span::call_site();

@@ -19,7 +19,7 @@ use empa::render_pipeline::{
 use empa::render_target::{
     DepthAttachment, DepthValue, FloatAttachment, LoadOp, RenderLayout, RenderTarget, StoreOp,
 };
-use empa::shader_module::{ShaderSource, shader_source};
+use empa::shader_module::{ShaderSource, shader_wgsl};
 use empa::texture::format::{bgra8unorm, depth24plus};
 use empa::texture::{
     AttachableImageDescriptor, MipmapLevels, Texture2D, Texture2DDescriptor, TextureUsages,
@@ -54,7 +54,7 @@ struct Resources<'a> {
 
 type ResourceLayout = <Resources<'static> as empa::resource_binding::Resources>::Layout;
 
-const SHADER: ShaderSource = shader_source!("shader.wgsl");
+const SHADER: ShaderSource = shader_wgsl!("shader.wgsl");
 
 struct AppState {
     device: Device,

@@ -18,7 +18,7 @@ use empa::render_pipeline::{
 };
 use empa::render_target::{FloatAttachment, LoadOp, RenderTarget, StoreOp};
 use empa::resource_binding::Resources;
-use empa::shader_module::{ShaderSource, shader_source};
+use empa::shader_module::{ShaderSource, shader_wgsl};
 use empa::texture::AttachableImageDescriptor;
 use empa::texture::format::rgba8unorm;
 use empa::{buffer, texture};
@@ -38,7 +38,7 @@ struct MyResources<'a> {
     uniform_buffer: Uniform<'a, f32>,
 }
 
-const SHADER: ShaderSource = shader_source!("shader.wgsl");
+const SHADER: ShaderSource = shader_wgsl!("shader.wgsl");
 
 fn main() {
     arwa::spawn_local(render().map(|res| res.unwrap()));

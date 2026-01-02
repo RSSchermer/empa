@@ -4,7 +4,7 @@ mod abi_sized;
 mod buffer_usage;
 mod pipeline_constants;
 mod resources;
-mod shader_source;
+mod shader_wgsl;
 mod texture_usage;
 mod vertex;
 
@@ -24,8 +24,8 @@ pub fn TextureUsages(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn shader_source(input: TokenStream) -> TokenStream {
-    shader_source::expand_shader_source(input)
+pub fn shader_wgsl(input: TokenStream) -> TokenStream {
+    shader_wgsl::expand_shader_wgsl(input)
 }
 
 #[proc_macro_derive(PipelineConstants, attributes(constant_id))]

@@ -15,10 +15,10 @@ use empa::compute_pipeline::{
 };
 use empa::device::{Device, DeviceDescriptor};
 use empa::resource_binding::BindGroupLayout;
-use empa::shader_module::{ShaderSource, shader_source};
+use empa::shader_module::{ShaderSource, shader_wgsl};
 use futures::FutureExt;
 
-const SCAN_SHADER: ShaderSource = shader_source!("scan.wgsl");
+const SCAN_SHADER: ShaderSource = shader_wgsl!("scan.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
 struct ScanResources<'a> {
@@ -30,7 +30,7 @@ struct ScanResources<'a> {
 
 type ScanLayout = <ScanResources<'static> as empa::resource_binding::Resources>::Layout;
 
-const UNIFORM_ADD_SHADER: ShaderSource = shader_source!("uniform_add.wgsl");
+const UNIFORM_ADD_SHADER: ShaderSource = shader_wgsl!("uniform_add.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
 struct UniformAddResources<'a> {

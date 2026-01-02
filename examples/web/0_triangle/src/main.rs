@@ -14,7 +14,7 @@ use empa::render_pipeline::{
     VertexStageBuilder,
 };
 use empa::render_target::{FloatAttachment, LoadOp, RenderTarget, StoreOp};
-use empa::shader_module::{ShaderSource, shader_source};
+use empa::shader_module::{ShaderSource, shader_wgsl};
 use empa::texture::AttachableImageDescriptor;
 use empa::texture::format::rgba8unorm;
 use empa::{buffer, texture};
@@ -28,7 +28,7 @@ struct MyVertex {
     color: [u8; 4],
 }
 
-const SHADER: ShaderSource = shader_source!("shader.wgsl");
+const SHADER: ShaderSource = shader_wgsl!("shader.wgsl");
 
 fn main() {
     arwa::spawn_local(render().map(|res| res.unwrap()));

@@ -11,7 +11,7 @@ use empa::command::{DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{ComputePipelineDescriptorBuilder, ComputeStageBuilder};
 use empa::device::DeviceDescriptor;
 use empa::resource_binding::Resources;
-use empa::shader_module::{ShaderSource, shader_source};
+use empa::shader_module::{ShaderSource, shader_wgsl};
 use futures::FutureExt;
 
 #[derive(empa::resource_binding::Resources)]
@@ -20,7 +20,7 @@ struct MyResources<'a> {
     data: Storage<'a, [u32], ReadWrite>,
 }
 
-const SHADER: ShaderSource = shader_source!("shader.wgsl");
+const SHADER: ShaderSource = shader_wgsl!("shader.wgsl");
 
 fn main() {
     arwa::spawn_local(render().map(|res| res.unwrap()));

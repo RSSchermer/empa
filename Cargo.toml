@@ -72,6 +72,7 @@ png = "0.18"
 pollster = "0.4"
 proc-macro2 = "1.0.69"
 raw-window-handle = "0.6"
+risl = { version = "0.1.0", path = "../resl2/crates/library/risl" }
 serde = "1"
 syn = "2"
 wasm-bindgen = "0.2.105"
