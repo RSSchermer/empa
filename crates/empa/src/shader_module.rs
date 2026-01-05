@@ -4,6 +4,8 @@ use std::fmt;
 use std::ops::Deref;
 use std::sync::Arc;
 
+#[cfg(feature = "risl")]
+pub use empa_macros::shader_risl;
 pub use empa_macros::shader_wgsl;
 use empa_smi::wgsl::BuildSmiError;
 use empa_smi::{EntryPoint, ResourceBinding, ShaderModuleInterface};
