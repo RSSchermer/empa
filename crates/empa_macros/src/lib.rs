@@ -4,6 +4,8 @@ mod abi_sized;
 mod buffer_usage;
 mod pipeline_constants;
 mod resources;
+#[cfg(feature = "risl")]
+mod shader_risl;
 mod shader_wgsl;
 mod texture_usage;
 mod vertex;
@@ -21,6 +23,12 @@ pub fn BufferUsages(input: TokenStream) -> TokenStream {
 #[allow(nonstandard_style)]
 pub fn TextureUsages(input: TokenStream) -> TokenStream {
     texture_usage::expand_texture_usages(input)
+}
+
+#[cfg(feature = "risl")]
+#[proc_macro]
+pub fn shader_risl(input: TokenStream) -> TokenStream {
+    shader_risl::expand_shader_risl(input)
 }
 
 #[proc_macro]
