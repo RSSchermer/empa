@@ -1,0 +1,14 @@
+[package]
+name = "cube-3d-example-wgsl-web"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+publish = false
+
+[dependencies]
+arwa = { workspace = true }
+empa = { workspace = true, features = ["arwa"] }
+empa-glam = { workspace = true }
+glam = { workspace = true }
+futures = { workspace = true }

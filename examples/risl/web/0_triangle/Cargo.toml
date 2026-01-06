@@ -1,0 +1,13 @@
+[package]
+name = "triangle-example-risl-web"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+publish = false
+
+[dependencies]
+arwa = { workspace = true }
+empa = { workspace = true, features = ["risl", "arwa"] }
+futures = { workspace = true }
+risl = { workspace = true }

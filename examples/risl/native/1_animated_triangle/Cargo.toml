@@ -1,0 +1,13 @@
+[package]
+name = "animated-triangle-example-risl-native"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+publish = false
+
+[dependencies]
+empa = { workspace = true, features = ["risl", "dx12", "metal"] }
+pollster = { workspace = true }
+risl = { workspace = true }
+winit = { workspace = true }
