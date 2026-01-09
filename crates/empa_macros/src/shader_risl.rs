@@ -27,12 +27,14 @@ pub fn expand_shader_risl(mod_path: proc_macro::TokenStream) -> proc_macro::Toke
 
             quote! {
                 const {
-                    let wgsl = #wgsl_request;
-                    let smi = #smi_request;
+                    #wgsl_request;
+                    #smi_request;
 
-                    unsafe {
-                        risl::shader_module::ShaderSource::from_static_unchecked(&wgsl, &smi)
-                    }
+                    empa::shader_module::ShaderSource::from_static_unchecked("", &empa::smi::ShaderModuleInterface {
+                        resource_bindings: std::borrow::Cow::Borrowed(&[]),
+                        overridable_constants: std::borrow::Cow::Borrowed(&[]),
+                        entry_points: std::borrow::Cow::Borrowed(&[]),
+                    })
                 }
             }
             .into()
@@ -42,13 +44,8 @@ pub fn expand_shader_risl(mod_path: proc_macro::TokenStream) -> proc_macro::Toke
             let smi = smi_to_token_stream(&smi, &quote!(empa::smi));
 
             quote! {
-                const {
-                    let wgsl = #wgsl;
-                    let smi = #smi;
-
-                    unsafe {
-                        risl::shader_module::ShaderSource::from_static_unchecked(&wgsl, &smi)
-                    }
+                unsafe {
+                    empa::shader_module::ShaderSource::from_static_unchecked(#wgsl, &const { #smi })
                 }
             }
             .into()
