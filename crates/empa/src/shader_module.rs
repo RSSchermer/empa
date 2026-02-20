@@ -92,6 +92,15 @@ impl ShaderSource {
     }
 }
 
+impl fmt::Debug for ShaderSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ShaderSource")
+            .field("source", &self.source)
+            .field("smi", self.smi.deref())
+            .finish()
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(crate) struct EntryPointExt<'a> {
     smi: &'a ShaderModuleInterface,
