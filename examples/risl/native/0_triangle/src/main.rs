@@ -15,11 +15,11 @@ use empa::shader_module::{ShaderSource, shader_risl};
 use empa::texture::format::bgra8unorm;
 use empa::texture::{AttachableImageDescriptor, TextureUsages};
 use empa::{buffer, texture};
+use risl::prelude::*;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowId};
-use risl::prelude::*;
 
 #[shader_module]
 mod shader {
@@ -66,7 +66,7 @@ mod shader {
     #[fragment]
     fn frag_main(fragment: FragmentIn) -> FragmentOut {
         FragmentOut {
-            color: fragment.color
+            color: fragment.color,
         }
     }
 }

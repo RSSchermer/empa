@@ -73,7 +73,7 @@ mod shader {
     #[fragment]
     fn frag_main(fragment: FragmentIn) -> FragmentOut {
         FragmentOut {
-            color: fragment.color
+            color: fragment.color,
         }
     }
 }
